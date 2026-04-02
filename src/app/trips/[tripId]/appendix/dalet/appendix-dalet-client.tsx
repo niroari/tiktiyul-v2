@@ -27,7 +27,6 @@ export function AppendixDaletClient() {
   const [rows, setRows] = useState<ItineraryRow[]>([EMPTY_ROW()]);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "dalet", (raw) => {
@@ -52,6 +51,31 @@ export function AppendixDaletClient() {
     scheduleAutoSave(updated);
   }
 
+  function getHTML() {
+    const tableRows = rows.map((r) => `
+      <tr>
+        <td>${r.day}</td>
+        <td style="text-align:center">${r.time}</td>
+        <td>${r.activity}</td>
+        <td>${r.notes}</td>
+      </tr>`).join("");
+    return `
+      <div class="header">
+        <div class="title">נספח ד׳ — תוכנית הטיול — לוח זמנים</div>
+        <div class="ministry">פירוט ימי ושעות הפעילות</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th style="width:100px">יום הטיול</th>
+          <th style="width:70px">שעה</th>
+          <th>הפעולה והמקום</th>
+          <th style="width:130px">הערות</th>
+        </tr></thead>
+        <tbody>${tableRows}</tbody>
+      </table>
+    `;
+  }
+
   function addRow() {
     const updated = [...rows, EMPTY_ROW()];
     setRows(updated);
@@ -66,7 +90,7 @@ export function AppendixDaletClient() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6" ref={contentRef}>
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ד׳ — תוכנית הטיול — לוח זמנים</h1>
@@ -150,7 +174,7 @@ export function AppendixDaletClient() {
           הוסף שורה
         </Button>
       </div>
-      <AppendixActions contentRef={contentRef} title="נספח ד׳ — תוכנית הטיול — לוח זמנים" filename="נספח-ד" />
+      <AppendixActions title="נספח ד׳ — תוכנית הטיול — לוח זמנים" filename="נספח-ד" getHTML={getHTML} />
     </div>
   );
 }

@@ -28,7 +28,6 @@ export function AppendixGimelClient() {
   const [form, setForm] = useState<FormData>(INITIAL);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "gimel", (raw) => {
@@ -54,13 +53,39 @@ export function AppendixGimelClient() {
     }, 1200);
   }
 
+  function getHTML() {
+    const cls = trip?.classes?.map((c) => c.name).join(", ") ?? "";
+    const dr = trip?.startDate && trip?.endDate
+      ? `${formatDateHe(trip.startDate)} עד ${formatDateHe(trip.endDate)}` : "";
+    return `
+      <div class="header">
+        <div class="title">נספח ג׳ — כתב מינוי לאחראי/ת טיול</div>
+        <div class="ministry">בחתימת מנהל/ת ביה"ס</div>
+      </div>
+      <div class="meta"><span>תאריך: <strong>${form.date ? formatDateHe(form.date) : ""}</strong></span></div>
+      <div class="letter-body">
+        <p>אל: <strong>${form.leaderName}</strong></p>
+        <br/>
+        <p>הריני ממנה אותך לאחראי/ת טיול לתלמידי כית/ות <strong>${cls}</strong>
+        שיתקיים בתאריכים <strong>${dr}</strong>
+        במקום/באזור <strong>${form.area}</strong>.</p>
+        <br/>
+        <p>בכבוד רב,</p>
+        <p><strong>${form.principalName}</strong></p>
+        <p>מנהל/ת ביה"ס — ${trip?.schoolName ?? ""}</p>
+        <br/>
+        <p>חתימה: _______________________</p>
+      </div>
+    `;
+  }
+
   const classes = trip?.classes?.map((c) => c.name).join(", ") ?? "—";
   const dateRange = trip?.startDate && trip?.endDate
     ? `${formatDateHe(trip.startDate)} עד ${formatDateHe(trip.endDate)}`
     : "—";
 
   return (
-    <div className="max-w-2xl space-y-6" ref={contentRef}>
+    <div className="max-w-2xl space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ג׳ — כתב מינוי לאחראי/ת טיול</h1>
@@ -127,7 +152,7 @@ export function AppendixGimelClient() {
         </div>
       </div>
 
-      <AppendixActions contentRef={contentRef} title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" filename="נספח-ג" />
+      <AppendixActions title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" filename="נספח-ג" getHTML={getHTML} />
 
       {/* Signature placeholder */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">

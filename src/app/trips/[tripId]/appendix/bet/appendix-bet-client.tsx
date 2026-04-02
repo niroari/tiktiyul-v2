@@ -58,7 +58,6 @@ export function AppendixBetClient() {
   const [form, setForm] = useState<FormData>(INITIAL);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   // Load from Firestore
   useEffect(() => {
@@ -114,13 +113,62 @@ export function AppendixBetClient() {
     scheduleAutoSave(updated);
   }
 
+  function getHTML() {
+    const classes = trip?.classes?.map((c) => c.name).join(", ") ?? "";
+    const schedRows = form.schedule.map((r) => `
+      <tr>
+        <td>${r.date}</td>
+        <td style="text-align:center">${r.fromTime}</td>
+        <td style="text-align:center">${r.toTime}</td>
+        <td>${r.activity}</td>
+        <td>${r.notes}</td>
+      </tr>`).join("");
+    return `
+      <div class="header">
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער</div>
+        <div class="title">נספח ב׳ — אישור תוכנית הטיול</div>
+      </div>
+      <div class="meta">
+        <span>כיתות: <strong>${classes}</strong></span>
+        <span>מקום לינה: <strong>${trip?.accommodation ?? ""}</strong></span>
+        <span>הסעה: <strong>${trip?.transport ?? ""}</strong></span>
+      </div>
+      <div class="meta">
+        <span>אחראי/ת טיול: <strong>${form.leaderName}</strong></span>
+        <span>טלפון: <strong>${form.leaderPhone}</strong></span>
+        <span>הורים מלווים: <strong>${form.parents}</strong></span>
+        <span>נושאי נשק: <strong>${form.weapons}</strong></span>
+      </div>
+      <div class="section-title">מסלול הטיול — לוח זמנים</div>
+      <table>
+        <thead><tr>
+          <th style="width:90px">תאריך</th>
+          <th style="width:60px">משעה</th>
+          <th style="width:60px">עד שעה</th>
+          <th>פירוט הפעילות והמקום</th>
+          <th style="width:110px">הערות</th>
+        </tr></thead>
+        <tbody>${schedRows}</tbody>
+      </table>
+      ${form.leaderNotes ? `<div class="section-title">הערות אחראי/ת טיול</div><p style="font-size:10px;line-height:1.6">${form.leaderNotes}</p>` : ""}
+      ${form.principalNotes ? `<div class="section-title">הערות מנהל/ת</div><p style="font-size:10px;line-height:1.6">${form.principalNotes}</p>` : ""}
+      <div class="section-title">חתימות</div>
+      <table style="margin-top:8px">
+        <tr>
+          <th>מורה אחראי/ת</th><th>רכז/ת טיולים</th><th>מנהל/ת ביה"ס</th>
+        </tr>
+        <tr><td style="height:40px"></td><td></td><td></td></tr>
+      </table>
+    `;
+  }
+
   // Auto-fill from trip metadata
   const classes = trip?.classes?.map((c) => c.name).join(", ") ?? "—";
   const accommodation = trip?.accommodation ?? "—";
   const transport = trip?.transport ?? "—";
 
   return (
-    <div className="max-w-4xl space-y-6" ref={contentRef}>
+    <div className="max-w-4xl space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -297,7 +345,7 @@ export function AppendixBetClient() {
         </div>
       </div>
 
-      <AppendixActions contentRef={contentRef} title="נספח ב׳ — אישור תוכנית הטיול" filename="נספח-ב" />
+      <AppendixActions title="נספח ב׳ — אישור תוכנית הטיול" filename="נספח-ב" getHTML={getHTML} />
 
       {/* Signatures placeholder */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">

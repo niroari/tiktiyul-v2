@@ -1,93 +1,120 @@
 "use client";
 
-import { useRef, useState, type RefObject } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 
+// Shared print wrapper — RTL, Times New Roman, clean A4 styling
+export function printHTML(innerHTML: string, title: string) {
+  const win = window.open("", "_blank");
+  if (!win) return;
+  win.document.write(`<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8"/>
+  <title>${title}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;700&display=swap');
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Frank Ruhl Libre', 'Times New Roman', serif; direction: rtl; text-align: right;
+           padding: 20px; font-size: 11px; color: #111; background: #fff; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+    th, td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 10px; }
+    th { background: #1b4332; color: white; font-weight: 600; }
+    .cat-row td { background: #d4edda; font-weight: bold; font-size: 10.5px; }
+    .header { text-align: center; border-bottom: 2px solid #1b4332; padding-bottom: 8px; margin-bottom: 12px; }
+    .header .ministry { font-size: 8px; color: #555; }
+    .header .title { font-size: 15px; font-weight: bold; margin-top: 4px; }
+    .footer { font-size: 8px; color: #888; margin-top: 8px; border-top: 1px solid #ccc; padding-top: 6px; }
+    .meta { display: flex; gap: 24px; font-size: 9.5px; margin-bottom: 8px; }
+    .section-title { font-weight: bold; font-size: 12px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+    .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 16px 20px; line-height: 2.2; font-size: 12px; margin: 10px 0; }
+    @media print { body { padding: 10px; } @page { margin: 10mm; } }
+  </style>
+</head>
+<body>${innerHTML}</body>
+</html>`);
+  win.document.close();
+  win.focus();
+  setTimeout(() => { win.print(); }, 600);
+}
+
+// Hidden div approach for PDF — renders clean HTML offscreen, captures with html2canvas
+async function exportToPDF(getHTML: () => string, filename: string) {
+  const html2canvas = (await import("html2canvas")).default;
+  const { jsPDF } = await import("jspdf");
+
+  // Build hidden container
+  const container = document.createElement("div");
+  container.style.cssText = "position:fixed;left:-9999px;top:0;width:794px;background:white;font-family:'Times New Roman',serif;direction:rtl;padding:28px;font-size:10px;color:#111;";
+  container.innerHTML = getHTML();
+  document.body.appendChild(container);
+
+  try {
+    const canvas = await html2canvas(container, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+      logging: false,
+    });
+
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const margin = 8;
+    const pageW = 210;
+    const pageH = 297;
+    const contentW = pageW - margin * 2;
+    const contentH = pageH - margin * 2;
+    const imgW = contentW;
+    const imgH = canvas.height * imgW / canvas.width;
+
+    let yOff = 0;
+    let page = 0;
+
+    while (yOff < imgH) {
+      if (page > 0) pdf.addPage();
+      const sliceH = Math.min(contentH, imgH - yOff);
+      const srcY = yOff * canvas.width / imgW;
+      const srcH = sliceH * canvas.width / imgW;
+
+      const slice = document.createElement("canvas");
+      slice.width = canvas.width;
+      slice.height = Math.ceil(srcH);
+      slice.getContext("2d")!.drawImage(
+        canvas, 0, Math.floor(srcY), canvas.width, Math.ceil(srcH),
+        0, 0, canvas.width, Math.ceil(srcH)
+      );
+
+      pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", margin, margin, imgW, sliceH);
+      yOff += contentH;
+      page++;
+    }
+
+    pdf.save(`${filename}.pdf`);
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
 type Props = {
-  contentRef: RefObject<HTMLDivElement | null>;
-  title: string;
   filename: string;
+  title: string;
+  getHTML: () => string; // returns clean print-ready inner HTML
 };
 
-export function AppendixActions({ contentRef, title, filename }: Props) {
+export function AppendixActions({ filename, title, getHTML }: Props) {
   const [exporting, setExporting] = useState(false);
 
   async function handleExportPDF() {
-    if (!contentRef.current) return;
     setExporting(true);
     try {
-      const html2canvas = (await import("html2canvas")).default;
-      const jsPDF = (await import("jspdf")).jsPDF;
-
-      const canvas = await html2canvas(contentRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-      });
-
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
-
-      const pageW = pdf.internal.pageSize.getWidth();
-      const pageH = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const contentW = pageW - margin * 2;
-      const imgH = (canvas.height * contentW) / canvas.width;
-
-      // Multi-page support
-      let yPos = margin;
-      let heightLeft = imgH;
-
-      pdf.addImage(imgData, "PNG", margin, yPos, contentW, imgH);
-      heightLeft -= pageH - margin * 2;
-
-      while (heightLeft > 0) {
-        yPos = heightLeft - imgH + margin;
-        pdf.addPage();
-        pdf.addImage(imgData, "PNG", margin, yPos, contentW, imgH);
-        heightLeft -= pageH - margin * 2;
-      }
-
-      pdf.save(`${filename}.pdf`);
+      await exportToPDF(getHTML, filename);
     } catch (e) {
       console.error("PDF export failed", e);
+      alert("שגיאה בייצוא PDF");
     } finally {
       setExporting(false);
     }
-  }
-
-  function handlePrint() {
-    if (!contentRef.current) return;
-
-    const content = contentRef.current.innerHTML;
-    const win = window.open("", "_blank");
-    if (!win) return;
-
-    win.document.write(`
-      <!DOCTYPE html>
-      <html lang="he" dir="rtl">
-      <head>
-        <meta charset="UTF-8" />
-        <title>${title}</title>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700&display=swap');
-          * { box-sizing: border-box; }
-          body { font-family: 'Rubik', sans-serif; direction: rtl; text-align: right; margin: 20px; font-size: 13px; color: #111; }
-          table { width: 100%; border-collapse: collapse; }
-          th, td { border: 1px solid #ccc; padding: 6px 10px; text-align: right; }
-          th { background: #f5f5f5; font-weight: 600; }
-          input, textarea { border: none; background: transparent; font-family: inherit; font-size: inherit; width: 100%; }
-          .rounded-\\[var\\(--radius\\)\\], .rounded-\\[var\\(--radius-sm\\)\\] { border-radius: 6px; }
-          @media print { body { margin: 0; } }
-        </style>
-      </head>
-      <body>${content}</body>
-      </html>
-    `);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); }, 500);
   }
 
   return (
@@ -98,7 +125,7 @@ export function AppendixActions({ contentRef, title, filename }: Props) {
         </svg>
         {exporting ? "מייצא..." : "ייצא PDF"}
       </Button>
-      <Button variant="outline" size="sm" onClick={handlePrint}>
+      <Button variant="outline" size="sm" onClick={() => printHTML(getHTML(), title)}>
         <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
         </svg>

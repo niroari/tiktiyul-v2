@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { AppendixActions } from "@/components/appendix-actions";
+import { useTrip } from "@/hooks/use-trip";
 
 // ─── Checklist data ───────────────────────────────────────────────────────────
 
@@ -79,8 +80,8 @@ export function AppendixAlefClient() {
   const { tripId } = useParams<{ tripId: string }>();
   const [data, setData] = useState<ChecklistData>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const { trip } = useTrip(tripId);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const contentRef = useRef<HTMLDivElement>(null);
 
   // Load from Firestore
   useEffect(() => {
@@ -118,8 +119,53 @@ export function AppendixAlefClient() {
   const { checked, total } = countChecked(data);
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
 
+  function getHTML() {
+    const classes = trip?.classes?.map((c) => c.name).join(", ") ?? "";
+    let rows = "";
+    CHECKLIST.forEach((cat) => {
+      rows += `<tr class="cat-row">
+        <td style="text-align:center">${cat.n}</td>
+        <td colspan="4">${cat.s}${cat.sub ? ` — ${cat.sub}` : ""}</td>
+        <td></td>
+      </tr>`;
+      cat.items.forEach((item, i) => {
+        const s = data[itemKey(cat.n, i)] ?? { w: false, m: false, note: "" };
+        rows += `<tr>
+          <td style="text-align:center;font-size:9px"></td>
+          <td style="font-size:9.5px;line-height:1.4">${item.d}</td>
+          <td style="text-align:center;font-size:14px">${s.w ? "✓" : ""}</td>
+          <td style="text-align:center;font-size:14px">${s.m ? "✓" : ""}</td>
+          <td style="font-size:9px;color:#555">${item.r ?? ""}</td>
+          <td style="font-size:9px">${s.note}</td>
+        </tr>`;
+      });
+    });
+    return `
+      <div class="header">
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
+        <div class="title">נספח א׳ — טופס ביקורת יציאה לטיול</div>
+      </div>
+      <table>
+        <thead><tr>
+          <th style="width:28px">מס"ד</th>
+          <th>פירוט הנושא</th>
+          <th style="width:50px;text-align:center">שבוע<br>לפני</th>
+          <th style="width:50px;text-align:center">בוקר<br>הטיול</th>
+          <th style="width:55px">הפניה</th>
+          <th>הערות</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="meta">
+        <span>טיול / סיור כיתות: <strong>${classes}</strong></span>
+        <span>חתימה: _______________________</span>
+      </div>
+      <div class="footer">עותק של טופס זה יועבר חתום בבוקר הטיול ע"י אחראי/ת הטיול למנהל/ת ביה"ס</div>
+    `;
+  }
+
   return (
-    <div ref={contentRef}>
+    <div>
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
@@ -216,7 +262,7 @@ export function AppendixAlefClient() {
       <p className="text-xs text-muted-foreground mt-3">
         עותק של טופס זה יועבר חתום בבוקר הטיול ע"י אחראי/ת הטיול למנהל/ת ביה"ס
       </p>
-      <AppendixActions contentRef={contentRef} title="נספח א׳ — טופס ביקורת לפני יציאה" filename="נספח-א" />
+      <AppendixActions title="נספח א׳ — טופס ביקורת לפני יציאה" filename="נספח-א" getHTML={getHTML} />
     </div>
   );
 }
