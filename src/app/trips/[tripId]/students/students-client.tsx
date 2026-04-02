@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useStudents } from "@/hooks/use-students";
 import { addStudent, updateStudent, deleteStudent } from "@/lib/firestore/students";
+import { ExcelImport } from "@/components/excel-import";
 import { Student, Gender } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -131,12 +132,21 @@ export function StudentsClient() {
             {students.length} תלמידים · {going} יוצאים · {notGoing} לא יוצאים
           </p>
         </div>
-        <Button onClick={openAdd}>
-          <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          הוסף תלמיד
-        </Button>
+        <div className="flex gap-2">
+          <ExcelImport
+            onImport={async (students) => {
+              for (const s of students) {
+                await addStudent(tripId, s);
+              }
+            }}
+          />
+          <Button onClick={openAdd}>
+            <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            הוסף תלמיד
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
