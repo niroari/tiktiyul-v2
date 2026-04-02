@@ -6,6 +6,7 @@ import { useTrip } from "@/hooks/use-trip";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { AppendixActions } from "@/components/appendix-actions";
 
 type FormData = {
   date: string;
@@ -27,6 +28,7 @@ export function AppendixGimelClient() {
   const [form, setForm] = useState<FormData>(INITIAL);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "gimel", (raw) => {
@@ -58,7 +60,7 @@ export function AppendixGimelClient() {
     : "—";
 
   return (
-    <div className="max-w-2xl space-y-6">
+    <div className="max-w-2xl space-y-6" ref={contentRef}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ג׳ — כתב מינוי לאחראי/ת טיול</h1>
@@ -124,6 +126,8 @@ export function AppendixGimelClient() {
           </div>
         </div>
       </div>
+
+      <AppendixActions contentRef={contentRef} title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" filename="נספח-ג" />
 
       {/* Signature placeholder */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">

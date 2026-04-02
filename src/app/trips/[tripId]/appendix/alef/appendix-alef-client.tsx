@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { AppendixActions } from "@/components/appendix-actions";
 
 // ─── Checklist data ───────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ export function AppendixAlefClient() {
   const [data, setData] = useState<ChecklistData>({});
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Load from Firestore
   useEffect(() => {
@@ -117,7 +119,7 @@ export function AppendixAlefClient() {
   const pct = total > 0 ? Math.round((checked / total) * 100) : 0;
 
   return (
-    <div>
+    <div ref={contentRef}>
       {/* Header */}
       <div className="flex items-start justify-between mb-6 gap-4 flex-wrap">
         <div>
@@ -214,6 +216,7 @@ export function AppendixAlefClient() {
       <p className="text-xs text-muted-foreground mt-3">
         עותק של טופס זה יועבר חתום בבוקר הטיול ע"י אחראי/ת הטיול למנהל/ת ביה"ס
       </p>
+      <AppendixActions contentRef={contentRef} title="נספח א׳ — טופס ביקורת לפני יציאה" filename="נספח-א" />
     </div>
   );
 }

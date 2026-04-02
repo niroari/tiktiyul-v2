@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTrip } from "@/hooks/use-trip";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { AppendixActions } from "@/components/appendix-actions";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -57,6 +58,7 @@ export function AppendixBetClient() {
   const [form, setForm] = useState<FormData>(INITIAL);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   // Load from Firestore
   useEffect(() => {
@@ -118,7 +120,7 @@ export function AppendixBetClient() {
   const transport = trip?.transport ?? "—";
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <div className="max-w-4xl space-y-6" ref={contentRef}>
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
@@ -294,6 +296,8 @@ export function AppendixBetClient() {
           />
         </div>
       </div>
+
+      <AppendixActions contentRef={contentRef} title="נספח ב׳ — אישור תוכנית הטיול" filename="נספח-ב" />
 
       {/* Signatures placeholder */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
