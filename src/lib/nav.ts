@@ -16,7 +16,7 @@ export function getTripNav(tripId: string): NavGroup[] {
     {
       title: "כללי",
       items: [
-        { label: "דשבורד", href: `${base}`, icon: "dashboard" },
+        { label: "דשבורד", href: `${base}/dashboard`, icon: "dashboard" },
         { label: "רשימת תלמידים", href: `${base}/students`, icon: "students" },
         { label: "צוות הטיול", href: `${base}/staff`, icon: "staff" },
         { label: "פרטי הטיול", href: `${base}/settings`, icon: "settings" },
