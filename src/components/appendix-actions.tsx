@@ -43,26 +43,42 @@ async function exportToPDF(getHTML: () => string, filename: string) {
   const html2canvas = (await import("html2canvas")).default;
   const { jsPDF } = await import("jspdf");
 
-  // Build hidden container
+  // Render into a visible-but-offscreen container so html2canvas can measure it
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = "position:absolute;top:0;left:0;width:794px;z-index:-9999;opacity:0;pointer-events:none;";
+
   const container = document.createElement("div");
-  container.style.cssText = "position:fixed;left:-9999px;top:0;width:794px;background:white;font-family:'Times New Roman',serif;direction:rtl;padding:28px;font-size:10px;color:#111;";
+  container.style.cssText = [
+    "background:white",
+    "font-family:'Times New Roman',serif",
+    "direction:rtl",
+    "text-align:right",
+    "padding:28px",
+    "font-size:10px",
+    "color:#111",
+    "line-height:1.5",
+  ].join(";");
   container.innerHTML = getHTML();
-  document.body.appendChild(container);
+  wrapper.appendChild(container);
+  document.body.appendChild(wrapper);
+
+  // Wait a tick for layout
+  await new Promise((r) => setTimeout(r, 100));
 
   try {
     const canvas = await html2canvas(container, {
       scale: 2,
       useCORS: true,
+      allowTaint: true,
       backgroundColor: "#ffffff",
       logging: false,
+      windowWidth: 794,
     });
 
     const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const margin = 8;
-    const pageW = 210;
-    const pageH = 297;
-    const contentW = pageW - margin * 2;
-    const contentH = pageH - margin * 2;
+    const contentW = 210 - margin * 2;
+    const contentH = 297 - margin * 2;
     const imgW = contentW;
     const imgH = canvas.height * imgW / canvas.width;
 
@@ -72,25 +88,24 @@ async function exportToPDF(getHTML: () => string, filename: string) {
     while (yOff < imgH) {
       if (page > 0) pdf.addPage();
       const sliceH = Math.min(contentH, imgH - yOff);
-      const srcY = yOff * canvas.width / imgW;
-      const srcH = sliceH * canvas.width / imgW;
+      const srcY = yOff * (canvas.width / imgW);
+      const srcH = sliceH * (canvas.width / imgW);
 
       const slice = document.createElement("canvas");
       slice.width = canvas.width;
       slice.height = Math.ceil(srcH);
-      slice.getContext("2d")!.drawImage(
-        canvas, 0, Math.floor(srcY), canvas.width, Math.ceil(srcH),
-        0, 0, canvas.width, Math.ceil(srcH)
-      );
-
-      pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", margin, margin, imgW, sliceH);
+      const ctx = slice.getContext("2d");
+      if (ctx && srcH > 0) {
+        ctx.drawImage(canvas, 0, Math.floor(srcY), canvas.width, Math.ceil(srcH), 0, 0, canvas.width, Math.ceil(srcH));
+        pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", margin, margin, imgW, sliceH);
+      }
       yOff += contentH;
       page++;
     }
 
     pdf.save(`${filename}.pdf`);
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(wrapper);
   }
 }
 
@@ -110,8 +125,9 @@ export function AppendixActions({ filename, title, getHTML }: Props) {
     try {
       await exportToPDF(getHTML, filename);
     } catch (e) {
-      console.error("PDF export failed", e);
-      alert("שגיאה בייצוא PDF");
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error("PDF export failed:", msg, e);
+      alert(`שגיאה בייצוא PDF:\n${msg}`);
     } finally {
       setExporting(false);
     }
