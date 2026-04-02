@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { TripClass } from "@/lib/types";
+import { saveTripMetadata } from "@/lib/firestore/trips";
 
 type FormData = {
   name: string;
@@ -28,8 +30,11 @@ const INITIAL: FormData = {
 };
 
 export function TripMetadataForm() {
+  const { tripId } = useParams<{ tripId: string }>();
   const [form, setForm] = useState<FormData>(INITIAL);
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   function setField<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -51,11 +56,19 @@ export function TripMetadataForm() {
     setField("classes", form.classes.filter((_, i) => i !== index));
   }
 
-  function handleSave() {
-    // TODO (step 2.5): save to Firestore
-    console.log("Saving trip metadata:", form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+  async function handleSave() {
+    setSaving(true);
+    setError(null);
+    try {
+      await saveTripMetadata(tripId, form);
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (e) {
+      setError("שמירה נכשלה — נסה שוב");
+      console.error(e);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -182,8 +195,8 @@ export function TripMetadataForm() {
 
       {/* Save */}
       <div className="flex items-center justify-between pt-2">
-        <Button onClick={handleSave} className="min-w-24">
-          {saved ? (
+        <Button onClick={handleSave} disabled={saving} className="min-w-24">
+          {saving ? "שומר..." : saved ? (
             <span className="flex items-center gap-1.5">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
@@ -193,6 +206,7 @@ export function TripMetadataForm() {
           ) : "שמור"}
         </Button>
         {saved && <p className="text-sm text-muted-foreground">השינויים נשמרו בהצלחה</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
       </div>
     </div>
   );

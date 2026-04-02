@@ -1,13 +1,5 @@
 import { TripShell } from "@/components/trip-shell";
-
-// Temporary mock — will come from Firestore in step 2.5
-async function getTrip(tripId: string) {
-  return {
-    id: tripId,
-    name: "טיול שנתי — כיתות ט׳",
-    schoolName: "בי״ס בן גוריון, הרצליה",
-  };
-}
+import { getTrip } from "@/lib/firestore/trips";
 
 export default async function TripLayout({
   children,
@@ -20,7 +12,11 @@ export default async function TripLayout({
   const trip = await getTrip(tripId);
 
   return (
-    <TripShell tripId={tripId} tripName={trip.name} schoolName={trip.schoolName}>
+    <TripShell
+      tripId={tripId}
+      tripName={trip?.name ?? "טיול"}
+      schoolName={trip?.schoolName ?? ""}
+    >
       {children}
     </TripShell>
   );
