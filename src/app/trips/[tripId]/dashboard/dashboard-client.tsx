@@ -46,6 +46,8 @@ export function DashboardClient() {
   // Derived stats
   const going = students.filter((s) => s.isGoing);
   const notGoing = students.length - going.length;
+  const boys  = going.filter((s) => s.gender === "male").length;
+  const girls = going.filter((s) => s.gender === "female").length;
   const days = trip?.startDate ? daysUntil(trip.startDate) : null;
 
   // Class breakdown
@@ -80,13 +82,15 @@ export function DashboardClient() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <StatCard
           label="תלמידים יוצאים"
           value={going.length}
           sub={notGoing > 0 ? `${notGoing} לא יוצאים` : "כולם יוצאים"}
           subColor={notGoing > 0 ? "muted" : "success"}
         />
+        <StatCard label="בנים" value={boys} sub={going.length > 0 ? `${Math.round(boys / going.length * 100)}%` : ""} />
+        <StatCard label="בנות" value={girls} sub={going.length > 0 ? `${Math.round(girls / going.length * 100)}%` : ""} />
         <StatCard
           label="אנשי צוות"
           value={staff.length}
