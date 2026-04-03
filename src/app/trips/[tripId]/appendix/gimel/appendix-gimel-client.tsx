@@ -7,7 +7,7 @@ import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { sigDocId, subscribeToSignature } from "@/lib/firestore/signatures";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AppendixActions } from "@/components/appendix-actions";
+import { AppendixActions, esc, safeSigUrl } from "@/components/appendix-actions";
 import { RemoteSignature } from "@/components/remote-signature";
 
 type FormData = {
@@ -73,19 +73,19 @@ export function AppendixGimelClient() {
       </div>
       <div class="meta"><span>תאריך: <strong>${form.date ? formatDateHe(form.date) : ""}</strong></span></div>
       <div class="letter-body">
-        <p>אל: <strong>${form.leaderName}</strong></p>
+        <p>אל: <strong>${esc(form.leaderName)}</strong></p>
         <br/>
-        <p>הריני ממנה אותך לאחראי/ת טיול לתלמידי כית/ות <strong>${cls}</strong>
-        שיתקיים בתאריכים <strong>${dr}</strong>
-        במקום/באזור <strong>${form.area}</strong>.</p>
+        <p>הריני ממנה אותך לאחראי/ת טיול לתלמידי כית/ות <strong>${esc(cls)}</strong>
+        שיתקיים בתאריכים <strong>${esc(dr)}</strong>
+        במקום/באזור <strong>${esc(form.area)}</strong>.</p>
         <br/>
         <p>בכבוד רב,</p>
-        <p><strong>${form.principalName}</strong></p>
-        <p>מנהל/ת ביה"ס — ${trip?.schoolName ?? ""}</p>
+        <p><strong>${esc(form.principalName)}</strong></p>
+        <p>מנהל/ת ביה"ס — ${esc(trip?.schoolName)}</p>
         <br/>
         <p>חתימה:</p>
-        ${principalSig
-          ? `<img src="${principalSig}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-top:4px">`
+        ${safeSigUrl(principalSig)
+          ? `<img src="${safeSigUrl(principalSig)}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-top:4px">`
           : `<div style="border-bottom:1px solid #555;width:200px;margin-top:8px"></div>`}
       </div>
     `;

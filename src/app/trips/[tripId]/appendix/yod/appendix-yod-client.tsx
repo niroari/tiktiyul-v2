@@ -6,7 +6,7 @@ import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { uploadFile, deleteFileByUrl } from "@/lib/firebase-storage";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
-import { AppendixActions } from "@/components/appendix-actions";
+import { AppendixActions, esc } from "@/components/appendix-actions";
 
 type MedRow = {
   id: string;
@@ -106,6 +106,9 @@ export function AppendixYodClient() {
     const row = rows.find((r) => r.id === rowId);
     if (!row) return;
 
+    const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+    if (!ALLOWED_TYPES.includes(file.type)) return;
+
     // Delete old cert if exists
     if (row.certUrl) await deleteFileByUrl(row.certUrl);
 
@@ -139,17 +142,17 @@ export function AppendixYodClient() {
     const tableRows = rows.map((r, i) => `
       <tr style="${i % 2 === 0 ? "" : "background:#f0f7f4"}">
         <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${i + 1}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${r.lastName} ${r.firstName}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${r.class}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${r.issue}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${r.notes}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.lastName)} ${esc(r.firstName)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(r.class)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.issue)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.notes)}</td>
       </tr>`).join("");
 
     return `
       <div class="header">
         <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
         <div class="title">נספח י׳ — תלמידים בעלי מגבלות רפואיות</div>
-        ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
+        ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
       </div>
       <table>
         <thead><tr>

@@ -2,9 +2,27 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ── Signatures — public (signers have no account) ─────────────────────────
+    // ── Signatures ────────────────────────────────────────────────────────────
+    // Public read (signers have no account).
+    // Write is restricted: only allowed when status is "pending" and not expired,
+    // and only the signature/status/signedAt fields may be changed.
     match /signatures/{docId} {
-      allow read, write: if true;
+      allow read: if true;
+
+      // Initial creation — allowed from the app (trip owner sets up the request)
+      allow create: if true;
+
+      // Submission — signer updates signature + status only, while still pending and not expired
+      allow update: if
+        resource.data.status == "pending" &&
+        request.time < resource.data.expiresAt &&
+        request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(["signature", "status", "signedAt"]) &&
+        request.resource.data.status == "signed" &&
+        request.resource.data.signature is string &&
+        request.resource.data.signature.size() < 300000;
+
+      allow delete: if false;
     }
 
     // ── Trips ─────────────────────────────────────────────────────────────────
@@ -17,16 +35,15 @@ service cloud.firestore {
     }
 
     match /trips/{tripId} {
-      // Any authenticated user can read trips
-      // (trip IDs are UUIDs; invite token is required to discover a trip)
-      allow read: if request.auth != null;
+      // Only members can read their own trips
+      allow read: if isMember(tripId);
 
       // Only the creator can create (and must set themselves as owner)
       allow create: if request.auth != null &&
         request.resource.data.ownerUid == request.auth.uid;
 
-      // Owner or collaborator can update
-      // Exception: any authenticated user can add themselves to collaborators (join via invite)
+      // Owner or collaborator can update.
+      // Exception: any authenticated user can add themselves to collaborators (join via invite link).
       allow update: if request.auth != null && (
         resource.data.ownerUid == request.auth.uid ||
         request.auth.uid in resource.data.collaborators ||

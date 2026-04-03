@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
 import { updateStudent } from "@/lib/firestore/students";
-import { printHTML } from "@/components/appendix-actions";
+import { printHTML, esc } from "@/components/appendix-actions";
 import { Button } from "@/components/ui/button";
 import type { Student } from "@/lib/types";
 
@@ -62,17 +62,17 @@ export function AppendixZayinClient() {
     for (const s of printStudents) {
       if (s.class !== lastClass) {
         const count = printStudents.filter((x) => x.class === s.class).length;
-        rows += `<tr class="cat-row"><td colspan="5" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${s.class} — ${count} תלמידים</td></tr>`;
+        rows += `<tr class="cat-row"><td colspan="5" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
         lastClass = s.class;
         rowInClass = 0;
       }
       const gender = s.gender === "male" ? "זכר" : s.gender === "female" ? "נקבה" : "";
       rows += `<tr style="${rowInClass % 2 === 0 ? "" : "background:#f0f7f4"}">
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${s.lastName}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${s.firstName}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${s.class}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${gender}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr">${s.phone ?? ""}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.lastName)}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.firstName)}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(s.class)}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(gender)}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr">${esc(s.phone)}</td>
       </tr>`;
       rowInClass++;
     }
@@ -85,7 +85,7 @@ export function AppendixZayinClient() {
       <div class="header">
         <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
         <div class="title">נספח ז׳ — רשימת תלמידים${goingOnly ? " (יוצאים)" : ""}</div>
-        <div class="ministry">${trip?.name ?? ""} | ${trip?.schoolName ?? ""}</div>
+        <div class="ministry">${esc(trip?.name)} | ${esc(trip?.schoolName)}</div>
       </div>
       <div class="meta">
         <span>סה"כ יוצאים: <strong>${going}</strong></span>

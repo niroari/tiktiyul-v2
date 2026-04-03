@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { Button } from "@/components/ui/button";
-import { AppendixActions } from "@/components/appendix-actions";
+import { AppendixActions, esc } from "@/components/appendix-actions";
 
 type ItineraryRow = {
   id: string;
@@ -54,10 +54,10 @@ export function AppendixDaletClient() {
   function getHTML() {
     const tableRows = rows.map((r) => `
       <tr>
-        <td>${r.day}</td>
-        <td style="text-align:center">${r.time}</td>
-        <td>${r.activity}</td>
-        <td>${r.notes}</td>
+        <td>${esc(r.day)}</td>
+        <td style="text-align:center">${esc(r.time)}</td>
+        <td>${esc(r.activity)}</td>
+        <td>${esc(r.notes)}</td>
       </tr>`).join("");
     return `
       <div class="header">

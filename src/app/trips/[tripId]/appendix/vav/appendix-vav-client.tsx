@@ -7,7 +7,7 @@ import { useTrip } from "@/hooks/use-trip";
 import { useStudents } from "@/hooks/use-students";
 import { useStaff } from "@/hooks/use-staff";
 import { Button } from "@/components/ui/button";
-import { AppendixActions } from "@/components/appendix-actions";
+import { AppendixActions, esc } from "@/components/appendix-actions";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -276,11 +276,11 @@ export function AppendixVavClient() {
       </tr>
       <tr>
         <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">שם</td>
-        ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${b.crew[ri]?.name ?? ""}</td>`).join("")}
+        ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${esc(b.crew[ri]?.name)}</td>`).join("")}
       </tr>
       <tr>
         <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">טלפון</td>
-        ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${b.crew[ri]?.phone ?? ""}</td>`).join("")}
+        ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${esc(b.crew[ri]?.phone)}</td>`).join("")}
       </tr>`).join("");
 
     const maxExtra = Math.max(0, ...data.buses.map((b) => b.extraTeachers.length));
@@ -292,12 +292,12 @@ export function AppendixVavClient() {
         <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">תפקיד / שם</td>
         ${data.buses.map((b) => {
           const e = b.extraTeachers[ei];
-          return `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${e ? `${e.role} — ${e.name}` : ""}</td>`;
+          return `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${e ? `${esc(e.role)} — ${esc(e.name)}` : ""}</td>`;
         }).join("")}
       </tr>
       <tr>
         <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">טלפון</td>
-        ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${b.extraTeachers[ei]?.phone ?? ""}</td>`).join("")}
+        ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${esc(b.extraTeachers[ei]?.phone)}</td>`).join("")}
       </tr>`).join("");
 
     // Class summary rows — handle splits
@@ -307,9 +307,9 @@ export function AppendixVavClient() {
         const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
         return [
           `<tr style="background:#fff8e1">
-            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;font-weight:bold">${cls}</td>
-            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${plannedByClass[cls]}</td>
-            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${data.actual[cls] ?? ""}</td>
+            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;font-weight:bold">${esc(cls)}</td>
+            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
+            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${esc(data.actual[cls])}</td>
           </tr>`,
           ...parts.map((count, pi) => `<tr style="background:#fffde7">
             <td style="padding:2px 6px 2px 16px;border:1px solid #ddd;font-size:8.5px;color:#666">${PART_LABELS[pi]}</td>
@@ -322,9 +322,9 @@ export function AppendixVavClient() {
         ].filter(Boolean);
       }
       return [`<tr>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px">${cls}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${plannedByClass[cls]}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${data.actual[cls] ?? ""}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px">${esc(cls)}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${esc(data.actual[cls])}</td>
       </tr>`];
     }).join("") || `<tr><td colspan="3" style="padding:6px;color:#aaa;text-align:center;font-size:9px">אין נתוני תלמידים</td></tr>`;
 

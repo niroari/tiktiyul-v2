@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { useTrip } from "@/hooks/use-trip";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { sigDocId, subscribeToSignature } from "@/lib/firestore/signatures";
-import { AppendixActions } from "@/components/appendix-actions";
+import { AppendixActions, esc, safeSigUrl } from "@/components/appendix-actions";
 import { SignatureCanvas, type SignatureCanvasHandle } from "@/components/signature-canvas";
 import { RemoteSignature } from "@/components/remote-signature";
 import { Input } from "@/components/ui/input";
@@ -153,11 +153,11 @@ export function AppendixBetClient() {
     const classes = trip?.classes?.map((c) => c.name).join(", ") ?? "";
     const schedRows = form.schedule.map((r) => `
       <tr>
-        <td>${r.date}</td>
-        <td style="text-align:center">${r.fromTime}</td>
-        <td style="text-align:center">${r.toTime}</td>
-        <td>${r.activity}</td>
-        <td>${r.notes}</td>
+        <td>${esc(r.date)}</td>
+        <td style="text-align:center">${esc(r.fromTime)}</td>
+        <td style="text-align:center">${esc(r.toTime)}</td>
+        <td>${esc(r.activity)}</td>
+        <td>${esc(r.notes)}</td>
       </tr>`).join("");
     return `
       <div class="header">
@@ -170,10 +170,10 @@ export function AppendixBetClient() {
         <span>הסעה: <strong>${trip?.transport ?? ""}</strong></span>
       </div>
       <div class="meta">
-        <span>אחראי/ת טיול: <strong>${form.leaderName}</strong></span>
-        <span>טלפון: <strong>${form.leaderPhone}</strong></span>
-        <span>הורים מלווים: <strong>${form.parents}</strong></span>
-        <span>נושאי נשק: <strong>${form.weapons}</strong></span>
+        <span>אחראי/ת טיול: <strong>${esc(form.leaderName)}</strong></span>
+        <span>טלפון: <strong>${esc(form.leaderPhone)}</strong></span>
+        <span>הורים מלווים: <strong>${esc(form.parents)}</strong></span>
+        <span>נושאי נשק: <strong>${esc(form.weapons)}</strong></span>
       </div>
       <div class="section-title">מסלול הטיול — לוח זמנים</div>
       <table>
@@ -186,8 +186,8 @@ export function AppendixBetClient() {
         </tr></thead>
         <tbody>${schedRows}</tbody>
       </table>
-      ${form.leaderNotes ? `<div class="section-title">הערות אחראי/ת טיול</div><p style="font-size:10px;line-height:1.6">${form.leaderNotes}</p>` : ""}
-      ${form.principalNotes ? `<div class="section-title">הערות מנהל/ת</div><p style="font-size:10px;line-height:1.6">${form.principalNotes}</p>` : ""}
+      ${form.leaderNotes ? `<div class="section-title">הערות אחראי/ת טיול</div><p style="font-size:10px;line-height:1.6">${esc(form.leaderNotes)}</p>` : ""}
+      ${form.principalNotes ? `<div class="section-title">הערות מנהל/ת</div><p style="font-size:10px;line-height:1.6">${esc(form.principalNotes)}</p>` : ""}
       <div class="section-title">חתימות</div>
       <table style="margin-top:8px">
         <tr>
@@ -195,13 +195,13 @@ export function AppendixBetClient() {
         </tr>
         <tr>
           <td style="height:70px;text-align:center;vertical-align:middle">
-            ${leaderSig ? `<img src="${leaderSig}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
+            ${safeSigUrl(leaderSig) ? `<img src="${safeSigUrl(leaderSig)}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
           </td>
           <td style="text-align:center;vertical-align:middle">
-            ${coordinatorSig ? `<img src="${coordinatorSig}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
+            ${safeSigUrl(coordinatorSig) ? `<img src="${safeSigUrl(coordinatorSig)}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
           </td>
           <td style="text-align:center;vertical-align:middle">
-            ${principalSig ? `<img src="${principalSig}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
+            ${safeSigUrl(principalSig) ? `<img src="${safeSigUrl(principalSig)}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
           </td>
         </tr>
       </table>

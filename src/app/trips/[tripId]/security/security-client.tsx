@@ -34,6 +34,10 @@ export function SecurityClient() {
     e.target.value = "";
     setFileError("");
 
+    if (file.type !== "application/pdf") {
+      setFileError("יש להעלות קובץ PDF בלבד.");
+      return;
+    }
     if (file.size > MAX_MB * 1024 * 1024) {
       setFileError(`הקובץ גדול מדי (${(file.size / 1024 / 1024).toFixed(1)} MB). המגבלה היא ${MAX_MB} MB.`);
       return;
@@ -72,6 +76,7 @@ export function SecurityClient() {
 
   function handlePrint() {
     if (!fileUrl) return;
+    if (!fileUrl.startsWith("https://firebasestorage.googleapis.com/")) return;
     const win = window.open("", "_blank");
     if (!win) return;
     win.document.write(`<html><head><title>אישור ביטחוני</title>

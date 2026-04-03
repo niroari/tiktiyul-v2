@@ -65,6 +65,12 @@ export function subscribeToSignature(
 }
 
 export async function submitSignature(docId: string, dataUrl: string): Promise<void> {
+  if (
+    (!dataUrl.startsWith("data:image/png;base64,") && !dataUrl.startsWith("data:image/jpeg;base64,")) ||
+    dataUrl.length > 300_000
+  ) {
+    throw new Error("Invalid signature data");
+  }
   await updateDoc(sigRef(docId), {
     signature: dataUrl,
     status:    "signed",

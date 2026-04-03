@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { useTrip } from "@/hooks/use-trip";
-import { AppendixActions } from "@/components/appendix-actions";
+import { AppendixActions, esc } from "@/components/appendix-actions";
 import { Button } from "@/components/ui/button";
 
 type Item = { id: string; text: string };
@@ -79,7 +79,7 @@ export function AppendixTetClient() {
       .map((it, i) => `
         <tr style="${i % 2 === 0 ? "" : "background:#f0f7f4"}">
           <td style="padding:6px 10px;border:1px solid #ddd;font-size:11px;text-align:center;width:36px">${i + 1}</td>
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:11px">${it.text}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd;font-size:11px">${esc(it.text)}</td>
           <td style="padding:6px 10px;border:1px solid #ddd;width:50px;text-align:center"></td>
         </tr>`)
       .join("");
@@ -88,7 +88,7 @@ export function AppendixTetClient() {
       <div class="header">
         <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
         <div class="title">נספח ט׳ — ציוד חובה לטיול</div>
-        ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
+        ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
       </div>
       <table>
         <thead><tr>

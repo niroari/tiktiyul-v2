@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { Button } from "@/components/ui/button";
-import { AppendixActions } from "@/components/appendix-actions";
+import { AppendixActions, esc } from "@/components/appendix-actions";
 
 type ContactRow = {
   id: string;
@@ -80,10 +80,10 @@ export function AppendixHeyClient() {
   function getHTML() {
     const tableRows = rows.map((r) => `
       <tr>
-        <td>${r.role}</td>
-        <td>${r.name}</td>
-        <td style="text-align:center;direction:ltr">${r.phone}</td>
-        <td>${r.notes}</td>
+        <td>${esc(r.role)}</td>
+        <td>${esc(r.name)}</td>
+        <td style="text-align:center;direction:ltr">${esc(r.phone)}</td>
+        <td>${esc(r.notes)}</td>
       </tr>`).join("");
     return `
       <div class="header">

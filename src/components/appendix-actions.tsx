@@ -2,6 +2,24 @@
 
 import { Button } from "@/components/ui/button";
 
+/** Escape user-supplied text before inserting into HTML strings. */
+export function esc(s: unknown): string {
+  return String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+/** Validate a signature data URL before embedding it in HTML. */
+export function safeSigUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (!url.startsWith("data:image/png;base64,") && !url.startsWith("data:image/jpeg;base64,")) return null;
+  if (url.length > 300_000) return null; // ~225KB decoded — plenty for a canvas sig
+  return url;
+}
+
 // Shared print wrapper — RTL, Times New Roman, clean A4 styling
 export function printHTML(innerHTML: string, title: string) {
   const win = window.open("", "_blank");
