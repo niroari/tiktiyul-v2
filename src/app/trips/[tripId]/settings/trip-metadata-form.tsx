@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { TripClass } from "@/lib/types";
 import { saveTripMetadata } from "@/lib/firestore/trips";
+import { useTrip } from "@/hooks/use-trip";
 
 type FormData = {
   name: string;
@@ -31,10 +32,27 @@ const INITIAL: FormData = {
 
 export function TripMetadataForm() {
   const { tripId } = useParams<{ tripId: string }>();
+  const { trip } = useTrip(tripId);
   const [form, setForm] = useState<FormData>(INITIAL);
+  const [seeded, setSeeded] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Seed form from Firestore once on first load
+  useEffect(() => {
+    if (!trip || seeded) return;
+    setForm({
+      name:          trip.name ?? "",
+      schoolName:    trip.schoolName ?? "",
+      startDate:     trip.startDate ?? "",
+      endDate:       trip.endDate ?? "",
+      classes:       trip.classes?.length ? trip.classes : [{ name: "", studentCount: 0 }],
+      accommodation: trip.accommodation ?? "",
+      transport:     trip.transport ?? "",
+    });
+    setSeeded(true);
+  }, [trip, seeded]);
 
   function setField<K extends keyof FormData>(key: K, value: FormData[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
