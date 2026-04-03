@@ -51,8 +51,10 @@ function makeBus(): Bus {
   };
 }
 
+const DRIVER_IDX = CREW_ROLES.indexOf("נהג");
+
 function calcEscorts(bus: Bus): number {
-  return bus.crew.filter((c) => c.name.trim()).length
+  return bus.crew.filter((c, i) => i !== DRIVER_IDX && c.name.trim()).length
     + bus.extraTeachers.filter((e) => e.name.trim()).length;
 }
 
