@@ -2,9 +2,11 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { useTrip } from "@/hooks/use-trip";
 import { useStudents } from "@/hooks/use-students";
 import { useStaff } from "@/hooks/use-staff";
+import { subscribeToAllAppendices } from "@/lib/firestore/appendix";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,11 @@ export function DashboardClient() {
   const { trip, loading: tripLoading } = useTrip(tripId);
   const { students, loading: studentsLoading } = useStudents(tripId);
   const { staff } = useStaff(tripId);
+  const [appendixMap, setAppendixMap] = useState<Record<string, Record<string, unknown>>>({});
+
+  useEffect(() => {
+    return subscribeToAllAppendices(tripId, setAppendixMap);
+  }, [tripId]);
 
   const loading = tripLoading || studentsLoading;
 
@@ -115,19 +122,29 @@ export function DashboardClient() {
         <div className="lg:col-span-2 bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
           <h2 className="text-sm font-semibold text-foreground mb-4">נספחים</h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-            {APPENDICES.map((a) => (
-              <Link
-                key={a.slug}
-                href={`/trips/${tripId}/appendix/${a.slug}`}
-                className="rounded-[var(--radius-sm)] border border-border bg-muted/40 p-3 text-center hover:border-primary/40 hover:bg-[var(--brand-light)] transition-colors group"
-              >
-                <div className="text-base font-bold text-muted-foreground group-hover:text-primary">{a.letter}׳</div>
-                <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{a.label}</div>
-                <div className="mt-1.5 w-2 h-2 rounded-full bg-border mx-auto" />
-              </Link>
-            ))}
+            {APPENDICES.map((a) => {
+              const saved = !!appendixMap[a.slug];
+              return (
+                <Link
+                  key={a.slug}
+                  href={`/trips/${tripId}/appendix/${a.slug}`}
+                  className="rounded-[var(--radius-sm)] border border-border bg-muted/40 p-3 text-center hover:border-primary/40 hover:bg-[var(--brand-light)] transition-colors group"
+                >
+                  <div className="text-base font-bold text-muted-foreground group-hover:text-primary">{a.letter}׳</div>
+                  <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{a.label}</div>
+                  <div className={`mt-1.5 w-2 h-2 rounded-full mx-auto transition-colors ${saved ? "bg-[var(--success)]" : "bg-border"}`} />
+                </Link>
+              );
+            })}
           </div>
-          <p className="text-xs text-muted-foreground mt-3">לחץ על נספח כדי להתחיל למלא אותו</p>
+          <div className="flex items-center gap-4 mt-3">
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-[var(--success)]" /> הושלם
+            </div>
+            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <div className="w-2 h-2 rounded-full bg-border" /> טרם התחיל
+            </div>
+          </div>
         </div>
 
         {/* Side column */}

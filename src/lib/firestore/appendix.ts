@@ -1,5 +1,6 @@
 import {
   doc,
+  collection,
   getDoc,
   setDoc,
   onSnapshot,
@@ -29,6 +30,19 @@ export async function getAppendix(
 ): Promise<Record<string, unknown> | null> {
   const snap = await getDoc(appendixDoc(tripId, appendixId));
   return snap.exists() ? snap.data() : null;
+}
+
+/** Subscribe to all appendices for a trip. Returns a map of appendixId → data. */
+export function subscribeToAllAppendices(
+  tripId: string,
+  callback: (map: Record<string, Record<string, unknown>>) => void
+): Unsubscribe {
+  const col = collection(db, "trips", tripId, "appendices");
+  return onSnapshot(col, (snap) => {
+    const map: Record<string, Record<string, unknown>> = {};
+    snap.docs.forEach((d) => { map[d.id] = d.data(); });
+    callback(map);
+  });
 }
 
 export function subscribeToAppendix(
