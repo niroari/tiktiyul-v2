@@ -60,6 +60,7 @@ export function SignsClient() {
   const [busNum, setBusNum]     = useState("");
   const [busClasses, setBusClasses] = useState("");
   const [logoError, setLogoError] = useState("");
+  const [logoUrlInput, setLogoUrlInput] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
@@ -120,7 +121,19 @@ export function SignsClient() {
 
   function clearLogo() {
     updateData({ logo: "" });
+    setLogoUrlInput("");
     if (fileInputRef.current) fileInputRef.current.value = "";
+  }
+
+  function handleLogoUrl() {
+    const url = logoUrlInput.trim();
+    if (!url) return;
+    if (!/^https:\/\/.+/.test(url)) {
+      setLogoError("הקישור חייב להתחיל ב-https://");
+      return;
+    }
+    setLogoError("");
+    updateData({ logo: url });
   }
 
   // ── Buses ─────────────────────────────────────────────────────────────────
@@ -222,10 +235,11 @@ export function SignsClient() {
       </div>
 
       {/* Logo section */}
-      <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5 space-y-3">
+      <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5 space-y-4">
         <h2 className="text-sm font-semibold border-b border-border pb-2">לוגו בית הספר (אופציונלי)</h2>
-        <div className="flex flex-wrap items-start gap-4">
-          <div className="space-y-2 flex-1 min-w-48">
+        <div className="flex flex-wrap items-start gap-6">
+          {/* File upload */}
+          <div className="space-y-1.5 flex-1 min-w-48">
             <label className="text-xs text-muted-foreground">העלאת קובץ (עד {MAX_LOGO_KB} KB)</label>
             <input
               ref={fileInputRef}
@@ -234,21 +248,40 @@ export function SignsClient() {
               onChange={handleLogoFile}
               className="text-sm text-muted-foreground file:mr-3 file:py-1 file:px-3 file:rounded file:border file:border-border file:text-sm file:bg-muted file:text-foreground file:cursor-pointer cursor-pointer"
             />
-            {logoError && <p className="text-xs text-destructive">{logoError}</p>}
           </div>
-
-          {data.logo && (
-            <div className="flex items-center gap-3">
-              <img src={data.logo} alt="לוגו" className="max-h-16 max-w-32 object-contain border border-border rounded p-1" />
+          {/* URL paste */}
+          <div className="space-y-1.5 flex-1 min-w-64">
+            <label className="text-xs text-muted-foreground">או הדבק קישור לתמונה</label>
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={logoUrlInput}
+                onChange={(e) => setLogoUrlInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleLogoUrl()}
+                placeholder="https://..."
+                dir="ltr"
+                className="flex-1 text-sm border border-border rounded-[var(--radius-sm)] px-3 py-1.5 focus:outline-none focus:border-primary"
+              />
               <button
-                onClick={clearLogo}
-                className="text-sm text-destructive hover:text-destructive/80 transition-colors"
+                onClick={handleLogoUrl}
+                className="px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors shrink-0"
               >
-                הסר
+                אשר
               </button>
             </div>
-          )}
+          </div>
         </div>
+
+        {logoError && <p className="text-xs text-destructive">{logoError}</p>}
+
+        {data.logo && (
+          <div className="flex items-center gap-3 pt-1">
+            <img src={data.logo} alt="לוגו" className="max-h-16 max-w-32 object-contain border border-border rounded p-1" />
+            <button onClick={clearLogo} className="text-sm text-destructive hover:text-destructive/80 transition-colors">
+              הסר
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Add bus form */}
