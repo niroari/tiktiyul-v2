@@ -238,17 +238,15 @@ export function AppendixVavClient() {
   const totalStudents = data.buses.reduce((s, b) => s + busStudentCount(b), 0);
   const totalEscorts  = data.buses.reduce((s, b) => s + calcEscorts(b), 0);
 
-  // All options for the bus class selector: whole classes + split parts
-  const tripClasses = trip?.classes?.map((c) => c.name) ?? [];
-
+  // All options for the bus class selector: derived from student list + splits
   function classOptions() {
     const opts: { value: string; label: string }[] = [];
-    tripClasses.forEach((cls) => {
+    classNames.forEach((cls) => {
       const parts = data.splits[cls];
       if (parts && parts.length >= 2) {
         parts.forEach((_, pi) => opts.push({ value: splitKey(cls, pi), label: splitLabel(cls, pi) }));
       } else {
-        opts.push({ value: cls, label: cls });
+        opts.push({ value: cls, label: `${cls} (${plannedByClass[cls]})` });
       }
     });
     return opts;
@@ -416,31 +414,46 @@ export function AppendixVavClient() {
         {data.buses.map((bus, bi) => (
           <div key={bus.id} className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)]">
             {/* Bus header */}
-            <div className="flex items-center gap-3 px-5 py-3 border-b border-border bg-[var(--brand-light)] rounded-t-[var(--radius)]">
-              <span className="font-semibold text-primary text-sm shrink-0">אוטובוס {bi + 1}</span>
-              {busStudentCount(bus) > 0 && (
-                <span className="text-xs text-muted-foreground shrink-0">{busStudentCount(bus)} תלמידים · {calcEscorts(bus)} מלווים</span>
-              )}
-              <div className="flex items-center gap-2 flex-1 flex-wrap">
-                {[0, 1, 2].map((si) => (
-                  <select
-                    key={si}
-                    value={bus.classSelections[si] ?? ""}
-                    onChange={(e) => setBusClass(bi, si, e.target.value)}
-                    className="text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-white text-foreground focus:outline-none focus:border-primary"
-                  >
-                    <option value="">— כיתה {si + 1} —</option>
-                    {opts.map((o) => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
-                  </select>
-                ))}
+            <div className="px-5 py-3 border-b border-border bg-[var(--brand-light)] rounded-t-[var(--radius)]">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold text-primary text-sm">אוטובוס {bi + 1}</span>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs font-medium text-foreground">
+                    👥 {busStudentCount(bus)} תלמידים
+                  </span>
+                  <span className="text-xs font-medium text-foreground">
+                    🧑‍🏫 {calcEscorts(bus)} מלווים
+                  </span>
+                  <span className="text-xs font-bold text-primary">
+                    סה״כ {busStudentCount(bus) + calcEscorts(bus)}
+                  </span>
+                  <button onClick={() => deleteBus(bi)} className="text-muted-foreground hover:text-destructive transition-colors">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </div>
-              <button onClick={() => deleteBus(bi)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                </svg>
-              </button>
+              {/* Class selectors */}
+              {classNames.length === 0 ? (
+                <p className="text-xs text-muted-foreground">ייבא רשימת תלמידים בנספח ז׳ כדי לבחור כיתות</p>
+              ) : (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {[0, 1, 2].map((si) => (
+                    <select
+                      key={si}
+                      value={bus.classSelections[si] ?? ""}
+                      onChange={(e) => setBusClass(bi, si, e.target.value)}
+                      className="text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-white text-foreground focus:outline-none focus:border-primary"
+                    >
+                      <option value="">— כיתה {si + 1} —</option>
+                      {opts.map((o) => (
+                        <option key={o.value} value={o.value}>{o.label}</option>
+                      ))}
+                    </select>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Crew */}
