@@ -1,6 +1,7 @@
 import {
   collection,
   doc,
+  getDocs,
   setDoc,
   updateDoc,
   deleteDoc,
@@ -41,6 +42,13 @@ export async function deleteStudent(
   studentId: string
 ): Promise<void> {
   await deleteDoc(studentDoc(tripId, studentId));
+}
+
+export async function getStudents(tripId: string): Promise<Student[]> {
+  const snap = await getDocs(studentsCol(tripId));
+  const students = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Student));
+  students.sort((a, b) => a.class.localeCompare(b.class) || a.lastName.localeCompare(b.lastName));
+  return students;
 }
 
 export function subscribeToStudents(

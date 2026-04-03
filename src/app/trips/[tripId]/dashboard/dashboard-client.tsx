@@ -7,6 +7,7 @@ import { useTrip } from "@/hooks/use-trip";
 import { useStudents } from "@/hooks/use-students";
 import { useStaff } from "@/hooks/use-staff";
 import { subscribeToAllAppendices } from "@/lib/firestore/appendix";
+import { PrintTripButton } from "./print-trip-button";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -81,11 +82,14 @@ export function DashboardClient() {
   return (
     <div className="space-y-6">
       {/* Page title */}
-      <div>
-        <h1 className="text-xl font-semibold text-foreground">דשבורד</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          {trip?.name ?? "טיול"} · {trip?.schoolName ?? ""}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-xl font-semibold text-foreground">דשבורד</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {trip?.name ?? "טיול"} · {trip?.schoolName ?? ""}
+          </p>
+        </div>
+        <PrintTripButton tripId={tripId} />
       </div>
 
       {/* Stat cards */}
