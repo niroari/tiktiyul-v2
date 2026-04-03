@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { updateStudent } from "@/lib/firestore/students";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
 import { AppendixActions } from "@/components/appendix-actions";
@@ -221,9 +222,6 @@ export function FoodClient() {
               </thead>
               <tbody>
                 {displayed.map((s, i) => {
-                  const activeFlags = (["vegetarian", "vegan", "glutenFree"] as const).filter(
-                    (f) => s.dietaryFlags?.[f]
-                  );
                   return (
                     <tr
                       key={s.id}
@@ -236,18 +234,25 @@ export function FoodClient() {
                       <td className="px-3 py-2 text-center text-muted-foreground">{s.class}</td>
                       <td className="px-3 py-2">
                         <div className="flex flex-wrap gap-1">
-                          {activeFlags.length === 0 ? (
-                            <span className="text-xs text-muted-foreground/50">—</span>
-                          ) : (
-                            activeFlags.map((f) => (
-                              <span
+                          {(["vegetarian", "vegan", "glutenFree"] as const).map((f) => {
+                            const on = !!s.dietaryFlags?.[f];
+                            return (
+                              <button
                                 key={f}
-                                className={`text-xs px-2 py-0.5 rounded-full border ${FLAG_COLORS[f]}`}
+                                onClick={() => updateStudent(tripId, s.id, {
+                                  dietaryFlags: { ...(s.dietaryFlags ?? { vegetarian: false, vegan: false, glutenFree: false }), [f]: !on },
+                                })}
+                                title={on ? `הסר ${FLAG_LABELS[f]}` : `סמן ${FLAG_LABELS[f]}`}
+                                className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                                  on
+                                    ? FLAG_COLORS[f]
+                                    : "border-border text-muted-foreground/40 hover:border-border hover:text-muted-foreground"
+                                }`}
                               >
                                 {FLAG_LABELS[f]}
-                              </span>
-                            ))
-                          )}
+                              </button>
+                            );
+                          })}
                         </div>
                       </td>
                       <td className="px-2 py-1.5">

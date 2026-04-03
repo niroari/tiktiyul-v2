@@ -6,6 +6,8 @@ import { useStudents } from "@/hooks/use-students";
 import { addStudent, updateStudent, deleteStudent } from "@/lib/firestore/students";
 import { ExcelImport } from "@/components/excel-import";
 import { Student, Gender } from "@/lib/types";
+
+type DietaryFlags = Student["dietaryFlags"];
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -39,7 +41,10 @@ type StudentFormData = {
   gender: Gender;
   phone: string;
   isGoing: boolean;
+  dietaryFlags: DietaryFlags;
 };
+
+const EMPTY_DIETARY: DietaryFlags = { vegetarian: false, vegan: false, glutenFree: false };
 
 const EMPTY_FORM: StudentFormData = {
   firstName: "",
@@ -48,6 +53,7 @@ const EMPTY_FORM: StudentFormData = {
   gender: "female",
   phone: "",
   isGoing: true,
+  dietaryFlags: EMPTY_DIETARY,
 };
 
 export function StudentsClient() {
@@ -87,6 +93,7 @@ export function StudentsClient() {
       gender: student.gender,
       phone: student.phone ?? "",
       isGoing: student.isGoing,
+      dietaryFlags: student.dietaryFlags ?? EMPTY_DIETARY,
     });
     setDialogOpen(true);
   }
@@ -94,14 +101,7 @@ export function StudentsClient() {
   async function handleSave() {
     setSaving(true);
     try {
-      const data: Omit<Student, "id"> = {
-        ...form,
-        dietaryFlags: editing?.dietaryFlags ?? {
-          vegetarian: false,
-          vegan: false,
-          glutenFree: false,
-        },
-      };
+      const data: Omit<Student, "id"> = { ...form };
       if (editing) {
         await updateStudent(tripId, editing.id, data);
       } else {
@@ -318,6 +318,33 @@ export function StudentsClient() {
               <span className="text-sm text-foreground">
                 {form.isGoing ? "יוצא לטיול" : "לא יוצא לטיול"}
               </span>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>העדפות מזון</Label>
+              <div className="flex flex-wrap gap-2">
+                {(["vegetarian", "vegan", "glutenFree"] as const).map((flag) => {
+                  const labels = { vegetarian: "צמחוני", vegan: "טבעוני", glutenFree: "ללא גלוטן" };
+                  const active = form.dietaryFlags[flag];
+                  return (
+                    <button
+                      key={flag}
+                      type="button"
+                      onClick={() => setForm({
+                        ...form,
+                        dietaryFlags: { ...form.dietaryFlags, [flag]: !active },
+                      })}
+                      className={`text-sm px-3 py-1 rounded-full border transition-colors ${
+                        active
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {labels[flag]}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 
