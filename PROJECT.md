@@ -205,6 +205,26 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
 NEXT_PUBLIC_FIREBASE_APP_ID
 ```
 
+## Future Options
+
+### AI Guidelines Assistant
+A chat interface allowing users to ask questions answered strictly from the official MOE circular (חוזר מנכ"ל — טיולים ופעילויות חוץ-בית ספריות, 2022).
+
+**Approach:** RAG-lite — send the full document text (~50K tokens) as system context with every query via the Anthropic API (claude-sonnet-4-6). No vector DB needed at this scale.
+
+**Files already prepared:**
+- `guidelines.txt` — full extracted text of the PDF (115 pages, ~243K chars)
+- Source PDF: `חוזר מנכל טיולים.pdf`
+
+**To implement:**
+1. `npm install @anthropic-ai/sdk`
+2. Add `ANTHROPIC_API_KEY` to `.env.local` and Vercel environment variables
+3. Create `src/app/api/ask-guidelines/route.ts` — streaming POST endpoint
+4. Create `src/app/trips/[tripId]/guidelines/` — chat UI page
+5. Add nav item to `src/lib/nav.ts`
+
+**Cost:** ~$0.01–0.03 per question (billed to your Anthropic account). All users share the same API key. Consider adding per-user rate limiting if opened to many users.
+
 ## Common Commands
 ```bash
 npm run dev          # Local dev server
