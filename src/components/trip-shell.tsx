@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/components/auth-provider";
+import { generateInviteToken } from "@/lib/firestore/trips";
 import { getTripNav } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 
@@ -10,18 +14,44 @@ type Props = {
   tripId: string;
   tripName: string;
   schoolName: string;
+  inviteToken?: string;
   children: React.ReactNode;
 };
 
-export function TripShell({ tripId, tripName, schoolName, children }: Props) {
+export function TripShell({ tripId, tripName, schoolName, inviteToken, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const pathname = usePathname();
-  const groups = getTripNav(tripId);
+  const router   = useRouter();
+  const { user } = useAuth();
+  const groups   = getTripNav(tripId);
 
   function isActive(href: string) {
     if (href === `/trips/${tripId}`) return pathname === href;
     return pathname.startsWith(href);
   }
+
+  async function handleShare() {
+    setGenerating(true);
+    try {
+      let token = inviteToken;
+      if (!token) token = await generateInviteToken(tripId);
+      const url = `${window.location.origin}/join/${token}`;
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  async function handleSignOut() {
+    await signOut(auth);
+    router.replace("/login");
+  }
+
+  const userInitial = user?.displayName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "?";
 
   return (
     <div className="min-h-screen bg-muted">
@@ -60,26 +90,33 @@ export function TripShell({ tripId, tripName, schoolName, children }: Props) {
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Progress pill */}
-          <div className="hidden sm:flex items-center gap-2 bg-muted border border-border rounded-full px-3 py-1">
-            <div className="w-16 h-1.5 bg-border rounded-full overflow-hidden">
-              <div className="h-full bg-primary rounded-full" style={{ width: "35%" }} />
-            </div>
-            <span className="text-xs text-muted-foreground">35%</span>
-          </div>
-
           {/* Share */}
-          <Button variant="outline" size="sm" className="text-primary border-primary hover:bg-[var(--brand-light)]">
-            <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-            </svg>
-            שיתוף
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleShare}
+            disabled={generating}
+            className="text-primary border-primary hover:bg-[var(--brand-light)]"
+          >
+            {copied ? (
+              <>
+                <svg className="w-3.5 h-3.5 ml-1 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+                <span className="text-green-600">הועתק!</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                </svg>
+                {generating ? "..." : "שיתוף"}
+              </>
+            )}
           </Button>
 
-          {/* Avatar */}
-          <div className="w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-semibold flex items-center justify-center cursor-pointer select-none">
-            נ
-          </div>
+          {/* User avatar + dropdown */}
+          <UserMenu initial={userInitial} photoURL={user?.photoURL ?? null} onSignOut={handleSignOut} />
         </div>
       </header>
 
@@ -145,6 +182,44 @@ export function TripShell({ tripId, tripName, schoolName, children }: Props) {
     </div>
   );
 }
+
+// ─── User Menu ────────────────────────────────────────────────────────────────
+
+function UserMenu({ initial, photoURL, onSignOut }: { initial: string; photoURL: string | null; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const { user } = useAuth();
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-8 h-8 rounded-full bg-[#1b4332] text-white text-sm font-semibold flex items-center justify-center overflow-hidden flex-shrink-0"
+      >
+        {photoURL
+          ? <img src={photoURL} alt="" className="w-full h-full object-cover" />
+          : initial}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-10 z-20 bg-white border border-border rounded-xl shadow-lg p-3 w-52 space-y-2 text-sm" dir="rtl">
+            <p className="text-xs text-muted-foreground truncate px-1">{user?.displayName ?? user?.email}</p>
+            <hr className="border-border" />
+            <button
+              onClick={() => { setOpen(false); onSignOut(); }}
+              className="w-full text-right px-2 py-1.5 rounded-md hover:bg-muted transition-colors text-destructive"
+            >
+              יציאה
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Nav Icon ─────────────────────────────────────────────────────────────────
 
 function NavIcon({ name, active }: { name: string; active: boolean }) {
   const cls = `w-4 h-4 flex-shrink-0 ${active ? "text-primary" : "text-muted-foreground"}`;

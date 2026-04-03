@@ -10,6 +10,10 @@ import {
   serverTimestamp,
   query,
   orderBy,
+  where,
+  or,
+  limit,
+  arrayUnion,
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -74,8 +78,39 @@ export function subscribeToTrip(
 export function subscribeToAllTrips(
   callback: (trips: Trip[]) => void
 ): Unsubscribe {
-  const q = query(tripsCol, orderBy("createdAt", "desc"));
-  return onSnapshot(q, (snap) => {
+  return onSnapshot(tripsCol, (snap) => {
     callback(snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip)));
   });
+}
+
+export function subscribeToUserTrips(
+  uid: string,
+  callback: (trips: Trip[]) => void
+): Unsubscribe {
+  const q = query(tripsCol, or(where("ownerUid", "==", uid), where("collaborators", "array-contains", uid)));
+  return onSnapshot(q, (snap) => {
+    const trips = snap.docs
+      .map((d) => ({ id: d.id, ...d.data() } as Trip))
+      .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")));
+    callback(trips);
+  });
+}
+
+export async function generateInviteToken(tripId: string): Promise<string> {
+  const token = crypto.randomUUID();
+  await updateDoc(tripDoc(tripId), { inviteToken: token, updatedAt: serverTimestamp() });
+  return token;
+}
+
+export async function joinTripByToken(token: string, uid: string): Promise<string | null> {
+  const q = query(tripsCol, where("inviteToken", "==", token), limit(1));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const ref  = snap.docs[0].ref;
+  const data = snap.docs[0].data() as Trip;
+  if (data.ownerUid === uid || (data.collaborators ?? []).includes(uid)) {
+    return snap.docs[0].id;
+  }
+  await updateDoc(ref, { collaborators: arrayUnion(uid), updatedAt: serverTimestamp() });
+  return snap.docs[0].id;
 }

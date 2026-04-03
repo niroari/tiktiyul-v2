@@ -16,6 +16,7 @@ export type Trip = {
   transport: string;
   ownerUid: string;
   collaborators: string[];  // uids
+  inviteToken?: string;
   createdAt: string;
   updatedAt: string;
 };

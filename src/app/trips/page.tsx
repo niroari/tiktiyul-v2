@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { signOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -15,12 +18,11 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Trip } from "@/lib/types";
-import { subscribeToAllTrips, createTrip, deleteTrip } from "@/lib/firestore/trips";
+import { subscribeToUserTrips, createTrip, deleteTrip } from "@/lib/firestore/trips";
 
 function formatDate(iso: string) {
   if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
+  return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
 }
 
 function daysUntil(iso: string) {
@@ -31,28 +33,38 @@ function daysUntil(iso: string) {
 
 export default function TripsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
-    const unsub = subscribeToAllTrips((data) => {
+    if (!user) return;
+    const unsub = subscribeToUserTrips(user.uid, (data) => {
       setTrips(data);
       setLoading(false);
     });
     return () => unsub();
-  }, []);
+  }, [user]);
+
+  async function handleSignOut() {
+    await signOut(auth);
+    router.replace("/login");
+  }
 
   return (
     <div className="min-h-screen bg-muted">
       <header className="sticky top-0 z-10 bg-white border-b border-border h-14 flex items-center justify-between px-6 shadow-[var(--shadow-card)]">
         <span className="font-bold text-lg text-primary tracking-tight">תיק טיול</span>
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          טיול חדש
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            טיול חדש
+          </Button>
+          <UserAvatar user={user} onSignOut={handleSignOut} />
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8">
@@ -71,6 +83,7 @@ export default function TripsPage() {
               <TripCard
                 key={trip.id}
                 trip={trip}
+                isOwner={trip.ownerUid === user?.uid}
                 onOpen={() => router.push(`/trips/${trip.id}`)}
                 onDelete={async () => {
                   if (!confirm(`למחוק את "${trip.name}"?`)) return;
@@ -86,7 +99,44 @@ export default function TripsPage() {
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}
         onCreate={(id) => router.push(`/trips/${id}/settings`)}
+        uid={user?.uid ?? ""}
       />
+    </div>
+  );
+}
+
+// ─── User Avatar ──────────────────────────────────────────────────────────────
+
+function UserAvatar({ user, onSignOut }: { user: ReturnType<typeof useAuth>["user"]; onSignOut: () => void }) {
+  const [open, setOpen] = useState(false);
+  const initial = user?.displayName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "?";
+
+  return (
+    <div className="relative">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-8 h-8 rounded-full bg-[#1b4332] text-white text-sm font-semibold flex items-center justify-center overflow-hidden flex-shrink-0"
+      >
+        {user?.photoURL
+          ? <img src={user.photoURL} alt="" className="w-full h-full object-cover" />
+          : initial}
+      </button>
+
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-10 z-20 bg-white border border-border rounded-xl shadow-lg p-3 w-52 space-y-2 text-sm">
+            <p className="text-xs text-muted-foreground truncate px-1">{user?.displayName ?? user?.email}</p>
+            <hr className="border-border" />
+            <button
+              onClick={() => { setOpen(false); onSignOut(); }}
+              className="w-full text-right px-2 py-1.5 rounded-md hover:bg-muted transition-colors text-destructive"
+            >
+              יציאה
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -95,10 +145,12 @@ export default function TripsPage() {
 
 function TripCard({
   trip,
+  isOwner,
   onOpen,
   onDelete,
 }: {
   trip: Trip;
+  isOwner: boolean;
   onOpen: () => void;
   onDelete: () => void;
 }) {
@@ -113,6 +165,9 @@ function TripCard({
             <h2 className="font-semibold text-foreground text-base">{trip.name}</h2>
             {days !== null && days > 0 && days <= 60 && (
               <Badge variant="secondary" className="text-xs">עוד {days} ימים</Badge>
+            )}
+            {!isOwner && (
+              <Badge variant="outline" className="text-xs text-muted-foreground">משותף</Badge>
             )}
           </div>
           <p className="text-sm text-muted-foreground mb-3">{trip.schoolName}</p>
@@ -147,17 +202,17 @@ function TripCard({
       </div>
 
       <div className="mt-4 flex items-center justify-between border-t border-border pt-3">
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onOpen}>פתח</Button>
-        </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="text-destructive hover:text-destructive"
-          onClick={onDelete}
-        >
-          מחק
-        </Button>
+        <Button variant="outline" size="sm" onClick={onOpen}>פתח</Button>
+        {isOwner && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive hover:text-destructive"
+            onClick={onDelete}
+          >
+            מחק
+          </Button>
+        )}
       </div>
     </Card>
   );
@@ -191,17 +246,19 @@ function NewTripDialog({
   open,
   onClose,
   onCreate,
+  uid,
 }: {
   open: boolean;
   onClose: () => void;
   onCreate: (tripId: string) => void;
+  uid: string;
 }) {
   const [name, setName] = useState("");
   const [schoolName, setSchoolName] = useState("");
   const [saving, setSaving] = useState(false);
 
   async function handleCreate() {
-    if (!name.trim()) return;
+    if (!name.trim() || !uid) return;
     setSaving(true);
     try {
       const id = await createTrip({
@@ -212,7 +269,7 @@ function NewTripDialog({
         classes: [],
         accommodation: "",
         transport: "",
-        ownerUid: "temp",
+        ownerUid: uid,
         collaborators: [],
       });
       setName("");
