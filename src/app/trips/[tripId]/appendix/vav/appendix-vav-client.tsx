@@ -66,12 +66,14 @@ export function AppendixVavClient() {
 
   const [data, setData]     = useState<VavData>({ buses: [], actual: {}, splits: {} });
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const isPending  = useRef(false); // true while local changes haven't been saved yet
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "vav", (raw) => {
+      if (isPending.current) return; // don't overwrite pending local changes
       if (raw?.buses) {
         setData({
           buses: (raw.buses as Bus[]).map((b) => ({
@@ -91,10 +93,12 @@ export function AppendixVavClient() {
   // ── Save ───────────────────────────────────────────────────────────────────
 
   function save(updated: VavData) {
+    isPending.current = true;
     setStatus("saving");
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
       await saveAppendix(tripId, "vav", updated as unknown as Record<string, unknown>);
+      isPending.current = false;
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);
     }, 1200);
