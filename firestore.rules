@@ -3,16 +3,9 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ── Signatures ────────────────────────────────────────────────────────────
-    // Public read (signers have no account).
-    // Write is restricted: only allowed when status is "pending" and not expired,
-    // and only the signature/status/signedAt fields may be changed.
     match /signatures/{docId} {
       allow read: if true;
-
-      // Initial creation — allowed from the app (trip owner sets up the request)
       allow create: if true;
-
-      // Submission — signer updates signature + status only, while still pending and not expired
       allow update: if
         resource.data.status == "pending" &&
         request.time < resource.data.expiresAt &&
@@ -21,11 +14,20 @@ service cloud.firestore {
         request.resource.data.status == "signed" &&
         request.resource.data.signature is string &&
         request.resource.data.signature.size() < 300000;
-
       allow delete: if false;
     }
 
     // ── Trips ─────────────────────────────────────────────────────────────────
+
+    // For reads: check ownership directly on the document being read (no get() needed)
+    function canReadTrip(tripData) {
+      return request.auth != null && (
+        tripData.ownerUid == request.auth.uid ||
+        request.auth.uid in tripData.collaborators
+      );
+    }
+
+    // For subcollections: must call get() since we only have tripId
     function isMember(tripId) {
       let trip = get(/databases/$(database)/documents/trips/$(tripId)).data;
       return request.auth != null && (
@@ -35,15 +37,9 @@ service cloud.firestore {
     }
 
     match /trips/{tripId} {
-      // Only members can read their own trips
-      allow read: if isMember(tripId);
-
-      // Only the creator can create (and must set themselves as owner)
+      allow read:   if canReadTrip(resource.data);
       allow create: if request.auth != null &&
         request.resource.data.ownerUid == request.auth.uid;
-
-      // Owner or collaborator can update.
-      // Exception: any authenticated user can add themselves to collaborators (join via invite link).
       allow update: if request.auth != null && (
         resource.data.ownerUid == request.auth.uid ||
         request.auth.uid in resource.data.collaborators ||
@@ -52,12 +48,9 @@ service cloud.firestore {
           request.auth.uid in request.resource.data.collaborators
         )
       );
-
-      // Only the owner can delete
       allow delete: if request.auth != null &&
         resource.data.ownerUid == request.auth.uid;
 
-      // Subcollections (students, staff, appendices) — owner or collaborator only
       match /{subcollection}/{docId} {
         allow read, write: if isMember(tripId);
       }
