@@ -45,6 +45,7 @@ export function getTripNav(tripId: string): NavGroup[] {
         { label: "הודעת מסע", href: `${base}/masa`, icon: "masa" },
         { label: "שילוט אוטובוסים", href: `${base}/signs`, icon: "signs" },
         { label: "אישור ביטחוני", href: `${base}/security`, icon: "security" },
+        { label: "נספחים נוספים", href: `${base}/extra-appendices`, icon: "extra" },
       ],
     },
   ];
