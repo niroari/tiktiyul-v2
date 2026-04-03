@@ -293,29 +293,6 @@ export function MasaClient() {
     }
   }
 
-  // ── Helpers ─────────────────────────────────────────────────────────────────
-
-  const inputCls = "w-full text-sm border border-border rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:border-primary";
-  const labelCls = "text-xs font-medium text-muted-foreground";
-
-  function Field({ label, value, onChange, placeholder, dir }: {
-    label: string; value: string; onChange: (v:string)=>void; placeholder?: string; dir?: string;
-  }) {
-    return (
-      <div className="space-y-1">
-        <label className={labelCls}>{label}</label>
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          dir={dir}
-          className={inputCls}
-        />
-      </div>
-    );
-  }
-
   // ── Render ───────────────────────────────────────────────────────────────────
 
   return (
@@ -534,6 +511,27 @@ export function MasaClient() {
           dangerouslySetInnerHTML={{ __html: buildPage1(data) + buildPage2(data) }}
         />
       )}
+    </div>
+  );
+}
+
+const inputCls = "w-full text-sm border border-border rounded-[var(--radius-sm)] px-3 py-2 focus:outline-none focus:border-primary";
+const labelCls = "text-xs font-medium text-muted-foreground";
+
+function Field({ label, value, onChange, placeholder, dir }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string; dir?: string;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className={labelCls}>{label}</label>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        dir={dir}
+        className={inputCls}
+      />
     </div>
   );
 }
