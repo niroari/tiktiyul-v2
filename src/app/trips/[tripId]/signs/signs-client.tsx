@@ -145,7 +145,7 @@ export function SignsClient() {
   async function importFromVav() {
     const raw = await getAppendix(tripId, "vav");
     if (!raw?.buses) return;
-    const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳"];
+    const SHORT_PARTS = ["א׳", "ב׳", "ג׳"];
     const vavBuses = raw.buses as { classSelections?: string[] }[];
     const imported: Bus[] = vavBuses.map((b, i) => {
       const selections = (b.classSelections ?? []).filter(Boolean);
@@ -155,7 +155,7 @@ export function SignsClient() {
           const idx = sel.lastIndexOf("|");
           const cls = sel.slice(0, idx);
           const part = parseInt(sel.slice(idx + 1));
-          return `${cls} — ${PART_LABELS[part] ?? ""}`;
+          return `${cls} (${SHORT_PARTS[part] ?? ""})`;
         })
         .join(", ");
       return { id: crypto.randomUUID(), num: String(i + 1), classes: label };
