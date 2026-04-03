@@ -7,6 +7,7 @@ import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppendixActions } from "@/components/appendix-actions";
+import { RemoteSignature } from "@/components/remote-signature";
 
 type FormData = {
   date: string;
@@ -154,12 +155,18 @@ export function AppendixGimelClient() {
 
       <AppendixActions title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" filename="נספח-ג" getHTML={getHTML} />
 
-      {/* Signature placeholder */}
+      {/* Signature */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
-        <h2 className="text-sm font-semibold text-foreground mb-3">חתימת מנהל/ת ביה"ס</h2>
-        <div className="border border-dashed border-border rounded-[var(--radius-sm)] p-6 text-center">
-          <span className="text-xs text-muted-foreground">חתימות — שלב 5</span>
-        </div>
+        <h2 className="text-sm font-semibold text-foreground mb-4">חתימת מנהל/ת ביה"ס</h2>
+        <RemoteSignature
+          tripId={tripId}
+          role="c_principal"
+          roleName='מנהל/ת ביה"ס'
+          label='חתימת מנהל/ת ביה"ס'
+          tripName={trip?.name ?? ""}
+          schoolName={trip?.schoolName ?? ""}
+          leaderName={form.leaderName}
+        />
       </div>
     </div>
   );

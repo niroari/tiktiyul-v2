@@ -5,6 +5,8 @@ import { useParams } from "next/navigation";
 import { useTrip } from "@/hooks/use-trip";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { AppendixActions } from "@/components/appendix-actions";
+import { SignatureCanvas, type SignatureCanvasHandle } from "@/components/signature-canvas";
+import { RemoteSignature } from "@/components/remote-signature";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -57,7 +59,11 @@ export function AppendixBetClient() {
   const { trip } = useTrip(tripId);
   const [form, setForm] = useState<FormData>(INITIAL);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const saveTimer    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const leaderSigRef = useRef<SignatureCanvasHandle>(null);
+
+  // Leader sig — saved to appendix
+  const [leaderSig, setLeaderSig] = useState<string | null>(null);
 
   // Load from Firestore
   useEffect(() => {
@@ -72,10 +78,25 @@ export function AppendixBetClient() {
           principalNotes: String(raw.principalNotes ?? ""),
           schedule:       (raw.schedule as ScheduleRow[]) ?? [EMPTY_ROW()],
         });
+        if (raw.leaderSig) setLeaderSig(raw.leaderSig as string);
       }
     });
     return () => unsub();
   }, [tripId]);
+
+  function saveLeaderSig() {
+    const sig = leaderSigRef.current;
+    if (!sig || sig.isEmpty()) return;
+    const dataUrl = sig.toDataURL();
+    setLeaderSig(dataUrl);
+    saveAppendix(tripId, "bet", { ...form, leaderSig: dataUrl } as unknown as Record<string, unknown>);
+  }
+
+  function clearLeaderSig() {
+    leaderSigRef.current?.clear();
+    setLeaderSig(null);
+    saveAppendix(tripId, "bet", { ...form, leaderSig: null } as unknown as Record<string, unknown>);
+  }
 
   function scheduleAutoSave(updated: FormData) {
     setStatus("saving");
@@ -347,18 +368,48 @@ export function AppendixBetClient() {
 
       <AppendixActions title="נספח ב׳ — אישור תוכנית הטיול" filename="נספח-ב" getHTML={getHTML} />
 
-      {/* Signatures placeholder */}
-      <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
-        <h2 className="text-sm font-semibold text-foreground mb-3">חתימות</h2>
-        <div className="grid grid-cols-3 gap-4">
-          {["מורה אחראי/ת", "רכז/ת טיולים", "מנהל/ת ביה\"ס"].map((role) => (
-            <div key={role} className="border border-dashed border-border rounded-[var(--radius-sm)] p-4 text-center">
-              <p className="text-xs font-medium text-muted-foreground mb-2">{role}</p>
-              <div className="h-16 bg-muted/40 rounded flex items-center justify-center">
-                <span className="text-xs text-muted-foreground">חתימות — שלב 5</span>
+      {/* Signatures */}
+      <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5 space-y-5">
+        <h2 className="text-sm font-semibold text-foreground border-b border-border pb-2">חתימות</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+
+          {/* Leader — local canvas */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium text-muted-foreground">מורה אחראי/ת</p>
+            {leaderSig ? (
+              <div className="space-y-2">
+                <img src={leaderSig} alt="חתימה" className="w-full h-[90px] object-contain border border-border rounded bg-white p-1" />
+                <button onClick={clearLeaderSig} className="text-xs text-destructive hover:text-destructive/80 transition-colors">מחק חתימה</button>
               </div>
-            </div>
-          ))}
+            ) : (
+              <div className="space-y-2">
+                <SignatureCanvas ref={leaderSigRef} onEnd={saveLeaderSig} />
+                <button onClick={() => leaderSigRef.current?.clear()} className="text-xs text-muted-foreground hover:text-foreground transition-colors">נקה</button>
+              </div>
+            )}
+          </div>
+
+          {/* Coordinator — remote */}
+          <RemoteSignature
+            tripId={tripId}
+            role="b_coordinator"
+            roleName="רכז/ת טיולים"
+            label="רכז/ת טיולים"
+            tripName={trip?.name ?? ""}
+            schoolName={trip?.schoolName ?? ""}
+            leaderName={form.leaderName || trip?.name || ""}
+          />
+
+          {/* Principal — remote */}
+          <RemoteSignature
+            tripId={tripId}
+            role="b_principal"
+            roleName='מנהל/ת ביה"ס'
+            label='מנהל/ת ביה"ס'
+            tripName={trip?.name ?? ""}
+            schoolName={trip?.schoolName ?? ""}
+            leaderName={form.leaderName || trip?.name || ""}
+          />
         </div>
       </div>
     </div>
