@@ -196,7 +196,7 @@ export function TripMetadataForm() {
           <Label htmlFor="transport">תחבורה</Label>
           <Input
             id="transport"
-            placeholder="לדוגמה: אוטובוסים, רכב פרטי"
+            placeholder="שם חברת ההסעה"
             value={form.transport}
             onChange={(e) => setField("transport", e.target.value)}
           />
