@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { uploadFile, deleteFileByUrl } from "@/lib/firebase-storage";
 
-const MAX_MB = 1.5;
+const MAX_MB = 2.5;
 
 export function SecurityClient() {
   const { tripId } = useParams<{ tripId: string }>();
