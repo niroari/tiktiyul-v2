@@ -123,7 +123,7 @@ export function DashboardClient() {
           <h2 className="text-sm font-semibold text-foreground mb-4">נספחים</h2>
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {APPENDICES.map((a) => {
-              const saved = !!appendixMap[a.slug];
+              const saved = a.slug === "zayin" ? students.length > 0 : !!appendixMap[a.slug];
               return (
                 <Link
                   key={a.slug}
