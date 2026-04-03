@@ -131,7 +131,7 @@ export function AppendixGimelClient() {
           </div>
           <div className="space-y-1.5 col-span-2">
             <Label>אזור / יעד הטיול</Label>
-            <Input value={form.area} onChange={(e) => setField("area", e.target.value)} placeholder="לדוגמה: גליל עליון, מצדה..." />
+            <Input value={form.area} onChange={(e) => setField("area", e.target.value)} placeholder="לדוגמה: מדבר יהודה, גליל עליון" />
           </div>
         </div>
       </div>
