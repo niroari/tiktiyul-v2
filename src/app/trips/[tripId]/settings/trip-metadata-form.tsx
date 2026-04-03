@@ -142,21 +142,13 @@ export function TripMetadataForm() {
 
       {/* Classes */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">כיתות</h2>
-          <Button type="button" variant="ghost" size="sm" onClick={addClass} className="text-primary">
-            <svg className="w-3.5 h-3.5 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            הוסף כיתה
-          </Button>
-        </div>
+        <h2 className="text-sm font-semibold text-foreground">כיתות (או שם השכבה)</h2>
 
         <div className="space-y-2">
           {form.classes.map((cls, i) => (
             <div key={i} className="flex items-center gap-2">
               <Input
-                placeholder="שם הכיתה — לדוגמה: ט׳1"
+                placeholder="לדוגמה: שכבת ז׳, ח׳1"
                 value={cls.name}
                 onChange={(e) => setClass(i, "name", e.target.value)}
                 className="flex-1"
