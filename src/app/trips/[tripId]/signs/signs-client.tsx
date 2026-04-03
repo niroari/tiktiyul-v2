@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { getAppendix, saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 
 const MAX_LOGO_KB = 200;
 
@@ -142,6 +142,27 @@ export function SignsClient() {
     updateData({ buses: data.buses.filter((b) => b.id !== id) });
   }
 
+  async function importFromVav() {
+    const raw = await getAppendix(tripId, "vav");
+    if (!raw?.buses) return;
+    const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳"];
+    const vavBuses = raw.buses as { classSelections?: string[] }[];
+    const imported: Bus[] = vavBuses.map((b, i) => {
+      const selections = (b.classSelections ?? []).filter(Boolean);
+      const label = selections
+        .map((sel) => {
+          if (!sel.includes("|")) return sel;
+          const idx = sel.lastIndexOf("|");
+          const cls = sel.slice(0, idx);
+          const part = parseInt(sel.slice(idx + 1));
+          return `${cls} — ${PART_LABELS[part] ?? ""}`;
+        })
+        .join(", ");
+      return { id: crypto.randomUUID(), num: String(i + 1), classes: label };
+    });
+    updateData({ buses: imported });
+  }
+
   function printOne(bus: Bus) {
     openSignPrintWindow(buildSignHtml(bus, data.logo));
   }
@@ -184,9 +205,20 @@ export function SignsClient() {
           <h1 className="text-xl font-semibold text-foreground">שילוט אוטובוסים</h1>
           <p className="text-sm text-muted-foreground mt-0.5">שלטי A4 לתליה על אוטובוסים</p>
         </div>
-        <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
-          {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
+            {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
+          </span>
+          <button
+            onClick={importFromVav}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            יבא מטבלת שליטה
+          </button>
+        </div>
       </div>
 
       {/* Logo section */}
