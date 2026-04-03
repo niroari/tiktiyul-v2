@@ -38,14 +38,13 @@ export function printHTML(innerHTML: string, title: string) {
   setTimeout(() => { win.print(); }, 600);
 }
 
-// Hidden div approach for PDF — renders clean HTML offscreen, captures with html2canvas
+// Renders clean HTML offscreen, captures with html2canvas-pro (supports oklch/lab)
 async function exportToPDF(getHTML: () => string, filename: string) {
-  const html2canvas = (await import("html2canvas")).default;
+  const html2canvas = (await import("html2canvas-pro")).default;
   const { jsPDF } = await import("jspdf");
 
-  // Render into a visible-but-offscreen container so html2canvas can measure it
   const wrapper = document.createElement("div");
-  wrapper.style.cssText = "position:absolute;top:0;left:0;width:794px;z-index:-9999;opacity:0;pointer-events:none;";
+  wrapper.style.cssText = "position:fixed;top:0;left:0;width:794px;z-index:-9999;opacity:0;pointer-events:none;";
 
   const container = document.createElement("div");
   container.style.cssText = [
@@ -57,13 +56,13 @@ async function exportToPDF(getHTML: () => string, filename: string) {
     "font-size:10px",
     "color:#111",
     "line-height:1.5",
+    "width:794px",
   ].join(";");
   container.innerHTML = getHTML();
   wrapper.appendChild(container);
   document.body.appendChild(wrapper);
 
-  // Wait a tick for layout
-  await new Promise((r) => setTimeout(r, 100));
+  await new Promise((r) => setTimeout(r, 150));
 
   try {
     const canvas = await html2canvas(container, {
