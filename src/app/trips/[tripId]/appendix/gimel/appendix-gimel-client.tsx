@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTrip } from "@/hooks/use-trip";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { sigDocId, subscribeToSignature } from "@/lib/firestore/signatures";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppendixActions } from "@/components/appendix-actions";
@@ -29,6 +30,13 @@ export function AppendixGimelClient() {
   const [form, setForm] = useState<FormData>(INITIAL);
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [principalSig, setPrincipalSig] = useState<string | null>(null);
+
+  useEffect(() => {
+    return subscribeToSignature(sigDocId(tripId, "c_principal"), (doc) => {
+      setPrincipalSig(doc?.status === "signed" ? (doc.signature ?? null) : null);
+    });
+  }, [tripId]);
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "gimel", (raw) => {
@@ -75,7 +83,10 @@ export function AppendixGimelClient() {
         <p><strong>${form.principalName}</strong></p>
         <p>מנהל/ת ביה"ס — ${trip?.schoolName ?? ""}</p>
         <br/>
-        <p>חתימה: _______________________</p>
+        <p>חתימה:</p>
+        ${principalSig
+          ? `<img src="${principalSig}" style="max-height:70px;max-width:200px;object-fit:contain;display:block;margin-top:4px">`
+          : `<div style="border-bottom:1px solid #555;width:200px;margin-top:8px"></div>`}
       </div>
     `;
   }

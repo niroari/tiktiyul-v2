@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { useTrip } from "@/hooks/use-trip";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { sigDocId, subscribeToSignature } from "@/lib/firestore/signatures";
 import { AppendixActions } from "@/components/appendix-actions";
 import { SignatureCanvas, type SignatureCanvasHandle } from "@/components/signature-canvas";
 import { RemoteSignature } from "@/components/remote-signature";
@@ -64,6 +65,9 @@ export function AppendixBetClient() {
 
   // Leader sig — saved to appendix
   const [leaderSig, setLeaderSig] = useState<string | null>(null);
+  // Remote sigs — subscribed from signatures collection
+  const [coordinatorSig, setCoordinatorSig] = useState<string | null>(null);
+  const [principalSig, setPrincipalSig]     = useState<string | null>(null);
 
   // Load from Firestore
   useEffect(() => {
@@ -82,6 +86,17 @@ export function AppendixBetClient() {
       }
     });
     return () => unsub();
+  }, [tripId]);
+
+  // Subscribe to remote sigs so they appear in the print export
+  useEffect(() => {
+    const unsubC = subscribeToSignature(sigDocId(tripId, "b_coordinator"), (doc) => {
+      setCoordinatorSig(doc?.status === "signed" ? (doc.signature ?? null) : null);
+    });
+    const unsubP = subscribeToSignature(sigDocId(tripId, "b_principal"), (doc) => {
+      setPrincipalSig(doc?.status === "signed" ? (doc.signature ?? null) : null);
+    });
+    return () => { unsubC(); unsubP(); };
   }, [tripId]);
 
   function saveLeaderSig() {
@@ -178,7 +193,17 @@ export function AppendixBetClient() {
         <tr>
           <th>מורה אחראי/ת</th><th>רכז/ת טיולים</th><th>מנהל/ת ביה"ס</th>
         </tr>
-        <tr><td style="height:40px"></td><td></td><td></td></tr>
+        <tr>
+          <td style="height:70px;text-align:center;vertical-align:middle">
+            ${leaderSig ? `<img src="${leaderSig}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
+          </td>
+          <td style="text-align:center;vertical-align:middle">
+            ${coordinatorSig ? `<img src="${coordinatorSig}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
+          </td>
+          <td style="text-align:center;vertical-align:middle">
+            ${principalSig ? `<img src="${principalSig}" style="max-height:60px;max-width:100%;object-fit:contain">` : ""}
+          </td>
+        </tr>
       </table>
     `;
   }
