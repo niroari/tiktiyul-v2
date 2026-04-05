@@ -35,6 +35,7 @@ export function getTripNav(tripId: string): NavGroup[] {
         { label: "אישור הורים", href: `${base}/appendix/chet`, letter: "ח" },
         { label: "ציוד חובה", href: `${base}/appendix/tet`, letter: "ט" },
         { label: "מגבלות רפואיות", href: `${base}/appendix/yod`, letter: "י" },
+        { label: "בדיקת אוטובוס", href: `${base}/appendix/bus-check`, letter: 'ט"ו' },
       ],
     },
     {

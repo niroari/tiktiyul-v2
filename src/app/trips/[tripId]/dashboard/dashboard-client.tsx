@@ -34,6 +34,7 @@ const APPENDICES = [
   { letter: "ח", label: "אישור הורים",       slug: "chet" },
   { letter: "ט", label: "ציוד חובה",         slug: "tet" },
   { letter: "י", label: "מגבלות רפואיות",    slug: "yod" },
+  { letter: 'ט"ו', label: "בדיקת אוטובוס",   slug: "bus-check" },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -165,13 +166,14 @@ export function DashboardClient() {
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             {APPENDICES.map((a) => {
               const saved = a.slug === "zayin" ? students.length > 0 : !!appendixMap[a.slug];
+              const letterDisplay = a.letter.includes('"') ? a.letter : `${a.letter}׳`;
               return (
                 <Link
                   key={a.slug}
                   href={`/trips/${tripId}/appendix/${a.slug}`}
                   className="rounded-[var(--radius-sm)] border border-border bg-muted/40 p-3 text-center hover:border-primary/40 hover:bg-[var(--brand-light)] transition-colors group"
                 >
-                  <div className="text-base font-bold text-muted-foreground group-hover:text-primary">{a.letter}׳</div>
+                  <div className="text-base font-bold text-muted-foreground group-hover:text-primary">{letterDisplay}</div>
                   <div className="text-xs text-muted-foreground mt-0.5 leading-tight line-clamp-2">{a.label}</div>
                   <div className={`mt-1.5 w-2 h-2 rounded-full mx-auto transition-colors ${saved ? "bg-[var(--success)]" : "bg-border"}`} />
                 </Link>
