@@ -71,9 +71,46 @@ export function DashboardClient() {
 
   // Alerts
   const alerts: { type: "danger" | "warn" | "info"; text: string }[] = [];
+
+  // Trip basics
   if (!trip?.startDate) alerts.push({ type: "warn", text: "תאריך טיול לא הוגדר — עדכן בפרטי הטיול" });
   if (students.length === 0) alerts.push({ type: "warn", text: "טרם יובאו תלמידים — ייבא רשימת תלמידים" });
   if (staff.length === 0) alerts.push({ type: "info", text: "צוות הטיול ריק — הוסף אנשי צוות" });
+
+  // Buses
+  const vavBuses = (appendixMap["vav"]?.buses as unknown[]) ?? [];
+  if (students.length > 0 && vavBuses.length === 0)
+    alerts.push({ type: "warn", text: "לא הוגדרו אוטובוסים בטבלת השליטה" });
+
+  // Security approval
+  if (!(appendixMap["security"]?.fileUrl as string))
+    alerts.push({ type: "warn", text: "אישור ביטחוני לא הועלה" });
+
+  // Key appendices not started
+  if (!appendixMap["bet"])
+    alerts.push({ type: "warn", text: "נספח ב׳ (אישור מנהל ורכז) לא הושלם" });
+  if (!appendixMap["gimel"])
+    alerts.push({ type: "warn", text: "נספח ג׳ (כתב מינוי) לא הושלם" });
+
+  // Medical restrictions — remind if students loaded but yod is empty
+  const yodRows = (appendixMap["yod"]?.rows as unknown[]) ?? [];
+  if (going.length > 0 && yodRows.length === 0)
+    alerts.push({ type: "info", text: "נספח י׳ ריק — ודא שאין תלמידים עם מגבלות רפואיות" });
+
+  // Dietary flags — remind if no going student has any flag set
+  const anyDietary = going.some(
+    (s) => s.dietaryFlags?.vegetarian || s.dietaryFlags?.vegan || s.dietaryFlags?.glutenFree
+  );
+  if (going.length > 0 && !anyDietary)
+    alerts.push({ type: "info", text: "אין תלמידים עם מגבלות מזון מוגדרות — ודא שהמידע עודכן" });
+
+  // Upcoming trip with incomplete appendices
+  const APPENDIX_SLUGS = ["alef","bet","gimel","dalet","hey","vav","zayin","chet","tet","yod"];
+  const missingCount = APPENDIX_SLUGS.filter((slug) =>
+    slug === "zayin" ? going.length === 0 : !appendixMap[slug]
+  ).length;
+  if (days !== null && days <= 14 && days > 0 && missingCount > 0)
+    alerts.push({ type: "danger", text: `הטיול בעוד ${days} ימים — נותרו ${missingCount} נספחים שלא הושלמו` });
 
   if (loading) {
     return <div className="text-sm text-muted-foreground p-4">טוען...</div>;
