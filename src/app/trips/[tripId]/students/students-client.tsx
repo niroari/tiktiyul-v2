@@ -166,6 +166,35 @@ export function StudentsClient() {
         </div>
       </div>
 
+      {/* Excel format instructions */}
+      <div className="mb-5 rounded-[var(--radius)] border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+        <p className="font-medium text-foreground mb-1">פורמט קובץ Excel לייבוא</p>
+        <p className="mb-2">הקובץ צריך לכלול שורת כותרות עם העמודות הבאות (סדר העמודות לא משנה):</p>
+        <div className="flex flex-wrap gap-1.5">
+          {[
+            { name: "ת.ז", required: true },
+            { name: "שם משפחה", required: true },
+            { name: "שם פרטי", required: true },
+            { name: "כיתה", required: true },
+            { name: "מקבילה", required: true },
+            { name: "מין", required: false },
+            { name: "טלפון נייד", required: false },
+          ].map(({ name, required }) => (
+            <span
+              key={name}
+              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono border ${
+                required
+                  ? "bg-white border-border text-foreground"
+                  : "bg-white border-dashed border-border text-muted-foreground"
+              }`}
+            >
+              {name}
+              {!required && <span className="mr-1 text-[10px]">(אופציונלי)</span>}
+            </span>
+          ))}
+        </div>
+      </div>
+
       {/* Search */}
       <div className="mb-4">
         <Input
