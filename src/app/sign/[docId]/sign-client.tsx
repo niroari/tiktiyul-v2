@@ -9,6 +9,68 @@ import {
 } from "@/lib/firestore/signatures";
 import { SignatureCanvas, type SignatureCanvasHandle } from "@/components/signature-canvas";
 
+const DOC_RENDER_WIDTH = 820; // px — matches the print layout width
+
+function buildDocHtml(innerHtml: string) {
+  return `<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Times New Roman', serif; direction: rtl; text-align: right;
+       padding: 20px; font-size: 11px; color: #111; background: #fff; }
+table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+th, td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 10px; }
+th { background: #1b4332; color: white; font-weight: 600; }
+.header { text-align: center; border-bottom: 2px solid #1b4332; padding-bottom: 8px; margin-bottom: 12px; }
+.header .ministry { font-size: 8px; color: #555; }
+.header .title { font-size: 15px; font-weight: bold; margin-top: 4px; }
+.meta { display: flex; gap: 24px; font-size: 9.5px; margin-bottom: 8px; flex-wrap: wrap; }
+.section-title { font-weight: bold; font-size: 12px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+.letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 16px 20px; line-height: 2.2; font-size: 12px; margin: 10px 0; }
+img { max-width: 100%; }
+</style>
+</head>
+<body>${innerHtml}</body>
+</html>`;
+}
+
+function DocumentPreview({ html }: { html: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+  const IFRAME_HEIGHT = 880;
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const update = () => setScale(el.offsetWidth / DOC_RENDER_WIDTH);
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={containerRef} className="w-full overflow-hidden rounded-lg border border-border bg-white">
+      <iframe
+        srcDoc={buildDocHtml(html)}
+        sandbox="allow-same-origin"
+        scrolling="no"
+        style={{
+          width: DOC_RENDER_WIDTH,
+          height: IFRAME_HEIGHT,
+          border: "none",
+          display: "block",
+          transform: `scale(${scale})`,
+          transformOrigin: "top right",
+          marginBottom: IFRAME_HEIGHT * (scale - 1),
+        }}
+      />
+    </div>
+  );
+}
+
 export function SignClient() {
   const { docId } = useParams<{ docId: string }>();
 
@@ -116,13 +178,16 @@ export function SignClient() {
   if (state === "already_signed") {
     return (
       <Shell>
-        <div className="bg-white rounded-xl border border-border p-6 space-y-4">
-          <InfoCard doc={sigDoc!} />
-          <div className="border-t border-border pt-4 text-center space-y-2">
-            <span className="text-sm text-green-700 font-medium">✓ מסמך זה כבר נחתם</span>
-            {sigDoc?.signature && (
-              <img src={sigDoc.signature} alt="חתימה" className="max-h-16 object-contain mx-auto border border-border rounded p-1" />
-            )}
+        <div className="space-y-4">
+          {sigDoc?.previewHTML && <DocumentPreview html={sigDoc.previewHTML} />}
+          <div className="bg-white rounded-xl border border-border p-6 space-y-4">
+            <InfoCard doc={sigDoc!} />
+            <div className="border-t border-border pt-4 text-center space-y-2">
+              <span className="text-sm text-green-700 font-medium">✓ מסמך זה כבר נחתם</span>
+              {sigDoc?.signature && (
+                <img src={sigDoc.signature} alt="חתימה" className="max-h-16 object-contain mx-auto border border-border rounded p-1" />
+              )}
+            </div>
           </div>
         </div>
       </Shell>
@@ -133,6 +198,9 @@ export function SignClient() {
 
   return (
     <Shell>
+      <div className="space-y-4">
+        {sigDoc?.previewHTML && <DocumentPreview html={sigDoc.previewHTML} />}
+
       <div className="bg-white rounded-xl border border-border p-6 space-y-5">
         <InfoCard doc={sigDoc!} />
 
@@ -162,6 +230,7 @@ export function SignClient() {
         >
           {state === "submitting" ? "שומר..." : "חתום ושלח ✓"}
         </button>
+      </div>
       </div>
     </Shell>
   );

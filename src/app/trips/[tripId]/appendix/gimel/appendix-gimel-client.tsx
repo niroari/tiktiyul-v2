@@ -177,6 +177,7 @@ export function AppendixGimelClient() {
           tripName={trip?.name ?? ""}
           schoolName={trip?.schoolName ?? ""}
           leaderName={form.leaderName}
+          getPreviewHTML={getHTML}
         />
       </div>
     </div>

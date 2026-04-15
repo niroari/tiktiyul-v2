@@ -13,17 +13,18 @@ import { db } from "@/lib/firebase";
 export type SigStatus = "pending" | "signed";
 
 export type SignatureDoc = {
-  tripId:     string;
-  role:       string;
-  roleName:   string;
-  tripName:   string;
-  schoolName: string;
-  leaderName: string;
-  status:     SigStatus;
-  signature:  string | null;   // base64 PNG data URL
-  createdAt:  Timestamp;
-  expiresAt:  Timestamp;
-  signedAt?:  Timestamp;
+  tripId:      string;
+  role:        string;
+  roleName:    string;
+  tripName:    string;
+  schoolName:  string;
+  leaderName:  string;
+  previewHTML: string | null;  // inner HTML snapshot of the document at send time
+  status:      SigStatus;
+  signature:   string | null;  // base64 PNG data URL
+  createdAt:   Timestamp;
+  expiresAt:   Timestamp;
+  signedAt?:   Timestamp;
 };
 
 function sigRef(docId: string) {
@@ -37,7 +38,7 @@ export function sigDocId(tripId: string, role: string): string {
 
 export async function createSignatureRequest(
   docId: string,
-  data: Pick<SignatureDoc, "tripId" | "role" | "roleName" | "tripName" | "schoolName" | "leaderName">
+  data: Pick<SignatureDoc, "tripId" | "role" | "roleName" | "tripName" | "schoolName" | "leaderName" | "previewHTML">
 ): Promise<void> {
   const expiry = new Date();
   expiry.setDate(expiry.getDate() + 30);

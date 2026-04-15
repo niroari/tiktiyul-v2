@@ -10,16 +10,17 @@ import {
 } from "@/lib/firestore/signatures";
 
 type Props = {
-  tripId:     string;
-  role:       string;       // e.g. "b_coordinator"
-  roleName:   string;       // Hebrew, e.g. "רכז/ת"
-  tripName:   string;
-  schoolName: string;
-  leaderName: string;
-  label:      string;       // Display label above the widget
+  tripId:          string;
+  role:            string;       // e.g. "b_coordinator"
+  roleName:        string;       // Hebrew, e.g. "רכז/ת"
+  tripName:        string;
+  schoolName:      string;
+  leaderName:      string;
+  label:           string;       // Display label above the widget
+  getPreviewHTML?: () => string; // snapshot of the document at send time
 };
 
-export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, leaderName, label }: Props) {
+export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, leaderName, label, getPreviewHTML }: Props) {
   const docId = sigDocId(tripId, role);
 
   const [sigDoc, setSigDoc]       = useState<SignatureDoc | null>(null);
@@ -53,8 +54,8 @@ export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, 
   async function sendLink() {
     setSending(true);
     try {
-      await createSignatureRequest(docId, { tripId, role, roleName, tripName, schoolName, leaderName });
-      setSigDoc((prev) => prev ?? { tripId, role, roleName, tripName, schoolName, leaderName, status: "pending", signature: null, createdAt: null as any, expiresAt: null as any });
+      await createSignatureRequest(docId, { tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: getPreviewHTML?.() ?? null });
+      setSigDoc((prev) => prev ?? { tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: null, status: "pending", signature: null, createdAt: null as any, expiresAt: null as any });
       subscribeNow();
       const url = `${window.location.origin}/sign/${docId}`;
       setShareUrl(url);

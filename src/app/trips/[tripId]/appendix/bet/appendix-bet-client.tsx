@@ -423,6 +423,7 @@ export function AppendixBetClient() {
             tripName={trip?.name ?? ""}
             schoolName={trip?.schoolName ?? ""}
             leaderName={form.leaderName || trip?.name || ""}
+            getPreviewHTML={getHTML}
           />
 
           {/* Principal — remote */}
@@ -434,6 +435,7 @@ export function AppendixBetClient() {
             tripName={trip?.name ?? ""}
             schoolName={trip?.schoolName ?? ""}
             leaderName={form.leaderName || trip?.name || ""}
+            getPreviewHTML={getHTML}
           />
         </div>
       </div>
