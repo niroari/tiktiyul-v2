@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useStudents } from "@/hooks/use-students";
-import { addStudent, updateStudent, deleteStudent } from "@/lib/firestore/students";
+import { addStudent, updateStudent, deleteStudent, deleteAllStudents } from "@/lib/firestore/students";
 import { ExcelImport } from "@/components/excel-import";
 import { Student, Gender } from "@/lib/types";
 
@@ -65,6 +65,8 @@ export function StudentsClient() {
   const [form, setForm] = useState<StudentFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const going = students.filter((s) => s.isGoing).length;
   const notGoing = students.length - going;
@@ -122,6 +124,16 @@ export function StudentsClient() {
     await updateStudent(tripId, student.id, { isGoing: !student.isGoing });
   }
 
+  async function handleClearAll() {
+    setClearing(true);
+    try {
+      await deleteAllStudents(tripId);
+      setClearDialogOpen(false);
+    } finally {
+      setClearing(false);
+    }
+  }
+
   return (
     <div>
       {/* Header */}
@@ -133,6 +145,11 @@ export function StudentsClient() {
           </p>
         </div>
         <div className="flex gap-2">
+          {students.length > 0 && (
+            <Button variant="outline" onClick={() => setClearDialogOpen(true)} className="text-destructive hover:text-destructive">
+              נקה נתונים
+            </Button>
+          )}
           <ExcelImport
             onImport={async (students) => {
               for (const s of students) {
@@ -239,6 +256,24 @@ export function StudentsClient() {
           </Table>
         )}
       </div>
+
+      {/* Clear All Dialog */}
+      <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
+        <DialogContent className="sm:max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>נקה רשימת תלמידים</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground py-2">
+            פעולה זו תמחק את כל {students.length} התלמידים ברשימה. לא ניתן לבטל פעולה זו.
+          </p>
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)}>ביטול</Button>
+            <Button variant="destructive" onClick={handleClearAll} disabled={clearing}>
+              {clearing ? "מוחק..." : "מחק הכל"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>

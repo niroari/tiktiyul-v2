@@ -44,6 +44,11 @@ export async function deleteStudent(
   await deleteDoc(studentDoc(tripId, studentId));
 }
 
+export async function deleteAllStudents(tripId: string): Promise<void> {
+  const snap = await getDocs(studentsCol(tripId));
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+}
+
 export async function getStudents(tripId: string): Promise<Student[]> {
   const snap = await getDocs(studentsCol(tripId));
   const students = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Student));

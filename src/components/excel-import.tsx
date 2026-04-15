@@ -15,36 +15,62 @@ import { Student, Gender } from "@/lib/types";
 type ParsedStudent = Omit<Student, "id">;
 
 // ─── Parse Excel rows into student objects ────────────────────────────────────
-// Supports two Ministry of Education formats:
-// Old: [ת.ז, שם משפחה, שם פרטי, כיתה, מקבילה, טלפון]
-// New: [מספר, ת.ז, שם משפחה, שם פרטי, כיתה, מקבילה, מין, טלפון]
+// Supports Ministry of Education formats. Column positions are detected from
+// the header row (containing "ת.ז") so extra columns (e.g. "שם כיתה") don't
+// shift gender/phone offsets.
+//
+// Known formats:
+//   Old:     [ת.ז, שם משפחה, שם פרטי, כיתה, מקבילה, טלפון]
+//   New:     [מספר, ת.ז, שם משפחה, שם פרטי, כיתה, מקבילה, מין, טלפון]
+//   New+:    [מספר, ת.ז, שם משפחה, שם פרטי, כיתה, מקבילה, שם כיתה, מין]
+
+function cv(row: unknown[], idx: number | undefined): string {
+  if (idx === undefined) return "";
+  return String(row[idx] ?? "").trim();
+}
 
 function parseRows(rows: unknown[][]): ParsedStudent[] {
+  // Find the header row (first row containing "ת.ז")
+  let colMap: Record<string, number> | null = null;
+  let dataStart = 0;
+  for (let i = 0; i < Math.min(rows.length, 6); i++) {
+    const cells = rows[i].map((c) => String(c ?? "").trim());
+    if (cells.includes("ת.ז")) {
+      colMap = Object.fromEntries(cells.map((h, idx) => [h, idx]));
+      dataStart = i + 1;
+      break;
+    }
+  }
+
   const students: ParsedStudent[] = [];
 
-  for (const row of rows) {
-    const col0 = String(row[0] ?? "").trim();
-    const col1 = String(row[1] ?? "").trim();
-
+  for (let i = dataStart; i < rows.length; i++) {
+    const row = rows[i];
     let last = "", first = "", grade = "", kita = "", genderRaw = "", phone = "";
 
-    if (/^\d{7,9}$/.test(col1)) {
-      // New format: col0=מספר, col1=ת.ז
-      last      = String(row[2] ?? "").trim();
-      first     = String(row[3] ?? "").trim();
-      grade     = String(row[4] ?? "").trim();
-      kita      = String(row[5] ?? "").trim();
-      genderRaw = String(row[6] ?? "").trim(); // נ / ז
-      phone     = String(row[7] ?? "").trim();
-    } else if (/^\d{7,9}$/.test(col0)) {
-      // Old format: col0=ת.ז
-      last  = String(row[1] ?? "").trim();
-      first = String(row[2] ?? "").trim();
-      grade = String(row[3] ?? "").trim();
-      kita  = String(row[4] ?? "").trim();
-      phone = String(row[5] ?? "").trim();
+    if (colMap) {
+      // Header-guided: column positions come from the detected header row
+      const tzVal = cv(row, colMap["ת.ז"]);
+      if (!/^\d{7,9}$/.test(tzVal)) continue;
+      last      = cv(row, colMap["שם משפחה"]);
+      first     = cv(row, colMap["שם פרטי"]);
+      grade     = cv(row, colMap["כיתה"]);
+      kita      = cv(row, colMap["מקבילה"]);
+      genderRaw = cv(row, colMap["מין"]);
+      phone     = cv(row, colMap["טלפון"]);
     } else {
-      continue; // header row or empty
+      // Fallback: positional detection for headerless files
+      const col0 = String(row[0] ?? "").trim();
+      const col1 = String(row[1] ?? "").trim();
+      if (/^\d{7,9}$/.test(col1)) {
+        last = cv(row, 2); first = cv(row, 3); grade = cv(row, 4);
+        kita = cv(row, 5); genderRaw = cv(row, 6); phone = cv(row, 7);
+      } else if (/^\d{7,9}$/.test(col0)) {
+        last = cv(row, 1); first = cv(row, 2); grade = cv(row, 3);
+        kita = cv(row, 4); phone = cv(row, 5);
+      } else {
+        continue;
+      }
     }
 
     if (!first && !last) continue;
