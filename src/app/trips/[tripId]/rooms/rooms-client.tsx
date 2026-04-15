@@ -27,6 +27,7 @@ export function RoomsClient() {
   const [status, setStatus]       = useState<"idle" | "saving" | "saved">("idle");
   const [preferredSize, setPreferredSize] = useState(5);
   const [classFilter, setClassFilter]     = useState("all");
+  const [genderView, setGenderView]       = useState<"all" | "male" | "female">("all");
   // per-unassigned-student: which room they're being assigned to
   const [assigningId, setAssigningId] = useState<string | null>(null);
 
@@ -87,8 +88,11 @@ export function RoomsClient() {
     return room.studentIds.some((id) => studentById[id]?.class === classFilter);
   }
 
-  const filteredUnassigned =
-    classFilter === "all" ? unassigned : unassigned.filter((s) => s.class === classFilter);
+  const filteredUnassigned = unassigned.filter((s) => {
+    if (classFilter !== "all" && s.class !== classFilter) return false;
+    if (genderView !== "all" && s.gender !== genderView) return false;
+    return true;
+  });
 
   // ── Auto-assign ───────────────────────────────────────────────────────────────
 
@@ -431,6 +435,26 @@ export function RoomsClient() {
               </select>
             )}
 
+            {/* Gender view toggle */}
+            <div className="flex rounded-[var(--radius-sm)] border border-border overflow-hidden text-sm">
+              {(["all", "male", "female"] as const).map((opt) => {
+                const label = opt === "all" ? "הכל" : opt === "male" ? "בנים" : "בנות";
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => setGenderView(opt)}
+                    className={`px-3 py-1.5 transition-colors ${
+                      genderView === opt
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
+
             {/* Clear all */}
             {rooms.length > 0 && (
               <button
@@ -501,58 +525,62 @@ export function RoomsClient() {
           )}
 
           {/* Boys and Girls sections */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className={`grid gap-6 ${genderView === "all" ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1 max-w-2xl"}`}>
             {/* Boys */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium text-sm text-blue-700 flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-blue-200 inline-block" />
-                  בנים — {boyRooms.length} חדרים
-                </h2>
-                <button
-                  onClick={() => addRoom("male")}
-                  className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors"
-                >
-                  + הוסף חדר
-                </button>
-              </div>
-
-              {boyRooms.filter(roomMatchesFilter).length === 0 ? (
-                <div className="text-center text-muted-foreground text-sm py-8 bg-blue-50/50 rounded-[var(--radius)] border border-blue-100">
-                  {classFilter !== "all" ? "אין חדרי בנים לכיתה זו" : "אין חדרי בנים — לחץ ⚡ או + הוסף חדר"}
+            {(genderView === "all" || genderView === "male") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-medium text-sm text-blue-700 flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-blue-200 inline-block" />
+                    בנים — {boyRooms.length} חדרים
+                  </h2>
+                  <button
+                    onClick={() => addRoom("male")}
+                    className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors"
+                  >
+                    + הוסף חדר
+                  </button>
                 </div>
-              ) : (
-                boyRooms.filter(roomMatchesFilter).map((room) => (
-                  <RoomCard key={room.id} room={room} genderRooms={boyRooms} />
-                ))
-              )}
-            </div>
+
+                {boyRooms.filter(roomMatchesFilter).length === 0 ? (
+                  <div className="text-center text-muted-foreground text-sm py-8 bg-blue-50/50 rounded-[var(--radius)] border border-blue-100">
+                    {classFilter !== "all" ? "אין חדרי בנים לכיתה זו" : "אין חדרי בנים — לחץ ⚡ או + הוסף חדר"}
+                  </div>
+                ) : (
+                  boyRooms.filter(roomMatchesFilter).map((room) => (
+                    <RoomCard key={room.id} room={room} genderRooms={boyRooms} />
+                  ))
+                )}
+              </div>
+            )}
 
             {/* Girls */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <h2 className="font-medium text-sm text-pink-700 flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full bg-pink-200 inline-block" />
-                  בנות — {girlRooms.length} חדרים
-                </h2>
-                <button
-                  onClick={() => addRoom("female")}
-                  className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors"
-                >
-                  + הוסף חדר
-                </button>
-              </div>
-
-              {girlRooms.filter(roomMatchesFilter).length === 0 ? (
-                <div className="text-center text-muted-foreground text-sm py-8 bg-pink-50/50 rounded-[var(--radius)] border border-pink-100">
-                  {classFilter !== "all" ? "אין חדרי בנות לכיתה זו" : "אין חדרי בנות — לחץ ⚡ או + הוסף חדר"}
+            {(genderView === "all" || genderView === "female") && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="font-medium text-sm text-pink-700 flex items-center gap-1.5">
+                    <span className="w-3 h-3 rounded-full bg-pink-200 inline-block" />
+                    בנות — {girlRooms.length} חדרים
+                  </h2>
+                  <button
+                    onClick={() => addRoom("female")}
+                    className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors"
+                  >
+                    + הוסף חדר
+                  </button>
                 </div>
-              ) : (
-                girlRooms.filter(roomMatchesFilter).map((room) => (
-                  <RoomCard key={room.id} room={room} genderRooms={girlRooms} />
-                ))
-              )}
-            </div>
+
+                {girlRooms.filter(roomMatchesFilter).length === 0 ? (
+                  <div className="text-center text-muted-foreground text-sm py-8 bg-pink-50/50 rounded-[var(--radius)] border border-pink-100">
+                    {classFilter !== "all" ? "אין חדרי בנות לכיתה זו" : "אין חדרי בנות — לחץ ⚡ או + הוסף חדר"}
+                  </div>
+                ) : (
+                  girlRooms.filter(roomMatchesFilter).map((room) => (
+                    <RoomCard key={room.id} room={room} genderRooms={girlRooms} />
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </>
       )}
