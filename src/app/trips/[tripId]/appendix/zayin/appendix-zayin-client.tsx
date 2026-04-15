@@ -31,6 +31,7 @@ export function AppendixZayinClient() {
   const [sortField, setSortField]       = useState<SortField>("class");
   const [classFilter, setClassFilter]   = useState("");
   const [showNotGoing, setShowNotGoing] = useState(false);
+  const [genderFilter, setGenderFilter] = useState<"all" | "female" | "male">("all");
 
   // Derived
   const classes = [...new Set(students.map((s) => s.class))].sort((a, b) => a.localeCompare(b, "he"));
@@ -38,6 +39,7 @@ export function AppendixZayinClient() {
   const visible = sorted.filter((s) => {
     if (classFilter && s.class !== classFilter) return false;
     if (!showNotGoing && !s.isGoing) return false;
+    if (genderFilter !== "all" && s.gender !== genderFilter) return false;
     return true;
   });
 
@@ -144,6 +146,26 @@ export function AppendixZayinClient() {
               <option value="lastName">מיון: שם משפחה</option>
               <option value="firstName">מיון: שם פרטי</option>
             </select>
+
+            {/* Gender filter */}
+            <div className="flex rounded-[var(--radius-sm)] border border-border overflow-hidden text-sm">
+              {(["all", "female", "male"] as const).map((opt) => {
+                const label = opt === "all" ? "הכל" : opt === "female" ? "בנות" : "בנים";
+                return (
+                  <button
+                    key={opt}
+                    onClick={() => setGenderFilter(opt)}
+                    className={`px-3 py-1.5 text-xs transition-colors ${
+                      genderFilter === opt
+                        ? "bg-primary text-primary-foreground"
+                        : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                );
+              })}
+            </div>
 
             {/* Not going toggle */}
             {notGoingCount > 0 && (
