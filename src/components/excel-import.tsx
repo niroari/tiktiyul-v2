@@ -57,7 +57,7 @@ function parseRows(rows: unknown[][]): ParsedStudent[] {
       grade     = cv(row, colMap["כיתה"]);
       kita      = cv(row, colMap["מקבילה"]);
       genderRaw = cv(row, colMap["מין"]);
-      phone     = cv(row, colMap["טלפון"]);
+      phone     = cv(row, colMap["טלפון נייד"] ?? colMap["טלפון"]);
     } else {
       // Fallback: positional detection for headerless files
       const col0 = String(row[0] ?? "").trim();
