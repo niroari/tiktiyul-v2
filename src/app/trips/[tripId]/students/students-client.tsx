@@ -65,6 +65,7 @@ export function StudentsClient() {
   const [form, setForm] = useState<StudentFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [genderFilter, setGenderFilter] = useState<"all" | "female" | "male">("all");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
 
@@ -73,11 +74,12 @@ export function StudentsClient() {
 
   const filtered = students.filter((s) => {
     const q = search.toLowerCase();
-    return (
+    const matchesSearch =
       s.firstName.toLowerCase().includes(q) ||
       s.lastName.toLowerCase().includes(q) ||
-      s.class.toLowerCase().includes(q)
-    );
+      s.class.toLowerCase().includes(q);
+    const matchesGender = genderFilter === "all" || s.gender === genderFilter;
+    return matchesSearch && matchesGender;
   });
 
   function openAdd() {
@@ -195,14 +197,32 @@ export function StudentsClient() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
+      {/* Search + gender filter */}
+      <div className="mb-4 flex items-center gap-3 flex-wrap">
         <Input
           placeholder="חיפוש לפי שם או כיתה..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
+        <div className="flex rounded-[var(--radius-sm)] border border-border overflow-hidden text-sm">
+          {(["all", "female", "male"] as const).map((opt) => {
+            const label = opt === "all" ? "הכל" : opt === "female" ? "בנות" : "בנים";
+            return (
+              <button
+                key={opt}
+                onClick={() => setGenderFilter(opt)}
+                className={`px-3 py-1.5 transition-colors ${
+                  genderFilter === opt
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Table */}
