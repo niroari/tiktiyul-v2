@@ -7,7 +7,9 @@ import { useTrip } from "@/hooks/use-trip";
 import { useStudents } from "@/hooks/use-students";
 import { useStaff } from "@/hooks/use-staff";
 import { subscribeToAllAppendices } from "@/lib/firestore/appendix";
+import { subscribeToPendingUpdates } from "@/lib/firestore/pending-updates";
 import { PrintTripButton } from "./print-trip-button";
+import type { PendingUpdate } from "@/lib/types";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -45,9 +47,14 @@ export function DashboardClient() {
   const { students, loading: studentsLoading } = useStudents(tripId);
   const { staff } = useStaff(tripId);
   const [appendixMap, setAppendixMap] = useState<Record<string, Record<string, unknown>>>({});
+  const [pendingUpdates, setPendingUpdates] = useState<PendingUpdate[]>([]);
 
   useEffect(() => {
     return subscribeToAllAppendices(tripId, setAppendixMap);
+  }, [tripId]);
+
+  useEffect(() => {
+    return subscribeToPendingUpdates(tripId, setPendingUpdates);
   }, [tripId]);
 
   const loading = tripLoading || studentsLoading;
@@ -71,7 +78,10 @@ export function DashboardClient() {
   const glutenFree = going.filter((s) => s.dietaryFlags?.glutenFree).length;
 
   // Alerts
-  const alerts: { type: "danger" | "warn" | "info"; text: string }[] = [];
+  const alerts: { type: "danger" | "warn" | "info"; text: string; href?: string }[] = [];
+
+  if (pendingUpdates.length > 0)
+    alerts.push({ type: "warn", text: `${pendingUpdates.length} עדכונים ממחנכים ממתינים לאישורך`, href: `pending-updates` });
 
   // Trip basics
   if (!trip?.startDate) alerts.push({ type: "warn", text: "תאריך טיול לא הוגדר — עדכן בפרטי הטיול" });
@@ -214,17 +224,24 @@ export function DashboardClient() {
               <p className="text-xs text-[var(--success)] font-medium">הכל תקין ✓</p>
             ) : (
               <ul className="space-y-2">
-                {alerts.map((a, i) => (
-                  <li key={i} className={`text-xs p-2 rounded-[var(--radius-sm)] border flex gap-2 items-start
+                {alerts.map((a, i) => {
+                  const inner = (
+                    <>
+                      <span className="mt-0.5 flex-shrink-0">
+                        {a.type === "danger" ? "⛔" : a.type === "warn" ? "⚠️" : "ℹ️"}
+                      </span>
+                      <span>{a.text}</span>
+                      {a.href && <span className="mr-auto text-[10px] underline underline-offset-2 opacity-70">לטיפול ←</span>}
+                    </>
+                  );
+                  const cls = `text-xs p-2 rounded-[var(--radius-sm)] border flex gap-2 items-start
                     ${a.type === "danger" ? "bg-[var(--danger-light)] border-red-200 text-red-700" :
                       a.type === "warn"   ? "bg-[var(--warn-light)] border-amber-200 text-amber-700" :
-                                            "bg-muted border-border text-muted-foreground"}`}>
-                    <span className="mt-0.5 flex-shrink-0">
-                      {a.type === "danger" ? "⛔" : a.type === "warn" ? "⚠️" : "ℹ️"}
-                    </span>
-                    {a.text}
-                  </li>
-                ))}
+                                            "bg-muted border-border text-muted-foreground"}`;
+                  return a.href
+                    ? <Link key={i} href={a.href} className={cls + " hover:opacity-80 transition-opacity"}>{inner}</Link>
+                    : <li key={i} className={cls}>{inner}</li>;
+                })}
               </ul>
             )}
           </div>

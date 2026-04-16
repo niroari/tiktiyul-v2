@@ -1,3 +1,5 @@
+import { Timestamp } from "firebase/firestore";
+
 // ─── Trip ───────────────────────────────────────────────────────────────────
 
 export type TripClass = {
@@ -48,6 +50,35 @@ export type StaffMember = {
   name: string;
   role: string;
   phone: string;
+};
+
+// ─── Class token (teacher edit link) ─────────────────────────────────────────
+
+export type ClassToken = {
+  token: string;       // doc ID = UUID token
+  tripId: string;
+  class: string;       // e.g. "ז׳1"
+  tripName: string;
+  schoolName: string;
+  createdAt: Timestamp;
+  expiresAt: Timestamp;
+};
+
+// ─── Pending update (teacher-proposed student change) ─────────────────────────
+
+export type PendingUpdate = {
+  id: string;
+  tripId: string;
+  token: string;       // which classToken was used
+  studentId: string;
+  studentFirstName: string;
+  studentLastName: string;
+  studentClass: string;
+  proposedIsGoing: boolean;
+  proposedDietaryFlags: { vegetarian: boolean; vegan: boolean; glutenFree: boolean };
+  proposedMedicalNotes: string;
+  submittedAt: Timestamp;
+  status: "pending" | "approved" | "rejected";
 };
 
 // ─── Appendix status ─────────────────────────────────────────────────────────

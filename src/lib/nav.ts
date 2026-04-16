@@ -18,6 +18,7 @@ export function getTripNav(tripId: string): NavGroup[] {
       items: [
         { label: "דשבורד", href: `${base}/dashboard`, icon: "dashboard" },
         { label: "רשימת תלמידים", href: `${base}/students`, icon: "students" },
+        { label: "עדכונים ממתינים", href: `${base}/pending-updates`, icon: "pending" },
         { label: "צוות הטיול", href: `${base}/staff`, icon: "staff" },
         { label: "פרטי הטיול", href: `${base}/settings`, icon: "settings" },
       ],

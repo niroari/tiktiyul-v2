@@ -22,6 +22,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Class tokens (teacher edit links) ────────────────────────────────────
+    match /classTokens/{token} {
+      allow read: if true;   // public — needed by teacher edit page
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Trips ─────────────────────────────────────────────────────────────────
 
     // For reads: check ownership directly on the document being read (no get() needed)
@@ -58,6 +65,15 @@ service cloud.firestore {
 
       match /{subcollection}/{docId} {
         allow read, write: if isMember(tripId);
+      }
+
+      // Pending updates: teachers write publicly (token validated client-side);
+      // trip members can read and update status (approve/reject).
+      match /pendingUpdates/{updateId} {
+        allow create: if
+          request.resource.data.status == "pending" &&
+          exists(/databases/$(database)/documents/classTokens/$(request.resource.data.token));
+        allow read, update: if isMember(tripId);
       }
     }
   }

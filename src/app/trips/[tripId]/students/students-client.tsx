@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useStudents } from "@/hooks/use-students";
+import { useTrip } from "@/hooks/use-trip";
 import { addStudent, updateStudent, deleteStudent, deleteAllStudents } from "@/lib/firestore/students";
+import { createClassToken, listClassTokensForTrip } from "@/lib/firestore/class-tokens";
 import { ExcelImport } from "@/components/excel-import";
-import { Student, Gender } from "@/lib/types";
+import { Student, Gender, ClassToken } from "@/lib/types";
 
 type DietaryFlags = Student["dietaryFlags"];
 import { Button } from "@/components/ui/button";
@@ -59,6 +61,7 @@ const EMPTY_FORM: StudentFormData = {
 export function StudentsClient() {
   const { tripId } = useParams<{ tripId: string }>();
   const { students, loading } = useStudents(tripId);
+  const { trip } = useTrip(tripId);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Student | null>(null);
@@ -67,9 +70,14 @@ export function StudentsClient() {
   const [search, setSearch] = useState("");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
+  const [shareDialogOpen, setShareDialogOpen] = useState(false);
+  const [tokens, setTokens] = useState<ClassToken[]>([]);
+  const [generatingClass, setGeneratingClass] = useState<string | null>(null);
+  const [copiedToken, setCopiedToken] = useState<string | null>(null);
 
   const going = students.filter((s) => s.isGoing).length;
   const notGoing = students.length - going;
+  const classes = [...new Set(students.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
 
   const filtered = students.filter((s) => {
     const q = search.toLowerCase();
@@ -124,6 +132,37 @@ export function StudentsClient() {
     await updateStudent(tripId, student.id, { isGoing: !student.isGoing });
   }
 
+  async function openShareDialog() {
+    setShareDialogOpen(true);
+    const existing = await listClassTokensForTrip(tripId);
+    setTokens(existing);
+  }
+
+  async function generateToken(className: string) {
+    setGeneratingClass(className);
+    try {
+      const token = await createClassToken(tripId, className, trip?.name ?? "", trip?.schoolName ?? "");
+      setTokens((prev) => {
+        const filtered = prev.filter((t) => t.class !== className);
+        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", createdAt: null as any, expiresAt: null as any }];
+      });
+    } finally {
+      setGeneratingClass(null);
+    }
+  }
+
+  function copyLink(token: string) {
+    navigator.clipboard.writeText(`${window.location.origin}/class-edit/${token}`);
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(null), 2000);
+  }
+
+  function shareWhatsApp(token: string, className: string) {
+    const url = `${window.location.origin}/class-edit/${token}`;
+    const msg = `*תיק טיול — עדכון פרטי תלמידים*\nשלום, אנא עדכני את פרטי תלמידי כיתה ${className} לטיול "${trip?.name ?? ""}".\nלחץ/י על הקישור:\n${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  }
+
   async function handleClearAll() {
     setClearing(true);
     try {
@@ -145,6 +184,14 @@ export function StudentsClient() {
           </p>
         </div>
         <div className="flex gap-2">
+          {students.length > 0 && (
+            <Button variant="outline" onClick={openShareDialog}>
+              <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              שתף לעדכון
+            </Button>
+          )}
           {students.length > 0 && (
             <Button variant="outline" onClick={() => setClearDialogOpen(true)} className="text-destructive hover:text-destructive">
               נקה נתונים
@@ -300,6 +347,67 @@ export function StudentsClient() {
             <Button variant="destructive" onClick={handleClearAll} disabled={clearing}>
               {clearing ? "מוחק..." : "מחק הכל"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Share for teacher update dialog */}
+      <Dialog open={shareDialogOpen} onOpenChange={setShareDialogOpen}>
+        <DialogContent className="sm:max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>שתף קישור עדכון לכיתה</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            שלח/י לכל מחנך/ת קישור ייחודי — היא תוכל לעדכן יציאה, תזונה והערות רפואיות. השינויים יועברו אליך לאישור לפני עדכון המערכת.
+          </p>
+          <div className="space-y-2 max-h-72 overflow-y-auto">
+            {classes.map((className) => {
+              const existing = tokens.find((t) => t.class === className);
+              const isGenerating = generatingClass === className;
+              const editUrl = existing ? `${window.location.origin}/class-edit/${existing.token}` : null;
+              return (
+                <div key={className} className="flex items-center gap-2 border border-border rounded-[var(--radius-sm)] px-3 py-2">
+                  <span className="text-sm font-medium w-14 flex-shrink-0">כיתה {className}</span>
+                  {editUrl ? (
+                    <>
+                      <input
+                        readOnly
+                        value={editUrl}
+                        dir="ltr"
+                        className="flex-1 text-xs border border-border rounded px-2 py-1 bg-muted/30 focus:outline-none truncate"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+                      <button
+                        onClick={() => copyLink(existing!.token)}
+                        className="text-xs px-2 py-1 border border-border rounded hover:bg-muted/50 transition-colors whitespace-nowrap flex-shrink-0"
+                      >
+                        {copiedToken === existing!.token ? "הועתק ✓" : "העתק"}
+                      </button>
+                      <button
+                        onClick={() => shareWhatsApp(existing!.token, className)}
+                        className="text-green-600 hover:text-green-700 transition-colors flex-shrink-0"
+                        title="שתף בוואטסאפ"
+                      >
+                        <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                        </svg>
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => generateToken(className)}
+                      disabled={isGenerating}
+                      className="text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                    >
+                      {isGenerating ? "יוצר קישור..." : "צור קישור ↗"}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShareDialogOpen(false)}>סגור</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
