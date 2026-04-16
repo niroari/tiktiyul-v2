@@ -40,17 +40,35 @@ export default function LoginPage() {
   const [busy, setBusy]   = useState(false);
   const [error, setError] = useState("");
 
-  // Redirect if already logged in
+  // Redirect if already logged in — honour pending join flow
   useEffect(() => {
-    if (!loading && user) router.replace("/trips");
+    if (!loading && user) {
+      const pending = sessionStorage.getItem("joinToken");
+      if (pending) {
+        sessionStorage.removeItem("joinToken");
+        router.replace(`/join/${pending}`);
+      } else {
+        router.replace("/trips");
+      }
+    }
   }, [user, loading, router]);
+
+  function redirectAfterLogin() {
+    const pending = sessionStorage.getItem("joinToken");
+    if (pending) {
+      sessionStorage.removeItem("joinToken");
+      router.replace(`/join/${pending}`);
+    } else {
+      router.replace("/trips");
+    }
+  }
 
   async function handleGoogle() {
     setBusy(true);
     setError("");
     try {
       await signInWithPopup(auth, googleProvider);
-      router.replace("/trips");
+      redirectAfterLogin();
     } catch (e) {
       setError(authErrorMessage((e as AuthError).code));
     } finally {
@@ -68,7 +86,7 @@ export default function LoginPage() {
       } else {
         await createUserWithEmailAndPassword(auth, email.trim(), pass);
       }
-      router.replace("/trips");
+      redirectAfterLogin();
     } catch (e) {
       setError(authErrorMessage((e as AuthError).code));
     } finally {

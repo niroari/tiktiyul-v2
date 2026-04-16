@@ -11,7 +11,6 @@ import {
   query,
   orderBy,
   where,
-  or,
   limit,
   arrayUnion,
   type Unsubscribe,
@@ -87,13 +86,32 @@ export function subscribeToUserTrips(
   uid: string,
   callback: (trips: Trip[]) => void
 ): Unsubscribe {
-  const q = query(tripsCol, or(where("ownerUid", "==", uid), where("collaborators", "array-contains", uid)));
-  return onSnapshot(q, (snap) => {
-    const trips = snap.docs
-      .map((d) => ({ id: d.id, ...d.data() } as Trip))
-      .sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")));
-    callback(trips);
+  const ownerQ       = query(tripsCol, where("ownerUid", "==", uid));
+  const collaboratorQ = query(tripsCol, where("collaborators", "array-contains", uid));
+
+  // Merge two snapshots, deduplicate by id, sort by createdAt descending
+  const snapshots: Record<"owner" | "collab", Trip[]> = { owner: [], collab: [] };
+
+  function emit() {
+    const merged = [...snapshots.owner];
+    for (const t of snapshots.collab) {
+      if (!merged.some((x) => x.id === t.id)) merged.push(t);
+    }
+    merged.sort((a, b) => String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")));
+    callback(merged);
+  }
+
+  const unsubOwner = onSnapshot(ownerQ, (snap) => {
+    snapshots.owner = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip));
+    emit();
   });
+
+  const unsubCollab = onSnapshot(collaboratorQ, (snap) => {
+    snapshots.collab = snap.docs.map((d) => ({ id: d.id, ...d.data() } as Trip));
+    emit();
+  });
+
+  return () => { unsubOwner(); unsubCollab(); };
 }
 
 export async function generateInviteToken(tripId: string): Promise<string> {
