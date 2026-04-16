@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Dark green rounded square background -->
+  <rect width="32" height="32" rx="7" fill="#1b4332"/>
+  <!-- Map / road icon (white) - simplified path icon -->
+  <path
+    d="M9 24l5-14 5 8 3-5 4 11"
+    stroke="white"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+  />
+  <circle cx="16" cy="11" r="2.5" fill="white"/>
+  <path
+    d="M16 8.5C16 8.5 11 13.5 11 16.5C11 19.2 13.2 21.5 16 21.5C18.8 21.5 21 19.2 21 16.5C21 13.5 16 8.5 16 8.5Z"
+    fill="white"
+    opacity="0.9"
+  />
+  <circle cx="16" cy="16.5" r="2" fill="#1b4332"/>
+</svg>

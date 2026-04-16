@@ -12,6 +12,17 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "תיק טיול",
   description: "ניהול תיק טיול לבתי ספר",
+  openGraph: {
+    title: "תיק טיול",
+    description: "ניהול תיק טיול לבתי ספר",
+    type: "website",
+    locale: "he_IL",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "תיק טיול",
+    description: "ניהול תיק טיול לבתי ספר",
+  },
 };
 
 export default function RootLayout({
