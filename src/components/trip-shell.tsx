@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/components/auth-provider";
 import { generateInviteToken } from "@/lib/firestore/trips";
+import { subscribeToPendingUpdates } from "@/lib/firestore/pending-updates";
 import { getTripNav } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
 
@@ -22,10 +23,15 @@ export function TripShell({ tripId, tripName, schoolName, inviteToken, children 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
   const pathname = usePathname();
   const router   = useRouter();
   const { user } = useAuth();
   const groups   = getTripNav(tripId);
+
+  useEffect(() => {
+    return subscribeToPendingUpdates(tripId, (updates) => setPendingCount(updates.length));
+  }, [tripId]);
 
   function isActive(href: string) {
     if (href === `/trips/${tripId}`) return pathname === href;
@@ -156,9 +162,21 @@ export function TripShell({ tripId, tripName, schoolName, inviteToken, children 
                         {item.letter}
                       </span>
                     ) : (
-                      <NavIcon name={item.icon!} active={active} />
+                      <div className="relative flex-shrink-0">
+                        <NavIcon name={item.icon!} active={active} />
+                        {item.icon === "pending" && pendingCount > 0 && (
+                          <span className="absolute -top-1 -left-1 min-w-[14px] h-[14px] bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center px-0.5 leading-none">
+                            {pendingCount > 9 ? "9+" : pendingCount}
+                          </span>
+                        )}
+                      </div>
                     )}
                     <span className="truncate">{item.label}</span>
+                    {item.icon === "pending" && pendingCount > 0 && (
+                      <span className="mr-auto bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 leading-none flex-shrink-0">
+                        {pendingCount > 99 ? "99+" : pendingCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
