@@ -50,6 +50,7 @@ export type StaffMember = {
   name: string;
   role: string;
   phone: string;
+  gender?: Gender;
 };
 
 // ─── Class token (teacher edit link) ─────────────────────────────────────────

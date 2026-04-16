@@ -153,7 +153,15 @@ export function DashboardClient() {
         <StatCard
           label="אנשי צוות"
           value={staff.length}
-          sub={staff.length > 0 ? staff.map((s) => s.role).slice(0, 2).join(" · ") : "אין עדיין"}
+          sub={(() => {
+            if (staff.length === 0) return "אין עדיין";
+            const males   = staff.filter((s) => s.gender === "male").length;
+            const females = staff.filter((s) => s.gender === "female").length;
+            if (males > 0 && females > 0) return `${males} גברים · ${females} נשים`;
+            if (males > 0)   return `${males} גברים`;
+            if (females > 0) return `${females} נשים`;
+            return staff.map((s) => s.role).slice(0, 2).join(" · ");
+          })()}
         />
         <StatCard
           label="כיתות"

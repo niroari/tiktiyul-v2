@@ -26,8 +26,10 @@ const ROLE_SUGGESTIONS = [
   "מדריך",
 ];
 
-type FormData = { name: string; role: string; phone: string };
-const EMPTY: FormData = { name: "", role: "", phone: "" };
+import type { Gender } from "@/lib/types";
+
+type FormData = { name: string; role: string; phone: string; gender: Gender | "" };
+const EMPTY: FormData = { name: "", role: "", phone: "", gender: "" };
 
 export function StaffClient() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -47,17 +49,18 @@ export function StaffClient() {
 
   function openEdit(member: StaffMember) {
     setEditing(member);
-    setForm({ name: member.name, role: member.role, phone: member.phone });
+    setForm({ name: member.name, role: member.role, phone: member.phone, gender: member.gender ?? "" });
     setDialogOpen(true);
   }
 
   async function handleSave() {
     setSaving(true);
     try {
+      const data = { ...form, gender: form.gender || undefined };
       if (editing) {
-        await updateStaffMember(tripId, editing.id, form);
+        await updateStaffMember(tripId, editing.id, data);
       } else {
-        await addStaffMember(tripId, form);
+        await addStaffMember(tripId, data);
       }
       setDialogOpen(false);
     } finally {
@@ -113,7 +116,15 @@ export function StaffClient() {
                 {/* Info */}
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-foreground text-sm">{member.name}</p>
-                  <p className="text-xs text-muted-foreground">{member.role}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <p className="text-xs text-muted-foreground">{member.role}</p>
+                    {member.gender && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium
+                        ${member.gender === "male" ? "bg-blue-50 text-blue-600" : "bg-pink-50 text-pink-600"}`}>
+                        {member.gender === "male" ? "זכר" : "נקבה"}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
                 {/* Phone */}
@@ -199,6 +210,28 @@ export function StaffClient() {
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 type="tel"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>מגדר</Label>
+              <div className="flex gap-2">
+                {(["male", "female"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setForm({ ...form, gender: form.gender === g ? "" : g })}
+                    className={`flex-1 py-2 text-sm rounded-[var(--radius-sm)] border transition-colors
+                      ${form.gender === g
+                        ? g === "male"
+                          ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
+                          : "bg-pink-50 border-pink-300 text-pink-700 font-medium"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                  >
+                    {g === "male" ? "זכר" : "נקבה"}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 
