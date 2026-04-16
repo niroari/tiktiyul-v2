@@ -7,13 +7,18 @@ service cloud.firestore {
       allow read: if true;
       allow create: if true;
       allow update: if
-        resource.data.status == "pending" &&
-        request.time < resource.data.expiresAt &&
-        request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(["signature", "status", "signedAt"]) &&
-        request.resource.data.status == "signed" &&
-        request.resource.data.signature is string &&
-        request.resource.data.signature.size() < 300000;
+        // Authenticated trip member resending / resetting the request
+        isMember(resource.data.tripId) ||
+        // Public signer submitting their signature (no auth required)
+        (
+          resource.data.status == "pending" &&
+          request.time < resource.data.expiresAt &&
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(["signature", "status", "signedAt"]) &&
+          request.resource.data.status == "signed" &&
+          request.resource.data.signature is string &&
+          request.resource.data.signature.size() < 300000
+        );
       allow delete: if false;
     }
 

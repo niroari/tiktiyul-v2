@@ -55,7 +55,7 @@ export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, 
     setSending(true);
     try {
       await createSignatureRequest(docId, { tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: getPreviewHTML?.() ?? null });
-      setSigDoc((prev) => prev ?? { tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: null, status: "pending", signature: null, createdAt: null as any, expiresAt: null as any });
+      setSigDoc({ tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: null, status: "pending", signature: null, createdAt: null as any, expiresAt: null as any });
       subscribeNow();
       const url = `${window.location.origin}/sign/${docId}`;
       setShareUrl(url);
