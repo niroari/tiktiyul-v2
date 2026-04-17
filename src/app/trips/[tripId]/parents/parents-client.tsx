@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useParents } from "@/hooks/use-parents";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
 import { addParent, updateParent, deleteParent } from "@/lib/firestore/parents";
+import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { Parent, Trip } from "@/lib/types";
 import type { Gender } from "@/lib/types";
 import { RemoteSignature } from "@/components/remote-signature";
@@ -32,7 +33,9 @@ function daysBetween(start: string | undefined, end: string | undefined): number
   return Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1);
 }
 
-function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: string, address?: string, signature?: string): string {
+type ReferrerConfig = { date: string; referrerName: string; referrerRole: string };
+
+function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: string, address?: string, signature?: string, referrer?: ReferrerConfig): string {
   const name      = parent.name || "___";
   const phone     = parent.phone || "___";
   const tripName  = trip?.name || "___";
@@ -44,9 +47,12 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: stri
   const idDigits = idNumber
     ? idNumber.padStart(9, " ").split("")
     : Array(9).fill(" ");
-  const idBoxes = idDigits.map((d) =>
-    `<span style="display:inline-block;width:22px;height:22px;border:1px solid #000;margin-left:2px;text-align:center;line-height:22px;font-weight:bold;">${d.trim() || "&nbsp;"}</span>`
-  ).join("");
+  // Wrap in dir="ltr" so boxes flow left-to-right even inside the RTL document
+  const idBoxes = `<span dir="ltr" style="display:inline-block;">${
+    idDigits.map((d) =>
+      `<span style="display:inline-block;width:22px;height:22px;border:1px solid #000;margin-right:2px;text-align:center;line-height:22px;font-weight:bold;">${d.trim() || "&nbsp;"}</span>`
+    ).join("")
+  }</span>`;
 
   return `
 <div dir="rtl" style="font-family: 'David', 'Arial', sans-serif; max-width: 700px; margin: 0 auto; padding: 32px; font-size: 14px; line-height: 1.8; color: #000;">
@@ -125,9 +131,9 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: stri
     </thead>
     <tbody>
       <tr>
-        <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
-        <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
-        <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 8px 6px; vertical-align: top;">${referrer?.date || "&nbsp;"}</td>
+        <td style="border: 1px solid #000; padding: 8px 6px; vertical-align: top; font-weight: bold;">${referrer?.referrerName || "&nbsp;"}</td>
+        <td style="border: 1px solid #000; padding: 8px 6px; vertical-align: top;">${referrer?.referrerRole || "&nbsp;"}</td>
         <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
       </tr>
     </tbody>
@@ -137,13 +143,29 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: stri
     <p style="font-weight: bold; text-align: right; margin-bottom: 16px;">אישור המתנדב לקבלת התפקיד</p>
     <table style="width: 60%; margin-right: auto; border-collapse: collapse;">
       <tr>
-        <td style="padding: 4px 16px; text-align: center; width: 50%;">
-          <span style="border-top: 1px solid #000; display: block; padding-top: 4px;">שם</span>
-          <span style="font-weight: bold;">${name}</span>
+        <td style="padding: 0 16px 0 16px; text-align: center; width: 50%;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="height: 44px; vertical-align: bottom; text-align: center; padding-bottom: 4px; border-bottom: 1px solid #000;">
+                <span style="font-weight: bold;">${name}</span>
+              </td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding-top: 4px; font-size: 12px;">שם</td>
+            </tr>
+          </table>
         </td>
-        <td style="padding: 4px 16px; text-align: center; width: 50%;">
-          <span style="border-top: 1px solid #000; display: block; padding-top: 4px;">חתימה</span>
-          ${signature ? `<img src="${signature}" style="max-height:60px;max-width:180px;display:block;margin:4px auto;" />` : '<span style="display:block;min-height:48px;"></span>'}
+        <td style="padding: 0 16px 0 16px; text-align: center; width: 50%;">
+          <table style="width: 100%; border-collapse: collapse;">
+            <tr>
+              <td style="height: 72px; vertical-align: bottom; text-align: center; padding-bottom: 4px; border-bottom: 1px solid #000;">
+                ${signature ? `<img src="${signature}" style="max-height:64px;max-width:180px;display:block;margin:0 auto;" />` : "&nbsp;"}
+              </td>
+            </tr>
+            <tr>
+              <td style="text-align: center; padding-top: 4px; font-size: 12px;">חתימה</td>
+            </tr>
+          </table>
         </td>
       </tr>
     </table>
@@ -172,6 +194,36 @@ export function ParentsClient() {
   const [saving, setSaving] = useState(false);
   const [childSuggestOpen, setChildSuggestOpen] = useState(false);
   const [expandedSig, setExpandedSig] = useState<string | null>(null); // parentId
+
+  // Referrer config (pre-fills the authorisation table on every form)
+  const EMPTY_REF: ReferrerConfig = { date: "", referrerName: "", referrerRole: "" };
+  const [referrer, setReferrer] = useState<ReferrerConfig>(EMPTY_REF);
+  const [refDialogOpen, setRefDialogOpen] = useState(false);
+  const [refForm, setRefForm] = useState<ReferrerConfig>(EMPTY_REF);
+  const [refSaving, setRefSaving] = useState(false);
+
+  useEffect(() => {
+    return subscribeToAppendix(tripId, "volunteer-config", (data) => {
+      if (data) {
+        setReferrer({
+          date:         String(data.date ?? ""),
+          referrerName: String(data.referrerName ?? ""),
+          referrerRole: String(data.referrerRole ?? ""),
+        });
+      }
+    });
+  }, [tripId]);
+
+  async function saveReferrer() {
+    setRefSaving(true);
+    try {
+      await saveAppendix(tripId, "volunteer-config", refForm);
+      setReferrer(refForm);
+      setRefDialogOpen(false);
+    } finally {
+      setRefSaving(false);
+    }
+  }
 
   // Build student suggestions from going students
   const goingStudents = students.filter((s) => s.isGoing);
@@ -232,19 +284,34 @@ export function ParentsClient() {
   return (
     <div className="max-w-2xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">הורים מלווים</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {parents.length > 0 ? `${parents.length} הורים` : "אין הורים מלווים עדיין"}
           </p>
         </div>
-        <Button onClick={openAdd}>
-          <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          הוסף הורה מלווה
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => { setRefForm(referrer); setRefDialogOpen(true); }}
+            className="flex items-center gap-1.5 text-sm px-3 py-2 border border-border rounded-[var(--radius-sm)] text-muted-foreground hover:bg-muted transition-colors"
+            title="הגדרת נותן ההפניה לטפסי ביטוח"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            </svg>
+            {referrer.referrerName
+              ? <span>נותן הפניה: <strong>{referrer.referrerName}</strong></span>
+              : <span className="text-amber-600">הגדר נותן הפניה ↗</span>
+            }
+          </button>
+          <Button onClick={openAdd}>
+            <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            הוסף הורה מלווה
+          </Button>
+        </div>
       </div>
 
       {/* List */}
@@ -351,8 +418,8 @@ export function ParentsClient() {
                             leaderName={parent.name}
                             label=""
                             requiresId={true}
-                            getPreviewHTML={() => getVolunteerFormHTML(parent, trip ?? null)}
-                            getPrintHTML={(idNum, addr, sig) => getVolunteerFormHTML(parent, trip ?? null, idNum, addr, sig)}
+                            getPreviewHTML={() => getVolunteerFormHTML(parent, trip ?? null, undefined, undefined, undefined, referrer)}
+                            getPrintHTML={(idNum, addr, sig) => getVolunteerFormHTML(parent, trip ?? null, idNum, addr, sig, referrer)}
                           />
                         </div>
                       )}
@@ -364,6 +431,52 @@ export function ParentsClient() {
           </div>
         )}
       </div>
+
+      {/* Referrer Config Dialog */}
+      <Dialog open={refDialogOpen} onOpenChange={setRefDialogOpen}>
+        <DialogContent className="sm:max-w-sm" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>נותן ההפניה לטפסי ביטוח</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label>שם נותן ההפניה</Label>
+              <Input
+                placeholder="שם מלא"
+                value={refForm.referrerName}
+                onChange={(e) => setRefForm({ ...refForm, referrerName: e.target.value })}
+                autoFocus
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>תפקידו</Label>
+              <Input
+                placeholder="מנהל/ת בית הספר"
+                value={refForm.referrerRole}
+                onChange={(e) => setRefForm({ ...refForm, referrerRole: e.target.value })}
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>תאריך</Label>
+              <Input
+                type="date"
+                value={refForm.date}
+                onChange={(e) => setRefForm({ ...refForm, date: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setRefDialogOpen(false)}>ביטול</Button>
+            <Button onClick={saveReferrer} disabled={refSaving || !refForm.referrerName.trim()}>
+              {refSaving ? "שומר..." : "שמור"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add/Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
