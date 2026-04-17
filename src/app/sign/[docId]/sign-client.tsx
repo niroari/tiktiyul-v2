@@ -72,6 +72,20 @@ function DocumentPreview({ html }: { html: string }) {
   );
 }
 
+function Shell({ title, children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-[#f6faf8] flex flex-col items-center py-10 px-4" dir="rtl">
+      <div className="w-full max-w-lg space-y-5">
+        <div className="text-center space-y-1">
+          <div className="text-xs text-muted-foreground">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
+          {title && <h1 className="text-xl font-bold text-[#1b4332]">{title}</h1>}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function SignClient() {
   const { docId } = useParams<{ docId: string }>();
 
@@ -115,24 +129,6 @@ export function SignClient() {
       console.error(e);
       setState("error");
     }
-  }
-
-  // ── Layout wrapper ─────────────────────────────────────────────────────────
-
-  function Shell({ children }: { children: React.ReactNode }) {
-    return (
-      <div className="min-h-screen bg-[#f6faf8] flex flex-col items-center py-10 px-4" dir="rtl">
-        <div className="w-full max-w-lg space-y-5">
-          <div className="text-center space-y-1">
-            <div className="text-xs text-muted-foreground">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
-            <h1 className="text-xl font-bold text-[#1b4332]">
-              {sigDoc?.roleName ? `חתימה — ${sigDoc.roleName}` : "חתימה על מסמך"}
-            </h1>
-          </div>
-          {children}
-        </div>
-      </div>
-    );
   }
 
   // ── States ─────────────────────────────────────────────────────────────────
@@ -183,7 +179,7 @@ export function SignClient() {
 
   if (state === "already_signed") {
     return (
-      <Shell>
+      <Shell title={sigDoc?.roleName ? `חתימה — ${sigDoc.roleName}` : "חתימה על מסמך"}>
         <div className="space-y-4">
           {sigDoc?.previewHTML && <DocumentPreview html={sigDoc.previewHTML} />}
           <div className="bg-white rounded-xl border border-border p-6 space-y-4">
@@ -206,7 +202,7 @@ export function SignClient() {
   // ── Ready / submitting ────────────────────────────────────────────────────
 
   return (
-    <Shell>
+    <Shell title={sigDoc?.roleName ? `חתימה — ${sigDoc.roleName}` : "חתימה על מסמך"}>
       <div className="space-y-4">
         {sigDoc?.previewHTML && <DocumentPreview html={sigDoc.previewHTML} />}
 
