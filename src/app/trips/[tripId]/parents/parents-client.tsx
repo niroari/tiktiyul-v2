@@ -32,7 +32,7 @@ function daysBetween(start: string | undefined, end: string | undefined): number
   return Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1);
 }
 
-function getVolunteerFormHTML(parent: Parent, trip: Trip | null): string {
+function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: string, signature?: string): string {
   const name      = parent.name || "___";
   const phone     = parent.phone || "___";
   const tripName  = trip?.name || "___";
@@ -40,6 +40,13 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null): string {
   const startDate = formatDateHe(trip?.startDate);
   const endDate   = formatDateHe(trip?.endDate);
   const days      = trip?.startDate && trip?.endDate ? daysBetween(trip.startDate, trip.endDate) : "__";
+
+  const idDigits = idNumber
+    ? idNumber.padStart(9, " ").split("")
+    : Array(9).fill(" ");
+  const idBoxes = idDigits.map((d) =>
+    `<span style="display:inline-block;width:22px;height:22px;border:1px solid #000;margin-left:2px;text-align:center;line-height:22px;font-weight:bold;">${d.trim() || "&nbsp;"}</span>`
+  ).join("");
 
   return `
 <div dir="rtl" style="font-family: 'David', 'Arial', sans-serif; max-width: 700px; margin: 0 auto; padding: 32px; font-size: 14px; line-height: 1.8; color: #000;">
@@ -59,7 +66,7 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null): string {
 
   <div style="margin-bottom: 12px;">
     <span>מס' ת.ז &nbsp;</span>
-    ${Array(9).fill(0).map(() => `<span style="display: inline-block; width: 22px; height: 22px; border: 1px solid #000; margin-left: 2px; text-align: center; line-height: 22px;">&nbsp;</span>`).join("")}
+    ${idBoxes}
   </div>
 
   <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
@@ -135,7 +142,8 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null): string {
           <span style="font-weight: bold;">${name}</span>
         </td>
         <td style="padding: 4px 16px; text-align: center; width: 50%;">
-          <span style="border-top: 1px solid #000; display: block; padding-top: 4px; min-height: 48px;">חתימה</span>
+          <span style="border-top: 1px solid #000; display: block; padding-top: 4px;">חתימה</span>
+          ${signature ? `<img src="${signature}" style="max-height:60px;max-width:180px;display:block;margin:4px auto;" />` : '<span style="display:block;min-height:48px;"></span>'}
         </td>
       </tr>
     </table>
@@ -344,6 +352,7 @@ export function ParentsClient() {
                             label=""
                             requiresId={true}
                             getPreviewHTML={() => getVolunteerFormHTML(parent, trip ?? null)}
+                            getPrintHTML={(idNum, sig) => getVolunteerFormHTML(parent, trip ?? null, idNum, sig)}
                           />
                         </div>
                       )}

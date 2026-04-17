@@ -19,12 +19,35 @@ type Props = {
   label:           string;       // Display label above the widget
   requiresId?:     boolean;      // if true, sign page will collect ID number
   getPreviewHTML?: () => string; // snapshot of the document at send time
+  getPrintHTML?:   (idNumber: string, signature: string) => string; // complete form for printing
 };
 
-export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, leaderName, label, requiresId, getPreviewHTML }: Props) {
+export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, leaderName, label, requiresId, getPreviewHTML, getPrintHTML }: Props) {
   const docId = sigDocId(tripId, role);
 
   const [sigDoc, setSigDoc]       = useState<SignatureDoc | null>(null);
+
+  function printForm() {
+    if (!getPrintHTML || !sigDoc?.signature) return;
+    const html = getPrintHTML(sigDoc.idNumber ?? "", sigDoc.signature);
+    const w = window.open("", "_blank");
+    if (!w) return;
+    w.document.write(`<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'David', Arial, sans-serif; direction: rtl; background: #fff; }
+@media print { body { -webkit-print-color-adjust: exact; } }
+</style>
+</head>
+<body>${html}</body>
+</html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 400);
+  }
   const [loaded, setLoaded]       = useState(false);
   const [sending, setSending]     = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,7 +122,20 @@ export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, 
         {/* Status badge */}
         <div className="flex items-center gap-2 flex-wrap">
           {status === "signed" && sig ? (
-            <span className="text-xs bg-green-100 text-green-700 border border-green-200 rounded-full px-2.5 py-0.5 font-medium">✓ חתם/ה</span>
+            <>
+              <span className="text-xs bg-green-100 text-green-700 border border-green-200 rounded-full px-2.5 py-0.5 font-medium">✓ חתם/ה</span>
+              {getPrintHTML && (
+                <button
+                  onClick={printForm}
+                  className="text-xs flex items-center gap-1 text-primary hover:text-primary/80 transition-colors border border-primary/30 rounded-full px-2.5 py-0.5"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  הדפס טופס
+                </button>
+              )}
+            </>
           ) : status === "pending" ? (
             <span className="text-xs bg-amber-100 text-amber-700 border border-amber-200 rounded-full px-2.5 py-0.5 font-medium">⏳ ממתין לחתימה</span>
           ) : (
