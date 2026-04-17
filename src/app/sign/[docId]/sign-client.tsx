@@ -65,6 +65,7 @@ function DocumentPreview({ html }: { html: string }) {
           transform: `scale(${scale})`,
           transformOrigin: "top right",
           marginBottom: IFRAME_HEIGHT * (scale - 1),
+          pointerEvents: "none",
         }}
       />
     </div>
