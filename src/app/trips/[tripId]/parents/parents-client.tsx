@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useParams } from "next/navigation";
 import { useParents } from "@/hooks/use-parents";
 import { useStudents } from "@/hooks/use-students";
+import { useTrip } from "@/hooks/use-trip";
 import { addParent, updateParent, deleteParent } from "@/lib/firestore/parents";
-import { Parent } from "@/lib/types";
+import { Parent, Trip } from "@/lib/types";
 import type { Gender } from "@/lib/types";
+import { RemoteSignature } from "@/components/remote-signature";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,19 +20,150 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
+// ─── Volunteer form HTML generator ───────────────────────────────────────────
+
+function formatDateHe(iso: string | undefined) {
+  if (!iso) return "____";
+  return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
+}
+
+function daysBetween(start: string | undefined, end: string | undefined): number {
+  if (!start || !end) return 0;
+  return Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1);
+}
+
+function getVolunteerFormHTML(parent: Parent, trip: Trip | null): string {
+  const name      = parent.name || "___";
+  const phone     = parent.phone || "___";
+  const tripName  = trip?.name || "___";
+  const school    = trip?.schoolName || "___";
+  const startDate = formatDateHe(trip?.startDate);
+  const endDate   = formatDateHe(trip?.endDate);
+  const days      = trip?.startDate && trip?.endDate ? daysBetween(trip.startDate, trip.endDate) : "__";
+
+  return `
+<div dir="rtl" style="font-family: 'David', 'Arial', sans-serif; max-width: 700px; margin: 0 auto; padding: 32px; font-size: 14px; line-height: 1.8; color: #000;">
+  <div style="text-align: center; margin-bottom: 24px;">
+    <p style="font-weight: bold;">נספח ט'</p>
+    <p style="font-weight: bold; font-size: 16px; text-decoration: underline;">טופס ביטוח למתנדב</p>
+  </div>
+
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+    <tr>
+      <td style="padding: 4px 0; width: 60%;">
+        <span>הרינו לאשר בזה כי המתנדב/ת </span>
+        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 200px; font-weight: bold;">&nbsp;${name}&nbsp;</span>
+      </td>
+    </tr>
+  </table>
+
+  <div style="margin-bottom: 12px;">
+    <span>מס' ת.ז &nbsp;</span>
+    ${Array(9).fill(0).map(() => `<span style="display: inline-block; width: 22px; height: 22px; border: 1px solid #000; margin-left: 2px; text-align: center; line-height: 22px;">&nbsp;</span>`).join("")}
+  </div>
+
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 12px;">
+    <tr>
+      <td style="padding: 4px 0; width: 50%;">
+        <span>כתובת </span>
+        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 180px;">&nbsp;</span>
+      </td>
+      <td style="padding: 4px 0;">
+        <span>מס' טלפון </span>
+        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 120px; font-weight: bold;">&nbsp;${phone}&nbsp;</span>
+      </td>
+    </tr>
+  </table>
+
+  <div style="margin-bottom: 8px;">
+    <span>התנדב לעבוד בתפקיד </span>
+    <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 300px;">&nbsp;הורה מלווה&nbsp;</span>
+  </div>
+
+  <div style="margin-bottom: 8px;">
+    <span>למען </span>
+    <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 380px;">&nbsp;${tripName} — ${school}&nbsp;</span>
+  </div>
+
+  <p style="font-size: 12px; color: #444; margin-bottom: 16px;">
+    (יש לציין את זהות הגוף או האדם שהפעולה נשנית למענו וכן את מקום הפעולה)
+  </p>
+
+  <table style="width: 100%; border-collapse: collapse; margin-bottom: 24px;">
+    <tr>
+      <td style="padding: 4px 0; width: 33%;">
+        <span>מתאריך </span>
+        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 90px;">&nbsp;${startDate}&nbsp;</span>
+      </td>
+      <td style="padding: 4px 0; width: 33%;">
+        <span>עד תאריך </span>
+        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 90px;">&nbsp;${endDate}&nbsp;</span>
+      </td>
+      <td style="padding: 4px 0;">
+        <span>לתקופה של </span>
+        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 40px;">&nbsp;${days}&nbsp;</span>
+        <span> ימים</span>
+      </td>
+    </tr>
+  </table>
+
+  <table style="width: 100%; border-collapse: collapse; border: 1px solid #000; margin-bottom: 32px;">
+    <thead>
+      <tr style="background: #f5f5f5;">
+        <th style="border: 1px solid #000; padding: 6px; text-align: right;">תאריך</th>
+        <th style="border: 1px solid #000; padding: 6px; text-align: right;">שם נותן ההפניה</th>
+        <th style="border: 1px solid #000; padding: 6px; text-align: right;">תפקידו</th>
+        <th style="border: 1px solid #000; padding: 6px; text-align: right;">חותמת ביה"ס וחתימה</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
+        <td style="border: 1px solid #000; padding: 24px 6px;">&nbsp;</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-bottom: 24px; text-align: left;">
+    <p style="font-weight: bold; text-align: right; margin-bottom: 16px;">אישור המתנדב לקבלת התפקיד</p>
+    <table style="width: 60%; margin-right: auto; border-collapse: collapse;">
+      <tr>
+        <td style="padding: 4px 16px; text-align: center; width: 50%;">
+          <span style="border-top: 1px solid #000; display: block; padding-top: 4px;">שם</span>
+          <span style="font-weight: bold;">${name}</span>
+        </td>
+        <td style="padding: 4px 16px; text-align: center; width: 50%;">
+          <span style="border-top: 1px solid #000; display: block; padding-top: 4px; min-height: 48px;">חתימה</span>
+        </td>
+      </tr>
+    </table>
+  </div>
+
+  <p style="font-size: 12px; color: #444;">העתק : תיק טיולים של ביה"ס.</p>
+</div>`;
+}
+
+// ─── Form data ────────────────────────────────────────────────────────────────
+
 type FormData = { name: string; phone: string; gender: Gender | ""; childName: string; childClass: string };
 const EMPTY: FormData = { name: "", phone: "", gender: "", childName: "", childClass: "" };
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function ParentsClient() {
   const { tripId } = useParams<{ tripId: string }>();
   const { parents, loading } = useParents(tripId);
   const { students } = useStudents(tripId);
+  const { trip } = useTrip(tripId);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Parent | null>(null);
   const [form, setForm] = useState<FormData>(EMPTY);
   const [saving, setSaving] = useState(false);
   const [childSuggestOpen, setChildSuggestOpen] = useState(false);
+  const [expandedSig, setExpandedSig] = useState<string | null>(null); // parentId
 
   // Build student suggestions from going students
   const goingStudents = students.filter((s) => s.isGoing);
@@ -127,57 +260,92 @@ export function ParentsClient() {
                 </div>
                 <ul className="divide-y divide-border">
                   {byClass[cls].map((parent) => (
-                    <li key={parent.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/40 transition-colors">
-                      {/* Avatar */}
-                      <div className="w-9 h-9 rounded-full bg-[var(--brand-light)] text-primary font-semibold text-sm flex items-center justify-center flex-shrink-0">
-                        {parent.name.charAt(0)}
-                      </div>
-
-                      {/* Info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-foreground text-sm">{parent.name}</p>
-                          {parent.gender && (
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0
-                              ${parent.gender === "male" ? "bg-blue-50 text-blue-600" : "bg-pink-50 text-pink-600"}`}>
-                              {parent.gender === "male" ? "אב" : "אם"}
-                            </span>
-                          )}
+                    <li key={parent.id}>
+                      {/* Main row */}
+                      <div className="flex items-center gap-4 px-5 py-3.5 hover:bg-muted/40 transition-colors">
+                        {/* Avatar */}
+                        <div className="w-9 h-9 rounded-full bg-[var(--brand-light)] text-primary font-semibold text-sm flex items-center justify-center flex-shrink-0">
+                          {parent.name.charAt(0)}
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          הורה של{" "}
-                          <span className="font-medium text-foreground">{parent.childName}</span>
-                          {parent.childClass && ` · כיתה ${parent.childClass}`}
-                        </p>
-                      </div>
 
-                      {/* Phone */}
-                      <a
-                        href={`tel:${parent.phone}`}
-                        className="text-sm text-muted-foreground hover:text-primary transition-colors hidden sm:block flex-shrink-0"
-                      >
-                        {parent.phone || "—"}
-                      </a>
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-foreground text-sm">{parent.name}</p>
+                            {parent.gender && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0
+                                ${parent.gender === "male" ? "bg-blue-50 text-blue-600" : "bg-pink-50 text-pink-600"}`}>
+                                {parent.gender === "male" ? "אב" : "אם"}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            הורה של{" "}
+                            <span className="font-medium text-foreground">{parent.childName}</span>
+                            {parent.childClass && ` · כיתה ${parent.childClass}`}
+                          </p>
+                        </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {/* Phone */}
+                        <a
+                          href={`tel:${parent.phone}`}
+                          className="text-sm text-muted-foreground hover:text-primary transition-colors hidden sm:block flex-shrink-0"
+                        >
+                          {parent.phone || "—"}
+                        </a>
+
+                        {/* Signature button */}
                         <button
-                          onClick={() => openEdit(parent)}
-                          className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded"
+                          onClick={() => setExpandedSig(expandedSig === parent.id ? null : parent.id)}
+                          title="טופס ביטוח למתנדב"
+                          className={`p-1.5 rounded transition-colors flex-shrink-0
+                            ${expandedSig === parent.id
+                              ? "text-primary bg-[var(--brand-light)]"
+                              : "text-muted-foreground hover:text-primary"
+                            }`}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                         </button>
-                        <button
-                          onClick={() => handleDelete(parent)}
-                          className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded"
-                        >
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
+
+                        {/* Edit / Delete */}
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={() => openEdit(parent)}
+                            className="p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDelete(parent)}
+                            className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
+
+                      {/* Signature panel — expands inline */}
+                      {expandedSig === parent.id && (
+                        <div className="px-5 pb-4 pt-1 border-t border-border bg-muted/20">
+                          <p className="text-xs font-semibold text-muted-foreground mb-2">טופס ביטוח למתנדב — נספח ט׳</p>
+                          <RemoteSignature
+                            tripId={tripId}
+                            role={`volunteer_${parent.id}`}
+                            roleName="הורה מלווה"
+                            tripName={trip?.name ?? ""}
+                            schoolName={trip?.schoolName ?? ""}
+                            leaderName={parent.name}
+                            label=""
+                            getPreviewHTML={() => getVolunteerFormHTML(parent, trip ?? null)}
+                          />
+                        </div>
+                      )}
                     </li>
                   ))}
                 </ul>
