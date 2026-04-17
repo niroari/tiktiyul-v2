@@ -59,6 +59,7 @@ export type Parent = {
   id: string;
   name: string;
   phone: string;
+  gender?: Gender;
   childName: string;   // student they are accompanying
   childClass: string;  // that student's class
 };

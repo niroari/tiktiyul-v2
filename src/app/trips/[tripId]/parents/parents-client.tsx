@@ -6,6 +6,7 @@ import { useParents } from "@/hooks/use-parents";
 import { useStudents } from "@/hooks/use-students";
 import { addParent, updateParent, deleteParent } from "@/lib/firestore/parents";
 import { Parent } from "@/lib/types";
+import type { Gender } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -17,8 +18,8 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-type FormData = { name: string; phone: string; childName: string; childClass: string };
-const EMPTY: FormData = { name: "", phone: "", childName: "", childClass: "" };
+type FormData = { name: string; phone: string; gender: Gender | ""; childName: string; childClass: string };
+const EMPTY: FormData = { name: "", phone: "", gender: "", childName: "", childClass: "" };
 
 export function ParentsClient() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -49,17 +50,18 @@ export function ParentsClient() {
 
   function openEdit(parent: Parent) {
     setEditing(parent);
-    setForm({ name: parent.name, phone: parent.phone, childName: parent.childName, childClass: parent.childClass });
+    setForm({ name: parent.name, phone: parent.phone, gender: parent.gender ?? "", childName: parent.childName, childClass: parent.childClass });
     setDialogOpen(true);
   }
 
   async function handleSave() {
     setSaving(true);
     try {
+      const data = { ...form, gender: form.gender || undefined };
       if (editing) {
-        await updateParent(tripId, editing.id, form);
+        await updateParent(tripId, editing.id, data);
       } else {
-        await addParent(tripId, form);
+        await addParent(tripId, data);
       }
       setDialogOpen(false);
     } finally {
@@ -133,7 +135,15 @@ export function ParentsClient() {
 
                       {/* Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground text-sm">{parent.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-foreground text-sm">{parent.name}</p>
+                          {parent.gender && (
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium flex-shrink-0
+                              ${parent.gender === "male" ? "bg-blue-50 text-blue-600" : "bg-pink-50 text-pink-600"}`}>
+                              {parent.gender === "male" ? "אב" : "אם"}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           הורה של{" "}
                           <span className="font-medium text-foreground">{parent.childName}</span>
@@ -203,6 +213,28 @@ export function ParentsClient() {
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
                 type="tel"
               />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>מגדר</Label>
+              <div className="flex gap-2">
+                {(["male", "female"] as const).map((g) => (
+                  <button
+                    key={g}
+                    type="button"
+                    onClick={() => setForm({ ...form, gender: form.gender === g ? "" : g })}
+                    className={`flex-1 py-2 text-sm rounded-[var(--radius-sm)] border transition-colors
+                      ${form.gender === g
+                        ? g === "male"
+                          ? "bg-blue-50 border-blue-300 text-blue-700 font-medium"
+                          : "bg-pink-50 border-pink-300 text-pink-700 font-medium"
+                        : "border-border text-muted-foreground hover:bg-muted"
+                      }`}
+                  >
+                    {g === "male" ? "אב" : "אם"}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Child name with autocomplete from students */}
