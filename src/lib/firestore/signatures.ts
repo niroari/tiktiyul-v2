@@ -20,8 +20,9 @@ export type SignatureDoc = {
   schoolName:  string;
   leaderName:  string;
   previewHTML: string | null;  // inner HTML snapshot of the document at send time
-  requiresId?: boolean;        // if true, sign page collects ID number
+  requiresId?: boolean;        // if true, sign page collects ID number + address
   idNumber?:   string;         // filled in by the signer
+  address?:    string;         // filled in by the signer
   status:      SigStatus;
   signature:   string | null;  // base64 PNG data URL
   createdAt:   Timestamp;
@@ -67,7 +68,7 @@ export function subscribeToSignature(
   });
 }
 
-export async function submitSignature(docId: string, dataUrl: string, idNumber?: string): Promise<void> {
+export async function submitSignature(docId: string, dataUrl: string, idNumber?: string, address?: string): Promise<void> {
   if (
     (!dataUrl.startsWith("data:image/png;base64,") && !dataUrl.startsWith("data:image/jpeg;base64,")) ||
     dataUrl.length > 300_000
@@ -79,5 +80,6 @@ export async function submitSignature(docId: string, dataUrl: string, idNumber?:
     status:    "signed",
     signedAt:  serverTimestamp(),
     ...(idNumber ? { idNumber } : {}),
+    ...(address  ? { address  } : {}),
   });
 }

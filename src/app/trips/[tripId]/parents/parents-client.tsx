@@ -32,7 +32,7 @@ function daysBetween(start: string | undefined, end: string | undefined): number
   return Math.max(1, Math.round((new Date(end).getTime() - new Date(start).getTime()) / 86400000) + 1);
 }
 
-function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: string, signature?: string): string {
+function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: string, address?: string, signature?: string): string {
   const name      = parent.name || "___";
   const phone     = parent.phone || "___";
   const tripName  = trip?.name || "___";
@@ -73,7 +73,7 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: stri
     <tr>
       <td style="padding: 4px 0; width: 50%;">
         <span>כתובת </span>
-        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 180px;">&nbsp;</span>
+        <span style="border-bottom: 1px solid #000; display: inline-block; min-width: 180px; font-weight: ${address ? "bold" : "normal"};">&nbsp;${address || ""}&nbsp;</span>
       </td>
       <td style="padding: 4px 0;">
         <span>מס' טלפון </span>
@@ -352,7 +352,7 @@ export function ParentsClient() {
                             label=""
                             requiresId={true}
                             getPreviewHTML={() => getVolunteerFormHTML(parent, trip ?? null)}
-                            getPrintHTML={(idNum, sig) => getVolunteerFormHTML(parent, trip ?? null, idNum, sig)}
+                            getPrintHTML={(idNum, addr, sig) => getVolunteerFormHTML(parent, trip ?? null, idNum, addr, sig)}
                           />
                         </div>
                       )}

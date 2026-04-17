@@ -19,7 +19,7 @@ type Props = {
   label:           string;       // Display label above the widget
   requiresId?:     boolean;      // if true, sign page will collect ID number
   getPreviewHTML?: () => string; // snapshot of the document at send time
-  getPrintHTML?:   (idNumber: string, signature: string) => string; // complete form for printing
+  getPrintHTML?:   (idNumber: string, address: string, signature: string) => string; // complete form for printing
 };
 
 export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, leaderName, label, requiresId, getPreviewHTML, getPrintHTML }: Props) {
@@ -29,7 +29,7 @@ export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, 
 
   function printForm() {
     if (!getPrintHTML || !sigDoc?.signature) return;
-    const html = getPrintHTML(sigDoc.idNumber ?? "", sigDoc.signature);
+    const html = getPrintHTML(sigDoc.idNumber ?? "", sigDoc.address ?? "", sigDoc.signature);
     const w = window.open("", "_blank");
     if (!w) return;
     w.document.write(`<!DOCTYPE html>

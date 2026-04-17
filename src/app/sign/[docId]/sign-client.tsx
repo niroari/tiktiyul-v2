@@ -93,6 +93,7 @@ export function SignClient() {
   const [state, setState]     = useState<"loading" | "ready" | "invalid" | "expired" | "already_signed" | "submitting" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
   const [idNumber, setIdNumber] = useState("");
+  const [address,  setAddress]  = useState("");
 
   const canvasRef = useRef<SignatureCanvasHandle>(null);
 
@@ -116,6 +117,10 @@ export function SignClient() {
       setErrorMsg("נא להזין מספר תעודת זהות");
       return;
     }
+    if (sigDoc?.requiresId && !address.trim()) {
+      setErrorMsg("נא להזין כתובת");
+      return;
+    }
     if (!canvas || canvas.isEmpty()) {
       setErrorMsg("נא לחתום לפני השליחה");
       return;
@@ -123,7 +128,7 @@ export function SignClient() {
     setErrorMsg("");
     setState("submitting");
     try {
-      await submitSignature(docId, canvas.toDataURL(), sigDoc?.requiresId ? idNumber.trim() : undefined);
+      await submitSignature(docId, canvas.toDataURL(), sigDoc?.requiresId ? idNumber.trim() : undefined, sigDoc?.requiresId ? address.trim() : undefined);
       setState("done");
     } catch (e) {
       console.error(e);
@@ -209,21 +214,33 @@ export function SignClient() {
       <div className="bg-white rounded-xl border border-border p-6 space-y-5">
         <InfoCard doc={sigDoc!} />
 
-        {/* ID number — only for forms that require it */}
+        {/* ID + address — only for forms that require it */}
         {sigDoc?.requiresId && (
-          <div className="border-t border-border pt-4 space-y-2">
-            <p className="text-sm font-medium">מספר תעודת זהות <span className="text-destructive">*</span></p>
-            <input
-              type="text"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={9}
-              placeholder="000000000"
-              dir="ltr"
-              value={idNumber}
-              onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, ""))}
-              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary tracking-widest font-mono"
-            />
+          <div className="border-t border-border pt-4 space-y-4">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">מספר תעודת זהות <span className="text-destructive">*</span></p>
+              <input
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={9}
+                placeholder="000000000"
+                dir="ltr"
+                value={idNumber}
+                onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, ""))}
+                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary tracking-widest font-mono"
+              />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">כתובת <span className="text-destructive">*</span></p>
+              <input
+                type="text"
+                placeholder="רחוב, מספר, עיר"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary"
+              />
+            </div>
           </div>
         )}
 
