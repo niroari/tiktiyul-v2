@@ -905,7 +905,16 @@ export function RoomsClient() {
           {filteredUnassigned.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-[var(--radius)] p-4">
               <p className="text-sm font-semibold text-amber-800 mb-2">
-                תלמידים ללא חדר ({filteredUnassigned.length}) — לחץ/י על תלמיד/ה לשיבוץ
+                תלמידים ללא חדר ({filteredUnassigned.length}
+                {(() => {
+                  const boys  = filteredUnassigned.filter((s) => s.gender === "male").length;
+                  const girls = filteredUnassigned.filter((s) => s.gender === "female").length;
+                  if (boys > 0 && girls > 0) return ` — ${boys} בנים, ${girls} בנות`;
+                  if (boys > 0) return ` — ${boys} בנים`;
+                  if (girls > 0) return ` — ${girls} בנות`;
+                  return "";
+                })()}
+                ) — לחץ/י על תלמיד/ה לשיבוץ
               </p>
               <div className="flex flex-wrap gap-2">
                 {filteredUnassigned.map((s) => {
