@@ -228,6 +228,158 @@ function HostelDialog({
   );
 }
 
+// ─── RoomCard ─────────────────────────────────────────────────────────────────
+
+type Student = { id: string; firstName: string; lastName: string; class: string; gender: string };
+
+type RoomCardProps = {
+  room: Room;
+  genderRooms: Room[];
+  studentById: Record<string, Student>;
+  unassigned: Student[];
+  dragOverRoom: string | null;
+  draggingId: string | null;
+  onMoveRoom: (id: string, dir: -1 | 1) => void;
+  onDeleteRoom: (id: string) => void;
+  onSetNumber: (id: string, num: string) => void;
+  onRemoveStudent: (roomId: string, studentId: string) => void;
+  onAssignStudent: (studentId: string, roomId: string) => void;
+  onMoveStudent: (studentId: string, fromRoom: string | null, toRoom: string) => void;
+  setDragOverRoom: (id: string | null) => void;
+  setDraggingId: (id: string | null) => void;
+};
+
+function RoomCard({
+  room, genderRooms, studentById, unassigned,
+  dragOverRoom, draggingId,
+  onMoveRoom, onDeleteRoom, onSetNumber, onRemoveStudent, onAssignStudent, onMoveStudent,
+  setDragOverRoom, setDraggingId,
+}: RoomCardProps) {
+  const studs      = room.studentIds.map((id) => studentById[id]).filter(Boolean);
+  const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ");
+  const isGirl     = room.gender === "female";
+  const chipBg     = isGirl ? "bg-pink-50"      : "bg-blue-50";
+  const chipBorder = isGirl ? "border-pink-200"  : "border-blue-200";
+  const chipText   = isGirl ? "text-pink-800"    : "text-blue-800";
+  const eligible   = unassigned.filter((s) => s.gender === room.gender);
+  const gIdx       = genderRooms.findIndex((r) => r.id === room.id);
+  const overCap    = room.capacity !== undefined && studs.length > room.capacity;
+
+  return (
+    <div className={`bg-white border rounded-[var(--radius)] shadow-[var(--shadow-card)] ${overCap ? "border-amber-400" : "border-border"}`}>
+      {/* Header */}
+      <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
+        <div className="flex flex-col gap-0.5">
+          <button onClick={() => onMoveRoom(room.id, -1)} disabled={gIdx === 0}
+            className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight">▲</button>
+          <button onClick={() => onMoveRoom(room.id, 1)} disabled={gIdx === genderRooms.length - 1}
+            className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight">▼</button>
+        </div>
+
+        <label className="text-xs text-muted-foreground whitespace-nowrap">מס׳ חדר:</label>
+        <input
+          type="text"
+          value={room.number}
+          onChange={(e) => onSetNumber(room.id, e.target.value)}
+          placeholder="ממתין לאכסנייה"
+          className="text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 focus:outline-none focus:border-primary w-28"
+          dir="ltr"
+        />
+
+        {classLabel && (
+          <span className="text-xs bg-[var(--primary-light,#e8f5e9)] text-primary rounded-full px-2 py-0.5">{classLabel}</span>
+        )}
+
+        <span className={`mr-auto text-xs ${overCap ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+          {studs.length}{room.capacity !== undefined ? `/${room.capacity}` : ""} תלמידים
+        </span>
+
+        <button onClick={() => onDeleteRoom(room.id)} className="text-muted-foreground hover:text-destructive transition-colors text-lg leading-none px-1" title="מחק חדר">✕</button>
+      </div>
+
+      {/* Students — drop zone */}
+      <div
+        className={`px-3 py-3 min-h-[64px] border-b border-dashed transition-colors ${
+          dragOverRoom === room.id ? "bg-primary/5 border-primary" : "border-border"
+        }`}
+        onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverRoom(room.id); }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverRoom(null); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragOverRoom(null);
+          const studentId = e.dataTransfer.getData("studentId");
+          const fromRoom  = e.dataTransfer.getData("fromRoom");
+          if (!studentId) return;
+          if (fromRoom) onMoveStudent(studentId, fromRoom, room.id);
+          else onAssignStudent(studentId, room.id);
+        }}
+      >
+        {dragOverRoom === room.id && studs.length === 0 && (
+          <div className="text-xs text-primary/50 text-center py-1">שחרר כאן</div>
+        )}
+        <div className="flex flex-wrap gap-1.5">
+          {studs.length === 0 && dragOverRoom !== room.id && (
+            <span className="text-xs text-muted-foreground/40 italic">גרור תלמיד/ה לכאן</span>
+          )}
+          {studs.map((s) => (
+            <span
+              key={s.id}
+              draggable
+              onDragStart={(e) => {
+                e.dataTransfer.setData("studentId", s.id);
+                e.dataTransfer.setData("fromRoom", room.id);
+                e.dataTransfer.effectAllowed = "move";
+                setDraggingId(s.id);
+              }}
+              onDragEnd={() => { setDraggingId(null); setDragOverRoom(null); }}
+              className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border cursor-grab active:cursor-grabbing transition-opacity ${chipBg} ${chipBorder} ${chipText} ${draggingId === s.id ? "opacity-40" : ""}`}
+            >
+              {s.firstName} {s.lastName}
+              <span className="text-muted-foreground text-[10px]">({s.class})</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemoveStudent(room.id, s.id); }}
+                className="text-muted-foreground hover:text-destructive transition-colors mr-0.5"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Add student */}
+      {eligible.length > 0 && (
+        <div className="px-3 py-2 flex gap-2">
+          <input
+            type="text"
+            list={`room-list-${room.id}`}
+            placeholder="הוסף תלמיד/ה..."
+            className="flex-1 text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 focus:outline-none focus:border-primary"
+            onKeyDown={(e) => {
+              if (e.key !== "Enter") return;
+              const val = (e.target as HTMLInputElement).value.trim();
+              const s = eligible.find((s) => `${s.lastName} ${s.firstName} (${s.class})` === val);
+              if (s) { onAssignStudent(s.id, room.id); (e.target as HTMLInputElement).value = ""; }
+            }}
+            onChange={(e) => {
+              const val = e.target.value.trim();
+              const s = eligible.find((s) => `${s.lastName} ${s.firstName} (${s.class})` === val);
+              if (s) { onAssignStudent(s.id, room.id); e.target.value = ""; }
+            }}
+          />
+          <datalist id={`room-list-${room.id}`}>
+            {eligible.map((s) => (
+              <option key={s.id} value={`${s.lastName} ${s.firstName} (${s.class})`} />
+            ))}
+          </datalist>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export function RoomsClient() {
@@ -560,136 +712,6 @@ export function RoomsClient() {
     `;
   }
 
-  // ── Room card (inside component to close over handlers) ───────────────────────
-
-  function RoomCard({ room, genderRooms }: { room: Room; genderRooms: Room[] }) {
-    const studs      = room.studentIds.map((id) => studentById[id]).filter(Boolean);
-    const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ");
-    const isGirl     = room.gender === "female";
-    const chipBg     = isGirl ? "bg-pink-50"    : "bg-blue-50";
-    const chipBorder = isGirl ? "border-pink-200" : "border-blue-200";
-    const chipText   = isGirl ? "text-pink-800"  : "text-blue-800";
-    const eligible   = unassigned.filter((s) => s.gender === room.gender);
-    const gIdx       = genderRooms.findIndex((r) => r.id === room.id);
-    const overCap    = room.capacity !== undefined && studs.length > room.capacity;
-
-    return (
-      <div className={`bg-white border rounded-[var(--radius)] shadow-[var(--shadow-card)] ${overCap ? "border-amber-400" : "border-border"}`}>
-        {/* Header */}
-        <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
-          <div className="flex flex-col gap-0.5">
-            <button onClick={() => moveRoom(room.id, -1)} disabled={gIdx === 0}
-              className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight">▲</button>
-            <button onClick={() => moveRoom(room.id, 1)} disabled={gIdx === genderRooms.length - 1}
-              className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight">▼</button>
-          </div>
-
-          <label className="text-xs text-muted-foreground whitespace-nowrap">מס׳ חדר:</label>
-          <input
-            type="text"
-            value={room.number}
-            onChange={(e) => setRoomNumber(room.id, e.target.value)}
-            placeholder="ממתין לאכסנייה"
-            className="text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 focus:outline-none focus:border-primary w-28"
-            dir="ltr"
-          />
-
-          {classLabel && (
-            <span className="text-xs bg-[var(--primary-light,#e8f5e9)] text-primary rounded-full px-2 py-0.5">{classLabel}</span>
-          )}
-
-          <span className={`mr-auto text-xs ${overCap ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
-            {studs.length}{room.capacity !== undefined ? `/${room.capacity}` : ""} תלמידים
-          </span>
-
-          <button onClick={() => deleteRoom(room.id)} className="text-muted-foreground hover:text-destructive transition-colors text-lg leading-none px-1" title="מחק חדר">✕</button>
-        </div>
-
-        {/* Students — drop zone */}
-        <div
-          className={`px-3 py-3 min-h-[64px] border-b border-dashed transition-colors ${
-            dragOverRoom === room.id
-              ? "bg-primary/5 border-primary"
-              : "border-border"
-          }`}
-          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverRoom(room.id); }}
-          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverRoom(null); }}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragOverRoom(null);
-            const studentId = e.dataTransfer.getData("studentId");
-            const fromRoom  = e.dataTransfer.getData("fromRoom");
-            if (!studentId) return;
-            if (fromRoom) moveStudent(studentId, fromRoom, room.id);
-            else assignStudentToRoom(studentId, room.id);
-          }}
-        >
-          {dragOverRoom === room.id && studs.length === 0 && (
-            <div className="text-xs text-primary/50 text-center py-1">שחרר כאן</div>
-          )}
-          <div className="flex flex-wrap gap-1.5">
-            {studs.length === 0 && dragOverRoom !== room.id && (
-              <span className="text-xs text-muted-foreground/40 italic">גרור תלמיד/ה לכאן</span>
-            )}
-            {studs.map((s) => (
-              <span
-                key={s.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData("studentId", s.id);
-                  e.dataTransfer.setData("fromRoom", room.id);
-                  e.dataTransfer.effectAllowed = "move";
-                  setDraggingId(s.id);
-                }}
-                onDragEnd={() => { setDraggingId(null); setDragOverRoom(null); }}
-                className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border cursor-grab active:cursor-grabbing transition-opacity ${chipBg} ${chipBorder} ${chipText} ${draggingId === s.id ? "opacity-40" : ""}`}
-              >
-                {s.firstName} {s.lastName}
-                <span className="text-muted-foreground text-[10px]">({s.class})</span>
-                <button
-                  onClick={(e) => { e.stopPropagation(); removeStudentFromRoom(room.id, s.id); }}
-                  className="text-muted-foreground hover:text-destructive transition-colors mr-0.5"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Add student */}
-        {eligible.length > 0 && (
-          <div className="px-3 py-2 flex gap-2">
-            <input
-              type="text"
-              list={`room-list-${room.id}`}
-              placeholder="הוסף תלמיד/ה..."
-              className="flex-1 text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 focus:outline-none focus:border-primary"
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                const val = (e.target as HTMLInputElement).value.trim();
-                const s = eligible.find((s) => `${s.lastName} ${s.firstName} (${s.class})` === val);
-                if (s) { assignStudentToRoom(s.id, room.id); (e.target as HTMLInputElement).value = ""; }
-              }}
-              onChange={(e) => {
-                const val = e.target.value.trim();
-                const s = eligible.find((s) => `${s.lastName} ${s.firstName} (${s.class})` === val);
-                if (s) { assignStudentToRoom(s.id, room.id); e.target.value = ""; }
-              }}
-            />
-            <datalist id={`room-list-${room.id}`}>
-              {eligible.map((s) => (
-                <option key={s.id} value={`${s.lastName} ${s.firstName} (${s.class})`} />
-              ))}
-            </datalist>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   // ── Render ────────────────────────────────────────────────────────────────────
 
   const hasSpecs = boySpecs.length > 0 || girlSpecs.length > 0;
@@ -885,7 +907,13 @@ export function RoomsClient() {
                   </div>
                 ) : (
                   boyRooms.filter(roomMatchesFilter).map((room) => (
-                    <RoomCard key={room.id} room={room} genderRooms={boyRooms} />
+                    <RoomCard key={room.id} room={room} genderRooms={boyRooms}
+                      studentById={studentById} unassigned={unassigned}
+                      dragOverRoom={dragOverRoom} draggingId={draggingId}
+                      onMoveRoom={moveRoom} onDeleteRoom={deleteRoom} onSetNumber={setRoomNumber}
+                      onRemoveStudent={removeStudentFromRoom} onAssignStudent={assignStudentToRoom}
+                      onMoveStudent={moveStudent} setDragOverRoom={setDragOverRoom} setDraggingId={setDraggingId}
+                    />
                   ))
                 )}
               </div>
@@ -908,7 +936,13 @@ export function RoomsClient() {
                   </div>
                 ) : (
                   girlRooms.filter(roomMatchesFilter).map((room) => (
-                    <RoomCard key={room.id} room={room} genderRooms={girlRooms} />
+                    <RoomCard key={room.id} room={room} genderRooms={girlRooms}
+                      studentById={studentById} unassigned={unassigned}
+                      dragOverRoom={dragOverRoom} draggingId={draggingId}
+                      onMoveRoom={moveRoom} onDeleteRoom={deleteRoom} onSetNumber={setRoomNumber}
+                      onRemoveStudent={removeStudentFromRoom} onAssignStudent={assignStudentToRoom}
+                      onMoveStudent={moveStudent} setDragOverRoom={setDragOverRoom} setDraggingId={setDraggingId}
+                    />
                   ))
                 )}
               </div>
