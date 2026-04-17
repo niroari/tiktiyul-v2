@@ -17,6 +17,25 @@ type DraftStudent = {
   dirty: boolean;
 };
 
+function Shell({ tokenDoc, children }: { tokenDoc: ClassToken | null; children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-[#f6faf8] px-4 py-8" dir="rtl">
+      <div className="max-w-2xl mx-auto space-y-5">
+        <div className="text-center space-y-1">
+          <div className="text-xs text-muted-foreground">משרד החינוך — מינהל חברה ונוער</div>
+          <h1 className="text-xl font-bold text-[#1b4332]">עדכון פרטי תלמידים</h1>
+          {tokenDoc && (
+            <p className="text-sm text-muted-foreground">
+              {tokenDoc.schoolName} · כיתה {tokenDoc.class} · {tokenDoc.tripName}
+            </p>
+          )}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 export function ClassEditClient() {
   const { token } = useParams<{ token: string }>();
 
@@ -92,33 +111,12 @@ export function ClassEditClient() {
     }
   }
 
-  // ── Shell ──────────────────────────────────────────────────────────────────
-
-  function Shell({ children }: { children: React.ReactNode }) {
-    return (
-      <div className="min-h-screen bg-[#f6faf8] px-4 py-8" dir="rtl">
-        <div className="max-w-2xl mx-auto space-y-5">
-          <div className="text-center space-y-1">
-            <div className="text-xs text-muted-foreground">משרד החינוך — מינהל חברה ונוער</div>
-            <h1 className="text-xl font-bold text-[#1b4332]">עדכון פרטי תלמידים</h1>
-            {tokenDoc && (
-              <p className="text-sm text-muted-foreground">
-                {tokenDoc.schoolName} · כיתה {tokenDoc.class} · {tokenDoc.tripName}
-              </p>
-            )}
-          </div>
-          {children}
-        </div>
-      </div>
-    );
-  }
-
   // ── States ─────────────────────────────────────────────────────────────────
 
-  if (state === "loading") return <Shell><div className="text-center py-16 text-muted-foreground text-sm">טוען...</div></Shell>;
+  if (state === "loading") return <Shell tokenDoc={null}><div className="text-center py-16 text-muted-foreground text-sm">טוען...</div></Shell>;
 
   if (state === "invalid") return (
-    <Shell>
+    <Shell tokenDoc={null}>
       <div className="bg-white rounded-xl border border-border p-8 text-center space-y-2">
         <div className="text-2xl">⚠️</div>
         <p className="font-medium">הקישור אינו תקף</p>
@@ -128,7 +126,7 @@ export function ClassEditClient() {
   );
 
   if (state === "expired") return (
-    <Shell>
+    <Shell tokenDoc={null}>
       <div className="bg-white rounded-xl border border-border p-8 text-center space-y-2">
         <div className="text-2xl">⏰</div>
         <p className="font-medium">פג תוקף הקישור</p>
@@ -138,7 +136,7 @@ export function ClassEditClient() {
   );
 
   if (state === "done") return (
-    <Shell>
+    <Shell tokenDoc={tokenDoc}>
       <div className="bg-white rounded-xl border border-green-200 p-8 text-center space-y-3">
         <div className="text-4xl">✅</div>
         <p className="text-lg font-bold text-green-700">הפרטים נשלחו לאישור</p>
@@ -150,7 +148,7 @@ export function ClassEditClient() {
   const dirtyCount = drafts.filter((d) => d.dirty).length;
 
   return (
-    <Shell>
+    <Shell tokenDoc={tokenDoc}>
       {/* Save reminder — prominent */}
       <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex gap-3 items-start">
         <span className="text-2xl flex-shrink-0">⚠️</span>
