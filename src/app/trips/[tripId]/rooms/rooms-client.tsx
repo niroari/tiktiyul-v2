@@ -245,6 +245,8 @@ export function RoomsClient() {
   const [genderView,   setGenderView]   = useState<"all" | "male" | "female">("all");
   const [assigningId,  setAssigningId]  = useState<string | null>(null);
   const [hostelOpen,   setHostelOpen]   = useState(false);
+  const [draggingId,   setDraggingId]   = useState<string | null>(null);
+  const [dragOverRoom, setDragOverRoom] = useState<string | null>(null);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending  = useRef(false);
@@ -457,6 +459,15 @@ export function RoomsClient() {
     ));
   }
 
+  function moveStudent(studentId: string, fromRoomId: string | null, toRoomId: string) {
+    if (fromRoomId === toRoomId) return;
+    updateRooms(rooms.map((r) => {
+      if (r.id === fromRoomId) return { ...r, studentIds: r.studentIds.filter((id) => id !== studentId) };
+      if (r.id === toRoomId)   return { ...r, studentIds: [...r.studentIds, studentId] };
+      return r;
+    }));
+  }
+
   // ── Convert StaffGroup → DlgStaffGroup for dialog ────────────────────────────
 
   function staffGroupsToDlg(groups: StaffGroup[]): DlgStaffGroup[] {
@@ -594,15 +605,51 @@ export function RoomsClient() {
           <button onClick={() => deleteRoom(room.id)} className="text-muted-foreground hover:text-destructive transition-colors text-lg leading-none px-1" title="מחק חדר">✕</button>
         </div>
 
-        {/* Students */}
-        <div className="px-3 py-3 min-h-[52px] border-b border-dashed border-border">
+        {/* Students — drop zone */}
+        <div
+          className={`px-3 py-3 min-h-[64px] border-b border-dashed transition-colors ${
+            dragOverRoom === room.id
+              ? "bg-primary/5 border-primary"
+              : "border-border"
+          }`}
+          onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverRoom(room.id); }}
+          onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverRoom(null); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragOverRoom(null);
+            const studentId = e.dataTransfer.getData("studentId");
+            const fromRoom  = e.dataTransfer.getData("fromRoom");
+            if (!studentId) return;
+            if (fromRoom) moveStudent(studentId, fromRoom, room.id);
+            else assignStudentToRoom(studentId, room.id);
+          }}
+        >
+          {dragOverRoom === room.id && studs.length === 0 && (
+            <div className="text-xs text-primary/50 text-center py-1">שחרר כאן</div>
+          )}
           <div className="flex flex-wrap gap-1.5">
-            {studs.length === 0 && <span className="text-xs text-muted-foreground/40 italic">אין תלמידים</span>}
+            {studs.length === 0 && dragOverRoom !== room.id && (
+              <span className="text-xs text-muted-foreground/40 italic">גרור תלמיד/ה לכאן</span>
+            )}
             {studs.map((s) => (
-              <span key={s.id} className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border ${chipBg} ${chipBorder} ${chipText}`}>
+              <span
+                key={s.id}
+                draggable
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("studentId", s.id);
+                  e.dataTransfer.setData("fromRoom", room.id);
+                  e.dataTransfer.effectAllowed = "move";
+                  setDraggingId(s.id);
+                }}
+                onDragEnd={() => { setDraggingId(null); setDragOverRoom(null); }}
+                className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border cursor-grab active:cursor-grabbing transition-opacity ${chipBg} ${chipBorder} ${chipText} ${draggingId === s.id ? "opacity-40" : ""}`}
+              >
                 {s.firstName} {s.lastName}
                 <span className="text-muted-foreground text-[10px]">({s.class})</span>
-                <button onClick={() => removeStudentFromRoom(room.id, s.id)} className="text-muted-foreground hover:text-destructive transition-colors mr-0.5">
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeStudentFromRoom(room.id, s.id); }}
+                  className="text-muted-foreground hover:text-destructive transition-colors mr-0.5"
+                >
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -786,13 +833,27 @@ export function RoomsClient() {
                         </div>
                       ) : (
                         <button
+                          draggable={targetRooms.length > 0}
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData("studentId", s.id);
+                            e.dataTransfer.setData("fromRoom", "");
+                            e.dataTransfer.effectAllowed = "move";
+                            setDraggingId(s.id);
+                          }}
+                          onDragEnd={() => setDraggingId(null)}
                           onClick={() => {
                             if (targetRooms.length === 0) return;
                             if (targetRooms.length === 1) assignStudentToRoom(s.id, targetRooms[0].id);
                             else setAssigningId(s.id);
                           }}
-                          title={targetRooms.length === 0 ? `הוסף חדר ${isGirl ? "בנות" : "בנים"} תחילה` : "לחץ לשיבוץ"}
-                          className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${chipBg} ${targetRooms.length === 0 ? "opacity-50 cursor-not-allowed" : "hover:opacity-80 cursor-pointer"}`}
+                          title={targetRooms.length === 0 ? `הוסף חדר ${isGirl ? "בנות" : "בנים"} תחילה` : "גרור לחדר או לחץ לשיבוץ"}
+                          className={`text-xs rounded-full px-2.5 py-1 border transition-all ${chipBg} ${
+                            targetRooms.length === 0
+                              ? "opacity-50 cursor-not-allowed"
+                              : draggingId === s.id
+                                ? "opacity-40 scale-95"
+                                : "hover:opacity-80 cursor-grab active:cursor-grabbing"
+                          }`}
                         >
                           {s.firstName} {s.lastName}
                           <span className="mr-1 opacity-60">({s.class})</span>
