@@ -67,6 +67,13 @@ service cloud.firestore {
         allow read, write: if isMember(tripId);
       }
 
+      // Students: readable without auth so teachers with a class token link can
+      // load their class list. TripId is a UUID — not guessable. Writes still
+      // require trip membership (the generic subcollection rule above applies).
+      match /students/{studentId} {
+        allow read: if true;
+      }
+
       // Pending updates: teachers write publicly (token validated client-side);
       // trip members can read and update status (approve/reject).
       match /pendingUpdates/{updateId} {

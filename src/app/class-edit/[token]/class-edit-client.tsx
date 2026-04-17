@@ -26,13 +26,15 @@ export function ClassEditClient() {
   const [submitError, setSubmitError] = useState("");
 
   useEffect(() => {
-    getClassToken(token).then((doc) => {
-      if (!doc) { setState("invalid"); return; }
-      const expired = doc.expiresAt?.toDate() < new Date();
-      if (expired) { setState("expired"); return; }
-      setTokenDoc(doc);
+    async function load() {
+      try {
+        const doc = await getClassToken(token);
+        if (!doc) { setState("invalid"); return; }
+        const expired = doc.expiresAt?.toDate() < new Date();
+        if (expired) { setState("expired"); return; }
+        setTokenDoc(doc);
 
-      getStudents(doc.tripId).then((students) => {
+        const students = await getStudents(doc.tripId);
         const classStudents = students
           .filter((s) => s.class === doc.class)
           .sort((a, b) => a.lastName.localeCompare(b.lastName, "he"));
@@ -46,8 +48,12 @@ export function ClassEditClient() {
           dirty: false,
         })));
         setState("ready");
-      });
-    }).catch(() => setState("invalid"));
+      } catch (e) {
+        console.error("class-edit load error:", e);
+        setState("invalid");
+      }
+    }
+    load();
   }, [token]);
 
   function update<K extends keyof DraftStudent>(studentId: string, field: K, value: DraftStudent[K]) {
