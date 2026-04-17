@@ -151,8 +151,21 @@ export function ClassEditClient() {
 
   return (
     <Shell>
+      {/* Save reminder — prominent */}
+      <div className="bg-amber-50 border-2 border-amber-300 rounded-xl p-4 flex gap-3 items-start">
+        <span className="text-2xl flex-shrink-0">⚠️</span>
+        <div>
+          <p className="font-bold text-amber-800 text-sm">חשוב — אל תשכחי ללחוץ על כפתור השליחה!</p>
+          <p className="text-amber-700 text-sm mt-0.5">
+            לאחר עדכון הפרטים, יש לגלול למטה וללחוץ על{" "}
+            <span className="font-bold">״שלח עדכונים לאישור״</span>{" "}
+            — רק אז השינויים יישמרו.
+          </p>
+        </div>
+      </div>
+
       <div className="bg-white/60 rounded-xl border border-border p-4 text-sm text-muted-foreground">
-        עדכני את הפרטים לפי הצורך — שינויים יועברו לאישור אחראי/ת הטיול לפני שיעודכנו במערכת.
+        שינויים יועברו לאישור אחראי/ת הטיול לפני שיעודכנו במערכת.
       </div>
 
       <div className="space-y-3">
