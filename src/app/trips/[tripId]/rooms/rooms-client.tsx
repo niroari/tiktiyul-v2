@@ -228,6 +228,69 @@ function HostelDialog({
   );
 }
 
+// ─── AddRoomButton ────────────────────────────────────────────────────────────
+
+type SlotInfo = { size: number; total: number; used: number; remaining: number };
+
+function AddRoomButton({
+  specs, slots, open, onToggle, onAdd,
+}: {
+  gender: "male" | "female";
+  specs: RoomSpec[];
+  slots: SlotInfo[];
+  open: boolean;
+  onToggle: () => void;
+  onAdd: (capacity?: number) => void;
+}) {
+  // No specs defined — plain button
+  if (specs.length === 0) {
+    return (
+      <button
+        onClick={() => onAdd(undefined)}
+        className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors"
+      >
+        + הוסף חדר
+      </button>
+    );
+  }
+
+  const allFull = slots.every((s) => s.remaining <= 0);
+
+  return (
+    <div className="relative">
+      <button
+        onClick={onToggle}
+        disabled={allFull}
+        className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+      >
+        + הוסף חדר {open ? "▲" : "▼"}
+      </button>
+
+      {open && (
+        <>
+          {/* Click-away backdrop */}
+          <div className="fixed inset-0 z-10" onClick={onToggle} />
+          <div className="absolute left-0 top-full mt-1 z-20 bg-white border border-border rounded-[var(--radius-sm)] shadow-lg min-w-[200px] overflow-hidden" dir="rtl">
+            {slots.map((slot) => (
+              <button
+                key={slot.size}
+                disabled={slot.remaining <= 0}
+                onClick={() => onAdd(slot.size)}
+                className="w-full text-right px-3 py-2 text-sm flex items-center justify-between gap-4 hover:bg-muted transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <span>חדר של <strong>{slot.size}</strong></span>
+                <span className={`text-xs ${slot.remaining <= 0 ? "text-muted-foreground" : slot.remaining <= 2 ? "text-amber-600" : "text-green-600"}`}>
+                  {slot.remaining > 0 ? `נותרו ${slot.remaining}/${slot.total}` : "מלא"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── RoomCard ─────────────────────────────────────────────────────────────────
 
 type Student = { id: string; firstName: string; lastName: string; class: string; gender: string };
@@ -288,6 +351,10 @@ function RoomCard({
 
         {classLabel && (
           <span className="text-xs bg-[var(--primary-light,#e8f5e9)] text-primary rounded-full px-2 py-0.5">{classLabel}</span>
+        )}
+
+        {room.capacity !== undefined && (
+          <span className="text-xs bg-muted text-muted-foreground rounded px-1.5 py-0.5 whitespace-nowrap">של {room.capacity}</span>
         )}
 
         <span className={`mr-auto text-xs ${overCap ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
@@ -399,6 +466,7 @@ export function RoomsClient() {
   const [hostelOpen,   setHostelOpen]   = useState(false);
   const [draggingId,   setDraggingId]   = useState<string | null>(null);
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null);
+  const [addMenuOpen,  setAddMenuOpen]  = useState<"male" | "female" | null>(null);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending  = useRef(false);
@@ -573,8 +641,19 @@ export function RoomsClient() {
 
   // ── Room actions ──────────────────────────────────────────────────────────────
 
-  function addRoom(gender: "male" | "female") {
-    updateRooms([...rooms, makeRoom(gender)]);
+  function addRoom(gender: "male" | "female", capacity?: number) {
+    updateRooms([...rooms, { ...makeRoom(gender), ...(capacity !== undefined ? { capacity } : {}) }]);
+  }
+
+  function remainingSlots(gender: "male" | "female") {
+    const specs = gender === "male" ? boySpecs : girlSpecs;
+    const gRooms = rooms.filter((r) => r.gender === gender);
+    return specs.map((spec) => ({
+      size:      spec.size,
+      total:     spec.count,
+      used:      gRooms.filter((r) => r.capacity === spec.size).length,
+      remaining: spec.count - gRooms.filter((r) => r.capacity === spec.size).length,
+    }));
   }
 
   function deleteRoom(roomId: string) {
@@ -899,7 +978,9 @@ export function RoomsClient() {
                     בנים — {boyRooms.length} חדרים
                     {goingBoys.length > 0 && <span className="text-muted-foreground font-normal">({goingBoys.length})</span>}
                   </h2>
-                  <button onClick={() => addRoom("male")} className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors">+ הוסף חדר</button>
+                  <AddRoomButton gender="male" specs={boySpecs} slots={remainingSlots("male")}
+                    open={addMenuOpen === "male"} onToggle={() => setAddMenuOpen(addMenuOpen === "male" ? null : "male")}
+                    onAdd={(cap) => { addRoom("male", cap); setAddMenuOpen(null); }} />
                 </div>
                 {boyRooms.filter(roomMatchesFilter).length === 0 ? (
                   <div className="text-center text-muted-foreground text-sm py-8 bg-blue-50/50 rounded-[var(--radius)] border border-blue-100">
@@ -928,7 +1009,9 @@ export function RoomsClient() {
                     בנות — {girlRooms.length} חדרים
                     {goingGirls.length > 0 && <span className="text-muted-foreground font-normal">({goingGirls.length})</span>}
                   </h2>
-                  <button onClick={() => addRoom("female")} className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors">+ הוסף חדר</button>
+                  <AddRoomButton gender="female" specs={girlSpecs} slots={remainingSlots("female")}
+                    open={addMenuOpen === "female"} onToggle={() => setAddMenuOpen(addMenuOpen === "female" ? null : "female")}
+                    onAdd={(cap) => { addRoom("female", cap); setAddMenuOpen(null); }} />
                 </div>
                 {girlRooms.filter(roomMatchesFilter).length === 0 ? (
                   <div className="text-center text-muted-foreground text-sm py-8 bg-pink-50/50 rounded-[var(--radius)] border border-pink-100">
