@@ -4,6 +4,13 @@ export const alt = "תיק טיול — ניהול תיק טיול לבתי ספ
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// Satori doesn't support Unicode BiDi — Hebrew renders LTR (visually reversed).
+// Reversing the string compensates: Satori's LTR rendering of the reversed
+// string produces the correct right-to-left visual output.
+function rtl(s: string) {
+  return [...s].reverse().join("");
+}
+
 export default function Image() {
   return new ImageResponse(
     (
@@ -47,7 +54,7 @@ export default function Image() {
             lineHeight: 1,
           }}
         >
-          תיק טיול
+          {rtl("תיק טיול")}
         </div>
 
         {/* Subtitle */}
@@ -58,7 +65,7 @@ export default function Image() {
             fontWeight: 400,
           }}
         >
-          ניהול תיק טיול לבתי ספר
+          {rtl("ניהול תיק טיול לבתי ספר")}
         </div>
       </div>
     ),
