@@ -20,6 +20,8 @@ export type SignatureDoc = {
   schoolName:  string;
   leaderName:  string;
   previewHTML: string | null;  // inner HTML snapshot of the document at send time
+  requiresId?: boolean;        // if true, sign page collects ID number
+  idNumber?:   string;         // filled in by the signer
   status:      SigStatus;
   signature:   string | null;  // base64 PNG data URL
   createdAt:   Timestamp;
@@ -38,7 +40,7 @@ export function sigDocId(tripId: string, role: string): string {
 
 export async function createSignatureRequest(
   docId: string,
-  data: Pick<SignatureDoc, "tripId" | "role" | "roleName" | "tripName" | "schoolName" | "leaderName" | "previewHTML">
+  data: Pick<SignatureDoc, "tripId" | "role" | "roleName" | "tripName" | "schoolName" | "leaderName" | "previewHTML" | "requiresId">
 ): Promise<void> {
   const expiry = new Date();
   expiry.setDate(expiry.getDate() + 30);
@@ -65,7 +67,7 @@ export function subscribeToSignature(
   });
 }
 
-export async function submitSignature(docId: string, dataUrl: string): Promise<void> {
+export async function submitSignature(docId: string, dataUrl: string, idNumber?: string): Promise<void> {
   if (
     (!dataUrl.startsWith("data:image/png;base64,") && !dataUrl.startsWith("data:image/jpeg;base64,")) ||
     dataUrl.length > 300_000
@@ -76,5 +78,6 @@ export async function submitSignature(docId: string, dataUrl: string): Promise<v
     signature: dataUrl,
     status:    "signed",
     signedAt:  serverTimestamp(),
+    ...(idNumber ? { idNumber } : {}),
   });
 }

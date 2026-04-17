@@ -17,10 +17,11 @@ type Props = {
   schoolName:      string;
   leaderName:      string;
   label:           string;       // Display label above the widget
+  requiresId?:     boolean;      // if true, sign page will collect ID number
   getPreviewHTML?: () => string; // snapshot of the document at send time
 };
 
-export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, leaderName, label, getPreviewHTML }: Props) {
+export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, leaderName, label, requiresId, getPreviewHTML }: Props) {
   const docId = sigDocId(tripId, role);
 
   const [sigDoc, setSigDoc]       = useState<SignatureDoc | null>(null);
@@ -54,7 +55,7 @@ export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, 
   async function sendLink() {
     setSending(true);
     try {
-      await createSignatureRequest(docId, { tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: getPreviewHTML?.() ?? null });
+      await createSignatureRequest(docId, { tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: getPreviewHTML?.() ?? null, requiresId: requiresId ?? false });
       setSigDoc({ tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: null, status: "pending", signature: null, createdAt: null as any, expiresAt: null as any });
       subscribeNow();
       const url = `${window.location.origin}/sign/${docId}`;
@@ -126,9 +127,14 @@ export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, 
           )}
         </div>
 
-        {/* Signed — show signature image */}
-        {status === "signed" && sig && (
-          <img src={sig} alt="חתימה" className="max-h-14 object-contain border border-border rounded p-1" />
+        {/* Signed — show ID + signature image */}
+        {status === "signed" && (
+          <div className="space-y-1">
+            {sigDoc?.idNumber && (
+              <p className="text-xs text-muted-foreground">ת.ז: <span className="font-medium text-foreground">{sigDoc.idNumber}</span></p>
+            )}
+            {sig && <img src={sig} alt="חתימה" className="max-h-14 object-contain border border-border rounded p-1" />}
+          </div>
         )}
 
         {/* Share section — shown after sending */}

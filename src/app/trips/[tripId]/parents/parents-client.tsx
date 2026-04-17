@@ -342,6 +342,7 @@ export function ParentsClient() {
                             schoolName={trip?.schoolName ?? ""}
                             leaderName={parent.name}
                             label=""
+                            requiresId={true}
                             getPreviewHTML={() => getVolunteerFormHTML(parent, trip ?? null)}
                           />
                         </div>

@@ -77,6 +77,7 @@ export function SignClient() {
   const [sigDoc, setSigDoc]   = useState<SignatureDoc | null>(null);
   const [state, setState]     = useState<"loading" | "ready" | "invalid" | "expired" | "already_signed" | "submitting" | "done" | "error">("loading");
   const [errorMsg, setErrorMsg] = useState("");
+  const [idNumber, setIdNumber] = useState("");
 
   const canvasRef = useRef<SignatureCanvasHandle>(null);
 
@@ -96,6 +97,10 @@ export function SignClient() {
 
   async function handleSubmit() {
     const canvas = canvasRef.current;
+    if (sigDoc?.requiresId && !idNumber.trim()) {
+      setErrorMsg("נא להזין מספר תעודת זהות");
+      return;
+    }
     if (!canvas || canvas.isEmpty()) {
       setErrorMsg("נא לחתום לפני השליחה");
       return;
@@ -103,7 +108,7 @@ export function SignClient() {
     setErrorMsg("");
     setState("submitting");
     try {
-      await submitSignature(docId, canvas.toDataURL());
+      await submitSignature(docId, canvas.toDataURL(), sigDoc?.requiresId ? idNumber.trim() : undefined);
       setState("done");
     } catch (e) {
       console.error(e);
@@ -184,6 +189,9 @@ export function SignClient() {
             <InfoCard doc={sigDoc!} />
             <div className="border-t border-border pt-4 text-center space-y-2">
               <span className="text-sm text-green-700 font-medium">✓ מסמך זה כבר נחתם</span>
+              {sigDoc?.idNumber && (
+                <p className="text-xs text-muted-foreground">ת.ז: <span className="font-medium text-foreground">{sigDoc.idNumber}</span></p>
+              )}
               {sigDoc?.signature && (
                 <img src={sigDoc.signature} alt="חתימה" className="max-h-16 object-contain mx-auto border border-border rounded p-1" />
               )}
@@ -203,6 +211,24 @@ export function SignClient() {
 
       <div className="bg-white rounded-xl border border-border p-6 space-y-5">
         <InfoCard doc={sigDoc!} />
+
+        {/* ID number — only for forms that require it */}
+        {sigDoc?.requiresId && (
+          <div className="border-t border-border pt-4 space-y-2">
+            <p className="text-sm font-medium">מספר תעודת זהות <span className="text-destructive">*</span></p>
+            <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
+              maxLength={9}
+              placeholder="000000000"
+              dir="ltr"
+              value={idNumber}
+              onChange={(e) => setIdNumber(e.target.value.replace(/\D/g, ""))}
+              className="w-full border border-border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-primary tracking-widest font-mono"
+            />
+          </div>
+        )}
 
         <div className="border-t border-border pt-4 space-y-3">
           <p className="text-sm font-medium">חתימה</p>
