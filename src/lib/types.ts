@@ -53,6 +53,16 @@ export type StaffMember = {
   gender?: Gender;
 };
 
+// ─── Parent ───────────────────────────────────────────────────────────────────
+
+export type Parent = {
+  id: string;
+  name: string;
+  phone: string;
+  childName: string;   // student they are accompanying
+  childClass: string;  // that student's class
+};
+
 // ─── Class token (teacher edit link) ─────────────────────────────────────────
 
 export type ClassToken = {

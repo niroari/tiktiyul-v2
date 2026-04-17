@@ -20,6 +20,7 @@ export function getTripNav(tripId: string): NavGroup[] {
         { label: "רשימת תלמידים", href: `${base}/students`, icon: "students" },
         { label: "עדכונים ממתינים", href: `${base}/pending-updates`, icon: "pending" },
         { label: "צוות הטיול", href: `${base}/staff`, icon: "staff" },
+        { label: "הורים מלווים", href: `${base}/parents`, icon: "parents" },
         { label: "פרטי הטיול", href: `${base}/settings`, icon: "settings" },
       ],
     },

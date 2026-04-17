@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { useTrip } from "@/hooks/use-trip";
 import { useStudents } from "@/hooks/use-students";
 import { useStaff } from "@/hooks/use-staff";
+import { useParents } from "@/hooks/use-parents";
 import { subscribeToAllAppendices } from "@/lib/firestore/appendix";
 import { subscribeToPendingUpdates } from "@/lib/firestore/pending-updates";
 import { PrintTripButton } from "./print-trip-button";
@@ -46,6 +47,7 @@ export function DashboardClient() {
   const { trip, loading: tripLoading } = useTrip(tripId);
   const { students, loading: studentsLoading } = useStudents(tripId);
   const { staff } = useStaff(tripId);
+  const { parents } = useParents(tripId);
   const [appendixMap, setAppendixMap] = useState<Record<string, Record<string, unknown>>>({});
   const [pendingUpdates, setPendingUpdates] = useState<PendingUpdate[]>([]);
 
@@ -141,7 +143,7 @@ export function DashboardClient() {
       </div>
 
       {/* Stat cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
         <StatCard
           label="תלמידים יוצאים"
           value={going.length}
@@ -162,6 +164,13 @@ export function DashboardClient() {
             if (females > 0) return `${females} נשים`;
             return staff.map((s) => s.role).slice(0, 2).join(" · ");
           })()}
+        />
+        <StatCard
+          label="הורים מלווים"
+          value={parents.length}
+          sub={parents.length > 0
+            ? [...new Set(parents.map((p) => p.childClass).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).slice(0, 3).join(" · ") || "ללא כיתה"
+            : "אין עדיין"}
         />
         <StatCard
           label="כיתות"
@@ -267,6 +276,23 @@ export function DashboardClient() {
                       <span className="text-muted-foreground">{count} תלמידים</span>
                     </li>
                   ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Parents list */}
+          {parents.length > 0 && (
+            <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
+              <h2 className="text-sm font-semibold text-foreground mb-3">הורים מלווים</h2>
+              <ul className="space-y-2">
+                {parents.map((p) => (
+                  <li key={p.id} className="flex items-center justify-between text-sm gap-2">
+                    <span className="text-foreground truncate">{p.name}</span>
+                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                      {p.childName}{p.childClass ? ` · ${p.childClass}` : ""}
+                    </span>
+                  </li>
+                ))}
               </ul>
             </div>
           )}
