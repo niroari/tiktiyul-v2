@@ -7,57 +7,327 @@ import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
 import { AppendixActions } from "@/components/appendix-actions";
 
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type RoomSpec   = { count: number; size: number };
+type StaffRoom  = { id: string; number: string; capacity: number };
+type StaffGroup = { id: string; label: string; rooms: StaffRoom[] };
+
 type Room = {
   id: string;
-  number: string;      // optional room number, e.g. "101"
+  number: string;
   gender: "male" | "female";
   studentIds: string[];
+  capacity?: number; // set when created from hostel spec
 };
+
+// Dialog uses specs (count × size) rather than expanded rooms
+type DlgStaffGroup = { id: string; label: string; specs: RoomSpec[] };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function specsTotal(specs: RoomSpec[]) {
+  return specs.reduce((sum, s) => sum + s.count * s.size, 0);
+}
 
 function makeRoom(gender: "male" | "female"): Room {
   return { id: crypto.randomUUID(), number: "", gender, studentIds: [] };
 }
+
+// ─── SpecEditor ───────────────────────────────────────────────────────────────
+
+function SpecEditor({ specs, onChange }: { specs: RoomSpec[]; onChange: (s: RoomSpec[]) => void }) {
+  return (
+    <div className="space-y-1.5">
+      {specs.map((spec, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="number"
+            min={1}
+            max={99}
+            value={spec.count}
+            onChange={(e) => {
+              const updated = [...specs];
+              updated[i] = { ...spec, count: Math.max(1, parseInt(e.target.value) || 1) };
+              onChange(updated);
+            }}
+            className="w-14 text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 text-center focus:outline-none focus:border-primary"
+          />
+          <span className="text-sm text-muted-foreground">חדרים של</span>
+          <input
+            type="number"
+            min={1}
+            max={20}
+            value={spec.size}
+            onChange={(e) => {
+              const updated = [...specs];
+              updated[i] = { ...spec, size: Math.max(1, parseInt(e.target.value) || 1) };
+              onChange(updated);
+            }}
+            className="w-14 text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 text-center focus:outline-none focus:border-primary"
+          />
+          <span className="text-sm text-muted-foreground">מקומות</span>
+          <button
+            onClick={() => onChange(specs.filter((_, j) => j !== i))}
+            className="text-muted-foreground hover:text-destructive transition-colors text-lg leading-none px-1"
+          >✕</button>
+        </div>
+      ))}
+      <button
+        onClick={() => onChange([...specs, { count: 1, size: 4 }])}
+        className="text-xs text-primary hover:text-primary/80 transition-colors"
+      >
+        + הוסף שורה
+      </button>
+    </div>
+  );
+}
+
+// ─── HostelDialog ─────────────────────────────────────────────────────────────
+
+type HostelDialogProps = {
+  open: boolean;
+  onClose: () => void;
+  boyCount: number;
+  girlCount: number;
+  initialBoySpecs: RoomSpec[];
+  initialGirlSpecs: RoomSpec[];
+  initialStaffGroups: DlgStaffGroup[];
+  onSave: (boySpecs: RoomSpec[], girlSpecs: RoomSpec[], staffGroups: DlgStaffGroup[]) => void;
+};
+
+function HostelDialog({
+  open, onClose, boyCount, girlCount,
+  initialBoySpecs, initialGirlSpecs, initialStaffGroups,
+  onSave,
+}: HostelDialogProps) {
+  const [boySpecs,     setBoySpecs]     = useState<RoomSpec[]>(initialBoySpecs);
+  const [girlSpecs,    setGirlSpecs]    = useState<RoomSpec[]>(initialGirlSpecs);
+  const [staffGroups,  setStaffGroups]  = useState<DlgStaffGroup[]>(initialStaffGroups);
+
+  // Sync when dialog opens
+  useEffect(() => {
+    if (open) {
+      setBoySpecs(initialBoySpecs.length ? initialBoySpecs : []);
+      setGirlSpecs(initialGirlSpecs.length ? initialGirlSpecs : []);
+      setStaffGroups(initialStaffGroups);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function addStaffGroup() {
+    setStaffGroups([...staffGroups, { id: crypto.randomUUID(), label: "", specs: [{ count: 1, size: 3 }] }]);
+  }
+
+  function removeStaffGroup(id: string) {
+    setStaffGroups(staffGroups.filter((g) => g.id !== id));
+  }
+
+  function updateStaffGroup(id: string, patch: Partial<DlgStaffGroup>) {
+    setStaffGroups(staffGroups.map((g) => g.id === id ? { ...g, ...patch } : g));
+  }
+
+  const boyTotal  = specsTotal(boySpecs);
+  const girlTotal = specsTotal(girlSpecs);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div
+        className="relative bg-white rounded-[var(--radius)] shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto"
+        dir="rtl"
+      >
+        {/* Header */}
+        <div className="sticky top-0 bg-white border-b border-border px-5 py-4 flex items-center justify-between z-10">
+          <h2 className="font-semibold text-base">קיבולת אכסנייה</h2>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground text-xl leading-none">✕</button>
+        </div>
+
+        <div className="px-5 py-5 space-y-6">
+
+          {/* Boys */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-blue-700">בנים</h3>
+              <span className={`text-xs ${boyTotal === boyCount ? "text-green-600 font-medium" : "text-amber-600"}`}>
+                {boyTotal} מקומות · {boyCount} בנים
+                {boyTotal === boyCount ? " ✓" : boyTotal < boyCount ? " — חסר " + (boyCount - boyTotal) : " — עודף " + (boyTotal - boyCount)}
+              </span>
+            </div>
+            <SpecEditor specs={boySpecs} onChange={setBoySpecs} />
+          </div>
+
+          {/* Girls */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between mb-1">
+              <h3 className="text-sm font-semibold text-pink-700">בנות</h3>
+              <span className={`text-xs ${girlTotal === girlCount ? "text-green-600 font-medium" : "text-amber-600"}`}>
+                {girlTotal} מקומות · {girlCount} בנות
+                {girlTotal === girlCount ? " ✓" : girlTotal < girlCount ? " — חסר " + (girlCount - girlTotal) : " — עודף " + (girlTotal - girlCount)}
+              </span>
+            </div>
+            <SpecEditor specs={girlSpecs} onChange={setGirlSpecs} />
+          </div>
+
+          {/* Staff */}
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold text-foreground border-t border-border pt-4">אנשי צוות</h3>
+            {staffGroups.length === 0 && (
+              <p className="text-xs text-muted-foreground">לא הוגדרו קבוצות צוות</p>
+            )}
+            {staffGroups.map((group) => (
+              <div key={group.id} className="border border-border rounded-[var(--radius-sm)] p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="שם הקבוצה (למשל: מורות)"
+                    value={group.label}
+                    onChange={(e) => updateStaffGroup(group.id, { label: e.target.value })}
+                    className="flex-1 text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1.5 focus:outline-none focus:border-primary"
+                  />
+                  <button
+                    onClick={() => removeStaffGroup(group.id)}
+                    className="text-muted-foreground hover:text-destructive text-xl leading-none px-1 flex-shrink-0"
+                  >✕</button>
+                </div>
+                <SpecEditor
+                  specs={group.specs}
+                  onChange={(specs) => updateStaffGroup(group.id, { specs })}
+                />
+              </div>
+            ))}
+            <button
+              onClick={addStaffGroup}
+              className="text-xs text-primary hover:text-primary/80 transition-colors"
+            >
+              + הוסף קבוצת צוות
+            </button>
+          </div>
+
+        </div>
+
+        {/* Footer */}
+        <div className="sticky bottom-0 bg-white border-t border-border px-5 py-3 flex justify-end gap-2">
+          <button
+            onClick={onClose}
+            className="text-sm px-4 py-2 border border-border rounded-[var(--radius-sm)] text-muted-foreground hover:bg-muted transition-colors"
+          >
+            ביטול
+          </button>
+          <button
+            onClick={() => { onSave(boySpecs, girlSpecs, staffGroups); onClose(); }}
+            className="text-sm px-4 py-2 bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors"
+          >
+            שמור
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
 
 export function RoomsClient() {
   const { tripId } = useParams<{ tripId: string }>();
   const { students } = useStudents(tripId);
   const { trip }     = useTrip(tripId);
 
-  const [rooms, setRooms]         = useState<Room[]>([]);
-  const [status, setStatus]       = useState<"idle" | "saving" | "saved">("idle");
+  const [rooms,        setRooms]        = useState<Room[]>([]);
+  const [boySpecs,     setBoySpecs]     = useState<RoomSpec[]>([]);
+  const [girlSpecs,    setGirlSpecs]    = useState<RoomSpec[]>([]);
+  const [staffGroups,  setStaffGroups]  = useState<StaffGroup[]>([]);
   const [preferredSize, setPreferredSize] = useState(5);
-  const [classFilter, setClassFilter]     = useState("all");
-  const [genderView, setGenderView]       = useState<"all" | "male" | "female">("all");
-  // per-unassigned-student: which room they're being assigned to
-  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [status,       setStatus]       = useState<"idle" | "saving" | "saved">("idle");
+  const [classFilter,  setClassFilter]  = useState("all");
+  const [genderView,   setGenderView]   = useState<"all" | "male" | "female">("all");
+  const [assigningId,  setAssigningId]  = useState<string | null>(null);
+  const [hostelOpen,   setHostelOpen]   = useState(false);
 
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const isPending = useRef(false);
+  const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const isPending  = useRef(false);
+
+  // ── Persist ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "rooms", (raw) => {
       if (isPending.current) return;
-      if (raw?.rooms) setRooms(raw.rooms as Room[]);
+      if (raw?.rooms)        setRooms(raw.rooms as Room[]);
       if (raw?.preferredSize) setPreferredSize(raw.preferredSize as number);
+      if (raw?.boySpecs)     setBoySpecs(raw.boySpecs as RoomSpec[]);
+      if (raw?.girlSpecs)    setGirlSpecs(raw.girlSpecs as RoomSpec[]);
+      if (raw?.staffGroups)  setStaffGroups(raw.staffGroups as StaffGroup[]);
     });
     return () => unsub();
   }, [tripId]);
 
-  function scheduleAutoSave(updatedRooms: Room[], size = preferredSize) {
+  function persist(
+    nextRooms:       Room[]       = rooms,
+    nextBoySpecs:    RoomSpec[]   = boySpecs,
+    nextGirlSpecs:   RoomSpec[]   = girlSpecs,
+    nextStaffGroups: StaffGroup[] = staffGroups,
+    nextSize:        number       = preferredSize,
+    delay                        = 1200,
+  ) {
     isPending.current = true;
     setStatus("saving");
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await saveAppendix(tripId, "rooms", { rooms: updatedRooms, preferredSize: size });
+      await saveAppendix(tripId, "rooms", {
+        rooms:        nextRooms,
+        preferredSize: nextSize,
+        boySpecs:     nextBoySpecs,
+        girlSpecs:    nextGirlSpecs,
+        staffGroups:  nextStaffGroups,
+      });
       isPending.current = false;
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);
-    }, 1200);
+    }, delay);
   }
 
   function updateRooms(updated: Room[]) {
     setRooms(updated);
-    scheduleAutoSave(updated);
+    persist(updated);
+  }
+
+  // ── Hostel config ─────────────────────────────────────────────────────────────
+
+  function saveHostelConfig(newBoySpecs: RoomSpec[], newGirlSpecs: RoomSpec[], dlgGroups: DlgStaffGroup[]) {
+    // Expand DlgStaffGroup (specs) → StaffGroup (rooms), preserving existing room numbers
+    const newStaffGroups: StaffGroup[] = dlgGroups.map((dg) => {
+      const existing = staffGroups.find((g) => g.id === dg.id);
+      const prevRooms = existing?.rooms ?? [];
+      const expanded: StaffRoom[] = [];
+      dg.specs.forEach((spec) => {
+        for (let i = 0; i < spec.count; i++) {
+          const prev = prevRooms[expanded.length];
+          expanded.push({
+            id:       prev?.id       ?? crypto.randomUUID(),
+            number:   prev?.number   ?? "",
+            capacity: spec.size,
+          });
+        }
+      });
+      return { id: dg.id, label: dg.label, rooms: expanded };
+    });
+
+    setBoySpecs(newBoySpecs);
+    setGirlSpecs(newGirlSpecs);
+    setStaffGroups(newStaffGroups);
+    persist(rooms, newBoySpecs, newGirlSpecs, newStaffGroups, preferredSize, 400);
+  }
+
+  function updateStaffRoomNumber(groupId: string, roomId: string, number: string) {
+    const updated = staffGroups.map((g) =>
+      g.id === groupId
+        ? { ...g, rooms: g.rooms.map((r) => r.id === roomId ? { ...r, number } : r) }
+        : g
+    );
+    setStaffGroups(updated);
+    persist(rooms, boySpecs, girlSpecs, updated);
   }
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -69,22 +339,18 @@ export function RoomsClient() {
       return c !== 0 ? c : a.lastName.localeCompare(b.lastName, "he");
     });
 
-  const allClasses = [...new Set(going.map((s) => s.class).filter(Boolean))].sort((a, b) =>
-    a.localeCompare(b, "he")
-  );
+  const allClasses   = [...new Set(going.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+  const assignedIds  = new Set(rooms.flatMap((r) => r.studentIds));
+  const unassigned   = going.filter((s) => !assignedIds.has(s.id));
+  const studentById  = Object.fromEntries(going.map((s) => [s.id, s]));
+  const boyRooms     = rooms.filter((r) => r.gender === "male");
+  const girlRooms    = rooms.filter((r) => r.gender === "female");
+  const goingBoys    = going.filter((s) => s.gender === "male");
+  const goingGirls   = going.filter((s) => s.gender === "female");
 
-  const assignedIds = new Set(rooms.flatMap((r) => r.studentIds));
-  const unassigned  = going.filter((s) => !assignedIds.has(s.id));
-
-  const studentById = Object.fromEntries(going.map((s) => [s.id, s]));
-
-  const boyRooms  = rooms.filter((r) => r.gender === "male");
-  const girlRooms = rooms.filter((r) => r.gender === "female");
-
-  // Filter rooms and unassigned by class
   function roomMatchesFilter(room: Room) {
     if (classFilter === "all") return true;
-    if (room.studentIds.length === 0) return true; // empty rooms always visible
+    if (room.studentIds.length === 0) return true;
     return room.studentIds.some((id) => studentById[id]?.class === classFilter);
   }
 
@@ -97,21 +363,37 @@ export function RoomsClient() {
   // ── Auto-assign ───────────────────────────────────────────────────────────────
 
   function autoAssign() {
-    const boys  = going.filter((s) => s.gender === "male");
-    const girls = going.filter((s) => s.gender === "female");
-
     const newRooms: Room[] = [];
 
-    function assignGroup(group: typeof going, gender: "male" | "female") {
-      const byClass: Record<string, typeof going> = {};
-      group.forEach((s) => {
-        const k = s.class || "ללא כיתה";
-        if (!byClass[k]) byClass[k] = [];
-        byClass[k].push(s);
+    function assignGroup(group: typeof going, gender: "male" | "female", specs: RoomSpec[]) {
+      const sorted = [...group].sort((a, b) => {
+        const c = a.class.localeCompare(b.class, "he");
+        return c !== 0 ? c : a.lastName.localeCompare(b.lastName, "he");
       });
-      Object.keys(byClass)
-        .sort((a, b) => a.localeCompare(b, "he"))
-        .forEach((cls) => {
+
+      if (specs.length > 0) {
+        let idx = 0;
+        for (const spec of specs) {
+          for (let i = 0; i < spec.count; i++) {
+            newRooms.push({
+              id: crypto.randomUUID(),
+              number: "",
+              gender,
+              studentIds: sorted.slice(idx, idx + spec.size).map((s) => s.id),
+              capacity: spec.size,
+            });
+            idx += spec.size;
+          }
+        }
+      } else {
+        // Fallback: chunk by preferredSize
+        const byClass: Record<string, typeof going> = {};
+        sorted.forEach((s) => {
+          const k = s.class || "ללא כיתה";
+          if (!byClass[k]) byClass[k] = [];
+          byClass[k].push(s);
+        });
+        Object.keys(byClass).sort((a, b) => a.localeCompare(b, "he")).forEach((cls) => {
           const arr = byClass[cls];
           for (let i = 0; i < arr.length; i += preferredSize) {
             newRooms.push({
@@ -122,11 +404,11 @@ export function RoomsClient() {
             });
           }
         });
+      }
     }
 
-    assignGroup(boys,  "male");
-    assignGroup(girls, "female");
-
+    assignGroup(goingBoys,  "male",   boySpecs);
+    assignGroup(goingGirls, "female", girlSpecs);
     updateRooms(newRooms);
   }
 
@@ -149,7 +431,7 @@ export function RoomsClient() {
   function setRoomNumber(roomId: string, number: string) {
     const updated = rooms.map((r) => r.id === roomId ? { ...r, number } : r);
     setRooms(updated);
-    scheduleAutoSave(updated);
+    persist(updated);
   }
 
   function moveRoom(roomId: string, dir: -1 | 1) {
@@ -162,47 +444,57 @@ export function RoomsClient() {
   }
 
   function removeStudentFromRoom(roomId: string, studentId: string) {
-    updateRooms(
-      rooms.map((r) =>
-        r.id === roomId ? { ...r, studentIds: r.studentIds.filter((id) => id !== studentId) } : r
-      )
-    );
+    updateRooms(rooms.map((r) =>
+      r.id === roomId ? { ...r, studentIds: r.studentIds.filter((id) => id !== studentId) } : r
+    ));
   }
 
   function assignStudentToRoom(studentId: string, roomId: string) {
     setAssigningId(null);
     if (!roomId) return;
-    updateRooms(
-      rooms.map((r) =>
-        r.id === roomId ? { ...r, studentIds: [...r.studentIds, studentId] } : r
-      )
-    );
+    updateRooms(rooms.map((r) =>
+      r.id === roomId ? { ...r, studentIds: [...r.studentIds, studentId] } : r
+    ));
+  }
+
+  // ── Convert StaffGroup → DlgStaffGroup for dialog ────────────────────────────
+
+  function staffGroupsToDlg(groups: StaffGroup[]): DlgStaffGroup[] {
+    return groups.map((g) => {
+      const specs: RoomSpec[] = [];
+      for (const room of g.rooms) {
+        const last = specs[specs.length - 1];
+        if (last && last.size === room.capacity) last.count++;
+        else specs.push({ count: 1, size: room.capacity });
+      }
+      return { id: g.id, label: g.label, specs };
+    });
   }
 
   // ── Print ─────────────────────────────────────────────────────────────────────
 
   function getHTML() {
-    const sections = [
-      { gender: "male"   as const, label: "בנים" },
-      { gender: "female" as const, label: "בנות" },
-    ].map(({ gender, label }) => {
+    const sections = (["male", "female"] as const).map((gender) => {
       const gRooms = rooms.filter((r) => r.gender === gender);
       if (gRooms.length === 0) return "";
+      const label = gender === "female" ? "בנות" : "בנים";
+      const bgColor = gender === "female" ? "#fce4ec" : "#e3f2fd";
+      const chipColor = bgColor;
+      const chipBorder = gender === "female" ? "#f48fb1" : "#90caf9";
 
       const cards = gRooms.map((room) => {
         const studs = room.studentIds.map((id) => studentById[id]).filter(Boolean);
-        const chipColor = gender === "female" ? "#fce4ec" : "#e3f2fd";
-        const chipBorder = gender === "female" ? "#f48fb1" : "#90caf9";
-        const chips = studs
-          .map((s) => `<span style="background:${chipColor};border:1px solid ${chipBorder};border-radius:12px;padding:2px 8px;font-size:10px;display:inline-block;margin:2px">${s.lastName} ${s.firstName} <span style="color:#999;font-size:9px">(${s.class})</span></span>`)
-          .join("");
+        const chips = studs.map((s) =>
+          `<span style="background:${chipColor};border:1px solid ${chipBorder};border-radius:12px;padding:2px 8px;font-size:10px;display:inline-block;margin:2px">${s.lastName} ${s.firstName} <span style="color:#999;font-size:9px">(${s.class})</span></span>`
+        ).join("");
         const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ");
+        const capLabel = room.capacity !== undefined ? ` · ${room.capacity} מקומות` : "";
         return `
           <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:10px;break-inside:avoid">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px">
               <strong>חדר ${room.number || "—"}</strong>
               ${classLabel ? `<span style="background:#e8f5e9;color:#2d6a4f;border-radius:8px;padding:1px 7px;font-size:10px">${classLabel}</span>` : ""}
-              <span style="margin-right:auto;color:#888">${studs.length} תלמידים</span>
+              <span style="margin-right:auto;color:#888">${studs.length} תלמידים${capLabel}</span>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:4px;min-height:24px">${chips || '<span style="color:#bbb;font-size:10px">ריק</span>'}</div>
           </div>`;
@@ -210,10 +502,27 @@ export function RoomsClient() {
 
       return `
         <div style="margin-bottom:20px">
-          <div style="font-size:13px;font-weight:bold;padding:6px 10px;background:${gender === "female" ? "#fce4ec" : "#e3f2fd"};border-radius:6px;margin-bottom:10px">${label} — ${gRooms.length} חדרים</div>
+          <div style="font-size:13px;font-weight:bold;padding:6px 10px;background:${bgColor};border-radius:6px;margin-bottom:10px">${label} — ${gRooms.length} חדרים</div>
           ${cards}
         </div>`;
     }).join("");
+
+    const staffHTML = staffGroups.length > 0
+      ? `<div style="margin-top:24px;border-top:2px solid #eee;padding-top:16px">
+          <div style="font-size:14px;font-weight:bold;margin-bottom:12px">אנשי צוות</div>
+          ${staffGroups.map((group) => `
+            <div style="margin-bottom:16px">
+              <div style="font-size:13px;font-weight:bold;padding:6px 10px;background:#f5f5f5;border-radius:6px;margin-bottom:8px">${group.label} — ${group.rooms.length} חדרים</div>
+              <div style="display:flex;flex-wrap:wrap;gap:8px">
+                ${group.rooms.map((room) => `
+                  <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px 12px;font-size:11px;break-inside:avoid">
+                    <strong>חדר ${room.number || "—"}</strong>
+                    <span style="color:#888;margin-right:6px">${room.capacity} מקומות</span>
+                  </div>`).join("")}
+              </div>
+            </div>`).join("")}
+        </div>`
+      : "";
 
     const unassignedHTML = unassigned.length > 0
       ? `<div style="margin-top:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;break-inside:avoid">
@@ -235,89 +544,65 @@ export function RoomsClient() {
         ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
       </div>
       ${sections}
+      ${staffHTML}
       ${unassignedHTML}
     `;
   }
 
-  // ── Room card component ───────────────────────────────────────────────────────
+  // ── Room card (inside component to close over handlers) ───────────────────────
 
   function RoomCard({ room, genderRooms }: { room: Room; genderRooms: Room[] }) {
-    const studs = room.studentIds.map((id) => studentById[id]).filter(Boolean);
-    const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b, "he"))
-      .join(" + ");
-
-    const isGirl    = room.gender === "female";
-    const chipBg    = isGirl ? "bg-pink-50"  : "bg-blue-50";
+    const studs      = room.studentIds.map((id) => studentById[id]).filter(Boolean);
+    const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ");
+    const isGirl     = room.gender === "female";
+    const chipBg     = isGirl ? "bg-pink-50"    : "bg-blue-50";
     const chipBorder = isGirl ? "border-pink-200" : "border-blue-200";
-    const chipText  = isGirl ? "text-pink-800" : "text-blue-800";
-
-    // eligible to add: unassigned students of same gender
-    const eligible = unassigned.filter((s) => s.gender === room.gender);
-
-    const gIdx = genderRooms.findIndex((r) => r.id === room.id);
+    const chipText   = isGirl ? "text-pink-800"  : "text-blue-800";
+    const eligible   = unassigned.filter((s) => s.gender === room.gender);
+    const gIdx       = genderRooms.findIndex((r) => r.id === room.id);
+    const overCap    = room.capacity !== undefined && studs.length > room.capacity;
 
     return (
-      <div className="bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)]">
-        {/* Card header */}
+      <div className={`bg-white border rounded-[var(--radius)] shadow-[var(--shadow-card)] ${overCap ? "border-amber-400" : "border-border"}`}>
+        {/* Header */}
         <div className="flex items-center gap-2 px-3 py-2.5 border-b border-border">
-          {/* Move controls */}
           <div className="flex flex-col gap-0.5">
-            <button
-              onClick={() => moveRoom(room.id, -1)}
-              disabled={gIdx === 0}
-              className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight"
-            >▲</button>
-            <button
-              onClick={() => moveRoom(room.id, 1)}
-              disabled={gIdx === genderRooms.length - 1}
-              className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight"
-            >▼</button>
+            <button onClick={() => moveRoom(room.id, -1)} disabled={gIdx === 0}
+              className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight">▲</button>
+            <button onClick={() => moveRoom(room.id, 1)} disabled={gIdx === genderRooms.length - 1}
+              className="border border-border rounded px-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-30 leading-tight">▼</button>
           </div>
 
-          {/* Room number */}
           <label className="text-xs text-muted-foreground whitespace-nowrap">מס׳ חדר:</label>
           <input
             type="text"
             value={room.number}
             onChange={(e) => setRoomNumber(room.id, e.target.value)}
             placeholder="ממתין לאכסנייה"
-            className="text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 focus:outline-none focus:border-primary w-28 ltr"
+            className="text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 focus:outline-none focus:border-primary w-28"
             dir="ltr"
           />
 
           {classLabel && (
-            <span className="text-xs bg-[var(--primary-light,#e8f5e9)] text-primary rounded-full px-2 py-0.5">
-              {classLabel}
-            </span>
+            <span className="text-xs bg-[var(--primary-light,#e8f5e9)] text-primary rounded-full px-2 py-0.5">{classLabel}</span>
           )}
 
-          <span className="mr-auto text-xs text-muted-foreground">{studs.length} תלמידים</span>
+          <span className={`mr-auto text-xs ${overCap ? "text-amber-600 font-medium" : "text-muted-foreground"}`}>
+            {studs.length}{room.capacity !== undefined ? `/${room.capacity}` : ""} תלמידים
+          </span>
 
-          <button
-            onClick={() => deleteRoom(room.id)}
-            className="text-muted-foreground hover:text-destructive transition-colors text-lg leading-none px-1"
-            title="מחק חדר"
-          >✕</button>
+          <button onClick={() => deleteRoom(room.id)} className="text-muted-foreground hover:text-destructive transition-colors text-lg leading-none px-1" title="מחק חדר">✕</button>
         </div>
 
-        {/* Students chips area */}
+        {/* Students */}
         <div className="px-3 py-3 min-h-[52px] border-b border-dashed border-border">
           <div className="flex flex-wrap gap-1.5">
-            {studs.length === 0 && (
-              <span className="text-xs text-muted-foreground/40 italic">אין תלמידים</span>
-            )}
+            {studs.length === 0 && <span className="text-xs text-muted-foreground/40 italic">אין תלמידים</span>}
             {studs.map((s) => (
-              <span
-                key={s.id}
-                className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border ${chipBg} ${chipBorder} ${chipText}`}
-              >
+              <span key={s.id} className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border ${chipBg} ${chipBorder} ${chipText}`}>
                 {s.firstName} {s.lastName}
                 <span className="text-muted-foreground text-[10px]">({s.class})</span>
-                <button
-                  onClick={() => removeStudentFromRoom(room.id, s.id)}
-                  className="text-muted-foreground hover:text-destructive transition-colors mr-0.5"
-                >
+                <button onClick={() => removeStudentFromRoom(room.id, s.id)} className="text-muted-foreground hover:text-destructive transition-colors mr-0.5">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
@@ -327,7 +612,7 @@ export function RoomsClient() {
           </div>
         </div>
 
-        {/* Add student selector */}
+        {/* Add student */}
         {eligible.length > 0 && (
           <div className="px-3 py-2 flex gap-2">
             <input
@@ -339,18 +624,12 @@ export function RoomsClient() {
                 if (e.key !== "Enter") return;
                 const val = (e.target as HTMLInputElement).value.trim();
                 const s = eligible.find((s) => `${s.lastName} ${s.firstName} (${s.class})` === val);
-                if (s) {
-                  assignStudentToRoom(s.id, room.id);
-                  (e.target as HTMLInputElement).value = "";
-                }
+                if (s) { assignStudentToRoom(s.id, room.id); (e.target as HTMLInputElement).value = ""; }
               }}
               onChange={(e) => {
                 const val = e.target.value.trim();
                 const s = eligible.find((s) => `${s.lastName} ${s.firstName} (${s.class})` === val);
-                if (s) {
-                  assignStudentToRoom(s.id, room.id);
-                  e.target.value = "";
-                }
+                if (s) { assignStudentToRoom(s.id, room.id); e.target.value = ""; }
               }}
             />
             <datalist id={`room-list-${room.id}`}>
@@ -366,17 +645,17 @@ export function RoomsClient() {
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
+  const hasSpecs = boySpecs.length > 0 || girlSpecs.length > 0;
+
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Page header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">חלוקת חדרים</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            חלוקת תלמידים לחדרים באכסנייה — הפרדה בין בנים לבנות
-          </p>
+          <p className="text-sm text-muted-foreground mt-0.5">חלוקת תלמידים לחדרים באכסנייה — הפרדה בין בנים לבנות</p>
         </div>
-        <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
+        <span className={`text-xs flex-shrink-0 pt-1 ${status === "saved" ? "text-green-600" : "text-muted-foreground"}`}>
           {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
         </span>
       </div>
@@ -390,28 +669,45 @@ export function RoomsClient() {
       {students.length > 0 && (
         <>
           {/* Toolbar */}
-          <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] px-4 py-3 flex flex-wrap items-center gap-4">
-            {/* Preferred size */}
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-foreground whitespace-nowrap">גודל חדר מועדף:</label>
-              <div className="flex gap-1">
-                {[4, 5, 6].map((n) => (
-                  <label key={n} className="flex items-center gap-1.5 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="room-size"
-                      checked={preferredSize === n}
-                      onChange={() => {
-                        setPreferredSize(n);
-                        scheduleAutoSave(rooms, n);
-                      }}
-                      className="accent-primary"
-                    />
-                    <span className="text-sm">{n}</span>
-                  </label>
-                ))}
+          <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] px-4 py-3 flex flex-wrap items-center gap-3">
+
+            {/* Hostel capacity button */}
+            <button
+              onClick={() => setHostelOpen(true)}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border rounded-[var(--radius-sm)] hover:bg-muted transition-colors"
+            >
+              <svg className="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              {hasSpecs
+                ? <span className="text-foreground">{specsTotal(boySpecs)} בנים · {specsTotal(girlSpecs)} בנות{staffGroups.length > 0 ? ` · ${staffGroups.length} קבוצות צוות` : ""}</span>
+                : <span className="text-muted-foreground">הגדר קיבולת אכסנייה</span>
+              }
+            </button>
+
+            {/* Preferred size — only when no specs set */}
+            {!hasSpecs && (
+              <div className="flex items-center gap-2">
+                <label className="text-sm text-muted-foreground whitespace-nowrap">גודל חדר:</label>
+                <div className="flex gap-1">
+                  {[4, 5, 6].map((n) => (
+                    <label key={n} className="flex items-center gap-1.5 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="room-size"
+                        checked={preferredSize === n}
+                        onChange={() => {
+                          setPreferredSize(n);
+                          persist(rooms, boySpecs, girlSpecs, staffGroups, n);
+                        }}
+                        className="accent-primary"
+                      />
+                      <span className="text-sm">{n}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Auto-assign */}
             <button
@@ -429,38 +725,29 @@ export function RoomsClient() {
                 className="text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1.5 focus:outline-none focus:border-primary"
               >
                 <option value="all">כל הכיתות</option>
-                {allClasses.map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
+                {allClasses.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
             )}
 
-            {/* Gender view toggle */}
+            {/* Gender view */}
             <div className="flex rounded-[var(--radius-sm)] border border-border overflow-hidden text-sm">
-              {(["all", "male", "female"] as const).map((opt) => {
-                const label = opt === "all" ? "הכל" : opt === "male" ? "בנים" : "בנות";
-                return (
-                  <button
-                    key={opt}
-                    onClick={() => setGenderView(opt)}
-                    className={`px-3 py-1.5 transition-colors ${
-                      genderView === opt
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
+              {(["all", "male", "female"] as const).map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => setGenderView(opt)}
+                  className={`px-3 py-1.5 transition-colors ${
+                    genderView === opt
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  {opt === "all" ? "הכל" : opt === "male" ? "בנים" : "בנות"}
+                </button>
+              ))}
             </div>
 
-            {/* Clear all */}
             {rooms.length > 0 && (
-              <button
-                onClick={clearAll}
-                className="mr-auto text-sm text-destructive hover:text-destructive/80 transition-colors"
-              >
+              <button onClick={clearAll} className="mr-auto text-sm text-destructive hover:text-destructive/80 transition-colors">
                 נקה הכל
               </button>
             )}
@@ -474,10 +761,9 @@ export function RoomsClient() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {filteredUnassigned.map((s) => {
-                  const isGirl   = s.gender === "female";
-                  const chipBg   = isGirl ? "bg-pink-100 border-pink-300 text-pink-900" : "bg-blue-100 border-blue-300 text-blue-900";
+                  const isGirl = s.gender === "female";
+                  const chipBg = isGirl ? "bg-pink-100 border-pink-300 text-pink-900" : "bg-blue-100 border-blue-300 text-blue-900";
                   const targetRooms = rooms.filter((r) => r.gender === s.gender);
-
                   return (
                     <div key={s.id} className="relative">
                       {assigningId === s.id ? (
@@ -492,7 +778,7 @@ export function RoomsClient() {
                             {targetRooms.map((r) => (
                               <option key={r.id} value={r.id}>
                                 {r.number ? `חדר ${r.number}` : `חדר ${rooms.indexOf(r) + 1}`}
-                                {` (${r.studentIds.length})`}
+                                {` (${r.studentIds.length}${r.capacity !== undefined ? `/${r.capacity}` : ""})`}
                               </option>
                             ))}
                           </select>
@@ -502,16 +788,11 @@ export function RoomsClient() {
                         <button
                           onClick={() => {
                             if (targetRooms.length === 0) return;
-                            if (targetRooms.length === 1) {
-                              assignStudentToRoom(s.id, targetRooms[0].id);
-                            } else {
-                              setAssigningId(s.id);
-                            }
+                            if (targetRooms.length === 1) assignStudentToRoom(s.id, targetRooms[0].id);
+                            else setAssigningId(s.id);
                           }}
                           title={targetRooms.length === 0 ? `הוסף חדר ${isGirl ? "בנות" : "בנים"} תחילה` : "לחץ לשיבוץ"}
-                          className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${chipBg} ${
-                            targetRooms.length === 0 ? "opacity-50 cursor-not-allowed" : "hover:opacity-80 cursor-pointer"
-                          }`}
+                          className={`text-xs rounded-full px-2.5 py-1 border transition-colors ${chipBg} ${targetRooms.length === 0 ? "opacity-50 cursor-not-allowed" : "hover:opacity-80 cursor-pointer"}`}
                         >
                           {s.firstName} {s.lastName}
                           <span className="mr-1 opacity-60">({s.class})</span>
@@ -524,7 +805,7 @@ export function RoomsClient() {
             </div>
           )}
 
-          {/* Boys and Girls sections */}
+          {/* Boys / Girls columns */}
           <div className={`grid gap-6 ${genderView === "all" ? "grid-cols-1 lg:grid-cols-2" : "grid-cols-1 max-w-2xl"}`}>
             {/* Boys */}
             {(genderView === "all" || genderView === "male") && (
@@ -533,15 +814,10 @@ export function RoomsClient() {
                   <h2 className="font-medium text-sm text-blue-700 flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-full bg-blue-200 inline-block" />
                     בנים — {boyRooms.length} חדרים
+                    {goingBoys.length > 0 && <span className="text-muted-foreground font-normal">({goingBoys.length})</span>}
                   </h2>
-                  <button
-                    onClick={() => addRoom("male")}
-                    className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors"
-                  >
-                    + הוסף חדר
-                  </button>
+                  <button onClick={() => addRoom("male")} className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors">+ הוסף חדר</button>
                 </div>
-
                 {boyRooms.filter(roomMatchesFilter).length === 0 ? (
                   <div className="text-center text-muted-foreground text-sm py-8 bg-blue-50/50 rounded-[var(--radius)] border border-blue-100">
                     {classFilter !== "all" ? "אין חדרי בנים לכיתה זו" : "אין חדרי בנים — לחץ ⚡ או + הוסף חדר"}
@@ -561,15 +837,10 @@ export function RoomsClient() {
                   <h2 className="font-medium text-sm text-pink-700 flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-full bg-pink-200 inline-block" />
                     בנות — {girlRooms.length} חדרים
+                    {goingGirls.length > 0 && <span className="text-muted-foreground font-normal">({goingGirls.length})</span>}
                   </h2>
-                  <button
-                    onClick={() => addRoom("female")}
-                    className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors"
-                  >
-                    + הוסף חדר
-                  </button>
+                  <button onClick={() => addRoom("female")} className="text-xs text-primary border border-primary/30 rounded px-2 py-0.5 hover:bg-primary/5 transition-colors">+ הוסף חדר</button>
                 </div>
-
                 {girlRooms.filter(roomMatchesFilter).length === 0 ? (
                   <div className="text-center text-muted-foreground text-sm py-8 bg-pink-50/50 rounded-[var(--radius)] border border-pink-100">
                     {classFilter !== "all" ? "אין חדרי בנות לכיתה זו" : "אין חדרי בנות — לחץ ⚡ או + הוסף חדר"}
@@ -582,10 +853,51 @@ export function RoomsClient() {
               </div>
             )}
           </div>
+
+          {/* Staff rooms */}
+          {staffGroups.length > 0 && (
+            <div className="space-y-4 border-t border-border pt-6">
+              <h2 className="font-medium text-sm text-foreground">
+                אנשי צוות
+                <button onClick={() => setHostelOpen(true)} className="mr-2 text-xs text-primary hover:text-primary/80 transition-colors font-normal">(ערוך)</button>
+              </h2>
+              {staffGroups.map((group) => (
+                <div key={group.id} className="space-y-2">
+                  <h3 className="text-sm text-muted-foreground">{group.label} — {group.rooms.length} חדרים</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                    {group.rooms.map((room) => (
+                      <div key={room.id} className="bg-white border border-border rounded-[var(--radius-sm)] px-3 py-2 flex items-center gap-2 shadow-[var(--shadow-card)]">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap flex-shrink-0">{room.capacity} מק׳</span>
+                        <input
+                          type="text"
+                          value={room.number}
+                          onChange={(e) => updateStaffRoomNumber(group.id, room.id, e.target.value)}
+                          placeholder="מס' חדר"
+                          className="flex-1 min-w-0 text-xs border border-border rounded px-1.5 py-1 focus:outline-none focus:border-primary"
+                          dir="ltr"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
       <AppendixActions title="חלוקת חדרים" filename="חלוקת-חדרים" getHTML={getHTML} />
+
+      <HostelDialog
+        open={hostelOpen}
+        onClose={() => setHostelOpen(false)}
+        boyCount={goingBoys.length}
+        girlCount={goingGirls.length}
+        initialBoySpecs={boySpecs}
+        initialGirlSpecs={girlSpecs}
+        initialStaffGroups={staffGroupsToDlg(staffGroups)}
+        onSave={saveHostelConfig}
+      />
     </div>
   );
 }
