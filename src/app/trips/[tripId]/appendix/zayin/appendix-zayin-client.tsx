@@ -62,12 +62,13 @@ export function AppendixZayinClient() {
     for (const s of printStudents) {
       if (s.class !== lastClass) {
         const count = printStudents.filter((x) => x.class === s.class).length;
-        rows += `<tr class="cat-row"><td colspan="5" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
+        rows += `<tr class="cat-row"><td colspan="6" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
         lastClass = s.class;
         rowInClass = 0;
       }
       const gender = s.gender === "male" ? "זכר" : s.gender === "female" ? "נקבה" : "";
       rows += `<tr style="${rowInClass % 2 === 0 ? "" : "background:#f0f7f4"}">
+        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr;text-align:left">${esc(s.idNumber)}</td>
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.lastName)}</td>
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.firstName)}</td>
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(s.class)}</td>
@@ -94,6 +95,7 @@ export function AppendixZayinClient() {
       </div>
       <table>
         <thead><tr>
+          <th style="width:80px">ת.ז</th>
           <th>שם משפחה</th>
           <th>שם פרטי</th>
           <th style="width:60px;text-align:center">כיתה</th>
@@ -177,6 +179,7 @@ export function AppendixZayinClient() {
             <table className="w-full text-sm">
               <thead className="bg-muted border-b border-border">
                 <tr>
+                  <th className="text-right px-4 py-2.5 font-medium text-muted-foreground w-28">ת.ז</th>
                   <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">שם משפחה</th>
                   <th className="text-right px-4 py-2.5 font-medium text-muted-foreground">שם פרטי</th>
                   <th className="px-3 py-2.5 font-medium text-muted-foreground text-center w-16">כיתה</th>
@@ -192,7 +195,7 @@ export function AppendixZayinClient() {
                     <>
                       {isClassHeader && sortField === "class" && (
                         <tr key={`header-${s.class}`} className="bg-[var(--brand-light)]">
-                          <td colSpan={7} className="px-4 py-1.5 text-xs font-semibold text-primary">
+                          <td colSpan={8} className="px-4 py-1.5 text-xs font-semibold text-primary">
                             כיתה {s.class} — {sorted.filter((x) => x.class === s.class && x.isGoing).length} יוצאים
                           </td>
                         </tr>
@@ -201,6 +204,7 @@ export function AppendixZayinClient() {
                         key={s.id}
                         className={`border-b border-border last:border-0 transition-colors ${!s.isGoing ? "opacity-40" : "hover:bg-muted/20"}`}
                       >
+                        <td className="px-4 py-2 text-xs font-mono text-muted-foreground" dir="ltr">{s.idNumber || "—"}</td>
                         <td className="px-4 py-2">{s.lastName}</td>
                         <td className="px-4 py-2">{s.firstName}</td>
                         <td className="px-3 py-2 text-center text-muted-foreground">{s.class}</td>

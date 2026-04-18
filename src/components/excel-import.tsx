@@ -46,12 +46,13 @@ function parseRows(rows: unknown[][]): ParsedStudent[] {
 
   for (let i = dataStart; i < rows.length; i++) {
     const row = rows[i];
-    let last = "", first = "", grade = "", kita = "", genderRaw = "", phone = "";
+    let last = "", first = "", grade = "", kita = "", genderRaw = "", phone = "", idNumber = "";
 
     if (colMap) {
       // Header-guided: column positions come from the detected header row
       const tzVal = cv(row, colMap["ת.ז"]);
       if (!/^\d{7,9}$/.test(tzVal)) continue;
+      idNumber  = tzVal;
       last      = cv(row, colMap["שם משפחה"]);
       first     = cv(row, colMap["שם פרטי"]);
       grade     = cv(row, colMap["כיתה"]);
@@ -63,9 +64,11 @@ function parseRows(rows: unknown[][]): ParsedStudent[] {
       const col0 = String(row[0] ?? "").trim();
       const col1 = String(row[1] ?? "").trim();
       if (/^\d{7,9}$/.test(col1)) {
+        idNumber = col1;
         last = cv(row, 2); first = cv(row, 3); grade = cv(row, 4);
         kita = cv(row, 5); genderRaw = cv(row, 6); phone = cv(row, 7);
       } else if (/^\d{7,9}$/.test(col0)) {
+        idNumber = col0;
         last = cv(row, 1); first = cv(row, 2); grade = cv(row, 3);
         kita = cv(row, 4); phone = cv(row, 5);
       } else {
@@ -84,6 +87,7 @@ function parseRows(rows: unknown[][]): ParsedStudent[] {
       class: className,
       gender,
       phone,
+      idNumber,
       isGoing: true,
       dietaryFlags: { vegetarian: false, vegan: false, glutenFree: false },
     });

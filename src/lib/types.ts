@@ -34,6 +34,7 @@ export type Student = {
   class: string;
   gender: Gender;
   phone?: string;
+  idNumber?: string;
   isGoing: boolean;
   dietaryFlags: {
     vegetarian: boolean;
