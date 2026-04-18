@@ -74,6 +74,15 @@ export function StudentsClient() {
   const [tokens, setTokens] = useState<ClassToken[]>([]);
   const [generatingClass, setGeneratingClass] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
+  const [expandedMedical, setExpandedMedical] = useState<Set<string>>(new Set());
+
+  function toggleMedical(id: string) {
+    setExpandedMedical((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
 
   const going = students.filter((s) => s.isGoing).length;
   const notGoing = students.length - going;
@@ -279,7 +288,11 @@ export function StudentsClient() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map((student) => (
+              {filtered.map((student) => {
+                const hasNotes = !!student.medicalNotes?.trim();
+                const isExpanded = expandedMedical.has(student.id);
+                return (
+                <>
                 <TableRow key={student.id} className="hover:bg-muted/50">
                   <TableCell className="font-medium">{student.lastName}</TableCell>
                   <TableCell>{student.firstName}</TableCell>
@@ -308,6 +321,17 @@ export function StudentsClient() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
+                      {hasNotes && (
+                        <button
+                          onClick={() => toggleMedical(student.id)}
+                          title="מגבלות רפואיות"
+                          className={`p-1 transition-colors ${isExpanded ? "text-amber-600" : "text-amber-400 hover:text-amber-600"}`}
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          </svg>
+                        </button>
+                      )}
                       <button
                         onClick={() => openEdit(student)}
                         className="p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -327,7 +351,19 @@ export function StudentsClient() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                {hasNotes && isExpanded && (
+                  <TableRow key={`${student.id}-notes`} className="bg-amber-50 hover:bg-amber-50">
+                    <TableCell colSpan={7} className="py-2 px-4">
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs font-medium text-amber-700 whitespace-nowrap pt-0.5">מגבלות רפואיות:</span>
+                        <span className="text-sm text-amber-900">{student.medicalNotes}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                </>
+                );
+              })}
             </TableBody>
           </Table>
         )}
