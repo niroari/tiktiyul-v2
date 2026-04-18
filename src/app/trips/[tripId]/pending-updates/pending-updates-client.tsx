@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useStudents } from "@/hooks/use-students";
 import { subscribeToPendingUpdates, resolvePendingUpdate } from "@/lib/firestore/pending-updates";
 import { updateStudent } from "@/lib/firestore/students";
+import { getAppendix, saveAppendix } from "@/lib/firestore/appendix";
 import type { PendingUpdate, Student } from "@/lib/types";
 
 // ── Diff helpers ───────────────────────────────────────────────────────────────
@@ -64,6 +65,30 @@ export function PendingUpdatesClient() {
         medicalNotes: update.proposedMedicalNotes,
       });
       await resolvePendingUpdate(tripId, update.id, "approved");
+
+      // If medical notes are non-empty, ensure the student appears in appendix yod
+      if (update.proposedMedicalNotes.trim()) {
+        const yod = await getAppendix(tripId, "yod");
+        const currentRows = ((yod?.rows ?? []) as { studentId: string }[]);
+        if (!currentRows.find((r) => r.studentId === update.studentId)) {
+          await saveAppendix(tripId, "yod", {
+            rows: [
+              ...currentRows,
+              {
+                id: crypto.randomUUID(),
+                studentId: update.studentId,
+                lastName: update.studentLastName,
+                firstName: update.studentFirstName,
+                class: update.studentClass,
+                issue: update.proposedMedicalNotes,
+                notes: "",
+                certUrl: "",
+                certName: "",
+              },
+            ],
+          });
+        }
+      }
     } finally {
       setResolving((r) => ({ ...r, [update.id]: false }));
     }
