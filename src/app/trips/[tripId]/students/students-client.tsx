@@ -75,6 +75,9 @@ export function StudentsClient() {
   const [generatingClass, setGeneratingClass] = useState<string | null>(null);
   const [copiedToken, setCopiedToken] = useState<string | null>(null);
   const [expandedMedical, setExpandedMedical] = useState<Set<string>>(new Set());
+  const [expandedNotes, setExpandedNotes]     = useState<Set<string>>(new Set());
+  const [noteEdits, setNoteEdits]             = useState<Record<string, string>>({});
+  const [showNotesOnly, setShowNotesOnly]     = useState(false);
 
   function toggleMedical(id: string) {
     setExpandedMedical((prev) => {
@@ -84,11 +87,33 @@ export function StudentsClient() {
     });
   }
 
+  function toggleNotes(id: string, currentNote: string) {
+    setExpandedNotes((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+        setNoteEdits((e) => ({ ...e, [id]: currentNote }));
+      }
+      return next;
+    });
+  }
+
+  async function saveNote(student: Student) {
+    const val = noteEdits[student.id] ?? "";
+    if (val === (student.notes ?? "")) return;
+    await updateStudent(tripId, student.id, { notes: val });
+  }
+
   const going = students.filter((s) => s.isGoing).length;
   const notGoing = students.length - going;
   const classes = [...new Set(students.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
 
+  const withNotes = students.filter((s) => !!s.notes?.trim());
+
   const filtered = students.filter((s) => {
+    if (showNotesOnly && !s.notes?.trim()) return false;
     const q = search.toLowerCase();
     return (
       s.firstName.toLowerCase().includes(q) ||
@@ -251,14 +276,26 @@ export function StudentsClient() {
         </div>
       </div>
 
-      {/* Search */}
-      <div className="mb-4">
+      {/* Search + notes filter */}
+      <div className="mb-4 flex items-center gap-3 flex-wrap">
         <Input
           placeholder="חיפוש לפי שם או כיתה..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
+        {withNotes.length > 0 && (
+          <button
+            onClick={() => setShowNotesOnly((v) => !v)}
+            className={`text-xs px-2.5 py-1.5 rounded-[var(--radius-sm)] border transition-colors ${
+              showNotesOnly
+                ? "bg-sky-100 border-sky-300 text-sky-700"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {showNotesOnly ? "הצג הכל" : `הצג עם הערות (${withNotes.length})`}
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -284,13 +321,15 @@ export function StudentsClient() {
                 <TableHead className="text-right">מגדר</TableHead>
                 <TableHead className="text-right">טלפון</TableHead>
                 <TableHead className="text-right">יוצא</TableHead>
-                <TableHead className="text-right w-20"></TableHead>
+                <TableHead className="text-right w-28"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filtered.map((student) => {
-                const hasNotes = !!student.medicalNotes?.trim();
-                const isExpanded = expandedMedical.has(student.id);
+                const hasMedical      = !!student.medicalNotes?.trim();
+                const isMedExpanded   = expandedMedical.has(student.id);
+                const isNotesExpanded = expandedNotes.has(student.id);
+                const hasNotes        = !!student.notes?.trim();
                 return (
                 <>
                 <TableRow key={student.id} className="hover:bg-muted/50">
@@ -321,17 +360,32 @@ export function StudentsClient() {
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
-                      {hasNotes && (
+                      {hasMedical && (
                         <button
                           onClick={() => toggleMedical(student.id)}
                           title="מגבלות רפואיות"
-                          className={`p-1 transition-colors ${isExpanded ? "text-amber-600" : "text-amber-400 hover:text-amber-600"}`}
+                          className={`p-1 transition-colors ${isMedExpanded ? "text-amber-600" : "text-amber-400 hover:text-amber-600"}`}
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                           </svg>
                         </button>
                       )}
+                      <button
+                        onClick={() => toggleNotes(student.id, student.notes ?? "")}
+                        title={hasNotes ? "הערות" : "הוסף הערה"}
+                        className={`p-1 transition-colors ${
+                          isNotesExpanded
+                            ? "text-sky-600"
+                            : hasNotes
+                              ? "text-sky-500 hover:text-sky-700"
+                              : "text-muted-foreground/40 hover:text-sky-500"
+                        }`}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
+                        </svg>
+                      </button>
                       <button
                         onClick={() => openEdit(student)}
                         className="p-1 text-muted-foreground hover:text-foreground transition-colors"
@@ -351,12 +405,29 @@ export function StudentsClient() {
                     </div>
                   </TableCell>
                 </TableRow>
-                {hasNotes && isExpanded && (
-                  <TableRow key={`${student.id}-notes`} className="bg-amber-50 hover:bg-amber-50">
+                {hasMedical && isMedExpanded && (
+                  <TableRow key={`${student.id}-medical`} className="bg-amber-50 hover:bg-amber-50">
                     <TableCell colSpan={7} className="py-2 px-4">
                       <div className="flex items-start gap-2">
                         <span className="text-xs font-medium text-amber-700 whitespace-nowrap pt-0.5">מגבלות רפואיות:</span>
                         <span className="text-sm text-amber-900">{student.medicalNotes}</span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                {isNotesExpanded && (
+                  <TableRow key={`${student.id}-notes`} className="bg-sky-50 hover:bg-sky-50">
+                    <TableCell colSpan={7} className="py-2 px-4">
+                      <div className="flex items-start gap-2">
+                        <span className="text-xs font-medium text-sky-700 whitespace-nowrap pt-2">הערות:</span>
+                        <textarea
+                          value={noteEdits[student.id] ?? ""}
+                          onChange={(e) => setNoteEdits((prev) => ({ ...prev, [student.id]: e.target.value }))}
+                          onBlur={() => saveNote(student)}
+                          placeholder="לדוגמה: מצטרף לטיול ביום השני"
+                          rows={2}
+                          className="flex-1 text-sm border border-sky-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-sky-400 resize-none placeholder:text-muted-foreground/40 bg-white"
+                        />
                       </div>
                     </TableCell>
                   </TableRow>

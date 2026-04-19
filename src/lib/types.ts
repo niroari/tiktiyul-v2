@@ -42,6 +42,7 @@ export type Student = {
     glutenFree: boolean;
   };
   medicalNotes?: string;
+  notes?: string;
 };
 
 // ─── Staff ───────────────────────────────────────────────────────────────────
@@ -90,6 +91,7 @@ export type PendingUpdate = {
   proposedIsGoing: boolean;
   proposedDietaryFlags: { vegetarian: boolean; vegan: boolean; glutenFree: boolean };
   proposedMedicalNotes: string;
+  proposedNotes: string;
   submittedAt: Timestamp;
   status: "pending" | "approved" | "rejected";
 };

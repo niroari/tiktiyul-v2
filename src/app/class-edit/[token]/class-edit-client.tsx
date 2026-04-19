@@ -14,6 +14,7 @@ type DraftStudent = {
   vegan: boolean;
   glutenFree: boolean;
   medicalNotes: string;
+  notes: string;
   dirty: boolean;
 };
 
@@ -64,6 +65,7 @@ export function ClassEditClient() {
           vegan: s.dietaryFlags?.vegan ?? false,
           glutenFree: s.dietaryFlags?.glutenFree ?? false,
           medicalNotes: s.medicalNotes ?? "",
+          notes: s.notes ?? "",
           dirty: false,
         })));
         setState("ready");
@@ -101,6 +103,7 @@ export function ClassEditClient() {
             proposedIsGoing: d.isGoing,
             proposedDietaryFlags: { vegetarian: d.vegetarian, vegan: d.vegan, glutenFree: d.glutenFree },
             proposedMedicalNotes: d.medicalNotes,
+            proposedNotes: d.notes,
           })
         )
       );
@@ -218,6 +221,18 @@ export function ClassEditClient() {
                 value={d.medicalNotes}
                 onChange={(e) => update(d.student.id, "medicalNotes", e.target.value)}
                 placeholder="אלרגיות, תרופות, מגבלות..."
+                rows={2}
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary resize-none placeholder:text-muted-foreground/40"
+              />
+            </div>
+
+            {/* General notes */}
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground">הערות</p>
+              <textarea
+                value={d.notes}
+                onChange={(e) => update(d.student.id, "notes", e.target.value)}
+                placeholder="לדוגמה: מצטרף לטיול ביום השני, עוזב מוקדם..."
                 rows={2}
                 className="w-full text-sm border border-border rounded-lg px-3 py-2 focus:outline-none focus:border-primary resize-none placeholder:text-muted-foreground/40"
               />

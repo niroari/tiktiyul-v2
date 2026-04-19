@@ -39,6 +39,12 @@ function computeDiff(update: PendingUpdate, current: Student | undefined): DiffR
     rows.push({ field: "הערות רפואיות", before: beforeNotes || "—", after: afterNotes || "—" });
   }
 
+  const beforeGeneral = (current.notes ?? "").trim();
+  const afterGeneral  = (update.proposedNotes ?? "").trim();
+  if (beforeGeneral !== afterGeneral) {
+    rows.push({ field: "הערות", before: beforeGeneral || "—", after: afterGeneral || "—" });
+  }
+
   return rows;
 }
 
@@ -63,6 +69,7 @@ export function PendingUpdatesClient() {
         isGoing: update.proposedIsGoing,
         dietaryFlags: update.proposedDietaryFlags,
         medicalNotes: update.proposedMedicalNotes,
+        notes: update.proposedNotes ?? "",
       });
       await resolvePendingUpdate(tripId, update.id, "approved");
 
