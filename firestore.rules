@@ -29,6 +29,15 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Invite token reverse lookup ───────────────────────────────────────────
+    // Public read so non-members can resolve a tripId from an invite token
+    // without querying the protected trips collection.
+    match /inviteTokens/{token} {
+      allow read: if true;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Trips ─────────────────────────────────────────────────────────────────
 
     // For reads: check ownership directly on the document being read (no get() needed)

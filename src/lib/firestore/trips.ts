@@ -21,6 +21,11 @@ import { Trip } from "@/lib/types";
 // v2 uses top-level "trips" collection (v1 used users/{uid}/trips)
 const tripsCol = collection(db, "trips");
 
+// Public reverse lookup: inviteTokens/{token} = { tripId }
+// Allows non-members to look up a tripId by invite token without querying the
+// protected trips collection.
+const inviteTokensCol = collection(db, "inviteTokens");
+
 export function tripDoc(tripId: string) {
   return doc(db, "trips", tripId);
 }
@@ -116,19 +121,24 @@ export function subscribeToUserTrips(
 
 export async function generateInviteToken(tripId: string): Promise<string> {
   const token = crypto.randomUUID();
-  await updateDoc(tripDoc(tripId), { inviteToken: token, updatedAt: serverTimestamp() });
+  // Write token to the trip doc AND to the public reverse-lookup collection so
+  // non-members can resolve a tripId without querying the protected trips collection.
+  await Promise.all([
+    updateDoc(tripDoc(tripId), { inviteToken: token, updatedAt: serverTimestamp() }),
+    setDoc(doc(inviteTokensCol, token), { tripId }),
+  ]);
   return token;
 }
 
 export async function joinTripByToken(token: string, uid: string): Promise<string | null> {
-  const q = query(tripsCol, where("inviteToken", "==", token), limit(1));
-  const snap = await getDocs(q);
-  if (snap.empty) return null;
-  const ref  = snap.docs[0].ref;
-  const data = snap.docs[0].data() as Trip;
-  if (data.ownerUid === uid || (data.collaborators ?? []).includes(uid)) {
-    return snap.docs[0].id;
-  }
-  await updateDoc(ref, { collaborators: arrayUnion(uid), updatedAt: serverTimestamp() });
-  return snap.docs[0].id;
+  // Look up tripId from the public inviteTokens collection — no auth required,
+  // avoids querying the protected trips collection.
+  const linkSnap = await getDoc(doc(inviteTokensCol, token));
+  if (!linkSnap.exists()) return null;
+  const tripId = (linkSnap.data() as { tripId: string }).tripId;
+
+  // arrayUnion is idempotent — safe to call even if already a collaborator.
+  // The Firestore update rule permits any auth'd user to add themselves to collaborators.
+  await updateDoc(tripDoc(tripId), { collaborators: arrayUnion(uid), updatedAt: serverTimestamp() });
+  return tripId;
 }
