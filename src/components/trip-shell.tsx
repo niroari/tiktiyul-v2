@@ -41,8 +41,7 @@ export function TripShell({ tripId, tripName, schoolName, inviteToken, children 
   async function handleShare() {
     setGenerating(true);
     try {
-      let token = inviteToken;
-      if (!token) token = await generateInviteToken(tripId);
+      const token = await generateInviteToken(tripId);
       const url = `${window.location.origin}/join/${token}`;
       await navigator.clipboard.writeText(url);
       setCopied(true);
