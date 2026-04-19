@@ -18,7 +18,8 @@ type Room = {
   number: string;
   gender: "male" | "female";
   studentIds: string[];
-  capacity?: number; // set when created from hostel spec
+  capacity?: number;   // set when created from hostel spec
+  classLabel?: string; // set when auto-allocated by class (before students are assigned)
 };
 
 // Dialog uses specs (count × size) rather than expanded rooms
@@ -32,6 +33,30 @@ function specsTotal(specs: RoomSpec[]) {
 
 function makeRoom(gender: "male" | "female"): Room {
   return { id: crypto.randomUUID(), number: "", gender, studentIds: [] };
+}
+
+// Greedy bin-packing: fill `n` spots using rooms from `pool` (largest-first).
+// When no room fits exactly, use the smallest available room (overflow allowed).
+function allocateRoomsForCount(n: number, pool: { size: number; remaining: number }[]): number[] {
+  const result: number[] = [];
+  let left = n;
+  const sorted = [...pool].sort((a, b) => b.size - a.size);
+  while (left > 0) {
+    const fit = sorted.find((p) => p.remaining > 0 && p.size <= left);
+    if (fit) {
+      fit.remaining--;
+      result.push(fit.size);
+      left -= fit.size;
+    } else {
+      // No room fits — use smallest available (overflow)
+      const overflow = [...sorted].reverse().find((p) => p.remaining > 0);
+      if (!overflow) break;
+      overflow.remaining--;
+      result.push(overflow.size);
+      left -= overflow.size;
+    }
+  }
+  return result;
 }
 
 // ─── SpecEditor ───────────────────────────────────────────────────────────────
@@ -319,7 +344,9 @@ function RoomCard({
   setDragOverRoom, setDraggingId,
 }: RoomCardProps) {
   const studs      = room.studentIds.map((id) => studentById[id]).filter(Boolean);
-  const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ");
+  const classLabel = studs.length > 0
+    ? [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ")
+    : (room.classLabel ?? "");
   const isGirl     = room.gender === "female";
   const chipBg     = isGirl ? "bg-pink-50"      : "bg-blue-50";
   const chipBorder = isGirl ? "border-pink-200"  : "border-blue-200";
@@ -572,6 +599,7 @@ export function RoomsClient() {
 
   function roomMatchesFilter(room: Room) {
     if (classFilter === "all") return true;
+    if (room.classLabel) return room.classLabel === classFilter;
     if (room.studentIds.length === 0) return true;
     return room.studentIds.some((id) => studentById[id]?.class === classFilter);
   }
@@ -631,6 +659,37 @@ export function RoomsClient() {
 
     assignGroup(goingBoys,  "male",   boySpecs);
     assignGroup(goingGirls, "female", girlSpecs);
+    updateRooms(newRooms);
+  }
+
+  function autoAllocateClasses() {
+    if (!confirm("לנקות חדרים קיימים ולחלק לפי כיתות (ללא שיבוץ תלמידים)?")) return;
+    const newRooms: Room[] = [];
+
+    function allocateGender(gender: "male" | "female", specs: RoomSpec[]) {
+      const byClass = new Map<string, number>();
+      going.filter((s) => s.gender === gender).forEach((s) => {
+        byClass.set(s.class, (byClass.get(s.class) ?? 0) + 1);
+      });
+      const classes = [...byClass.entries()].sort((a, b) => a[0].localeCompare(b[0], "he"));
+      const pool = specs.map((s) => ({ size: s.size, remaining: s.count }));
+      for (const [className, count] of classes) {
+        const sizes = allocateRoomsForCount(count, pool);
+        for (const size of sizes) {
+          newRooms.push({
+            id: crypto.randomUUID(),
+            number: "",
+            gender,
+            studentIds: [],
+            capacity: size,
+            classLabel: className,
+          });
+        }
+      }
+    }
+
+    allocateGender("male",   boySpecs);
+    allocateGender("female", girlSpecs);
     updateRooms(newRooms);
   }
 
@@ -864,6 +923,16 @@ export function RoomsClient() {
             >
               ⚡ חלק אוטומטית
             </button>
+
+            {/* Class-based allocation — only when hostel specs are set */}
+            {hasSpecs && (
+              <button
+                onClick={autoAllocateClasses}
+                className="flex items-center gap-1.5 px-4 py-1.5 text-sm border border-primary text-primary rounded-[var(--radius-sm)] hover:bg-[var(--brand-light)] transition-colors"
+              >
+                🏫 חלק לפי כיתות
+              </button>
+            )}
 
             {/* Class filter */}
             {allClasses.length > 1 && (
