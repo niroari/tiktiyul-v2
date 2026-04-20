@@ -1000,14 +1000,31 @@ export function RoomsClient() {
 
             {/* Class filter */}
             {allClasses.length > 1 && (
-              <select
-                value={classFilter}
-                onChange={(e) => setClassFilter(e.target.value)}
-                className="text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1.5 focus:outline-none focus:border-primary"
-              >
-                <option value="all">כל הכיתות</option>
-                {allClasses.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <div className="flex flex-wrap gap-1">
+                <button
+                  onClick={() => setClassFilter("all")}
+                  className={`px-3 py-1.5 text-sm rounded-[var(--radius-sm)] border transition-colors ${
+                    classFilter === "all"
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                  }`}
+                >
+                  כל הכיתות
+                </button>
+                {allClasses.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => setClassFilter(c)}
+                    className={`px-3 py-1.5 text-sm rounded-[var(--radius-sm)] border transition-colors ${
+                      classFilter === c
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
             )}
 
             {/* Gender view */}
