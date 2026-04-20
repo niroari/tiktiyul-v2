@@ -13,7 +13,7 @@ import type { PendingUpdate, Student } from "@/lib/types";
 type DiffRow = { field: string; before: string; after: string };
 
 function computeDiff(update: PendingUpdate, current: Student | undefined): DiffRow[] {
-  if (!current) return [];
+  if (!current || update.type === "room-assignment") return [];
   const rows: DiffRow[] = [];
 
   if (update.proposedIsGoing !== current.isGoing) {
@@ -62,10 +62,27 @@ export function PendingUpdatesClient() {
 
   const studentById = Object.fromEntries(students.map((s) => [s.id, s]));
 
+  async function approveRoomAssignment(update: PendingUpdate) {
+    const raw = await getAppendix(tripId, "rooms");
+    const currentRooms = ((raw?.rooms ?? []) as Array<{ id: string; studentIds: string[]; [k: string]: unknown }>);
+    const updatedRooms = currentRooms.map((room) => {
+      const proposed = update.proposedRooms?.find((r) => r.roomId === room.id);
+      return proposed ? { ...room, studentIds: proposed.studentIds } : room;
+    });
+    await saveAppendix(tripId, "rooms", { ...(raw ?? {}), rooms: updatedRooms });
+    await resolvePendingUpdate(tripId, update.id, "approved");
+  }
+
   async function approve(update: PendingUpdate) {
+    if (update.type === "room-assignment") {
+      setResolving((r) => ({ ...r, [update.id]: true }));
+      try { await approveRoomAssignment(update); }
+      finally { setResolving((r) => ({ ...r, [update.id]: false })); }
+      return;
+    }
     setResolving((r) => ({ ...r, [update.id]: true }));
     try {
-      await updateStudent(tripId, update.studentId, {
+      await updateStudent(tripId, update.studentId!, {
         isGoing: update.proposedIsGoing,
         dietaryFlags: update.proposedDietaryFlags,
         medicalNotes: update.proposedMedicalNotes,
@@ -114,9 +131,13 @@ export function PendingUpdatesClient() {
     for (const u of updates) await approve(u);
   }
 
-  // Group by class
+  // Split types
+  const studentUpdates = updates.filter((u) => !u.type || u.type === "student");
+  const roomUpdates    = updates.filter((u) => u.type === "room-assignment");
+
+  // Group student updates by class
   const byClass: Record<string, PendingUpdate[]> = {};
-  for (const u of updates) {
+  for (const u of studentUpdates) {
     if (!byClass[u.studentClass]) byClass[u.studentClass] = [];
     byClass[u.studentClass].push(u);
   }
@@ -148,6 +169,68 @@ export function PendingUpdatesClient() {
         <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-12 text-center">
           <p className="text-4xl mb-3">✅</p>
           <p className="text-muted-foreground text-sm">כל העדכונים טופלו. אין ממתינים.</p>
+        </div>
+      )}
+
+      {/* Room assignment proposals */}
+      {roomUpdates.length > 0 && (
+        <div className="space-y-3">
+          <h2 className="text-sm font-semibold text-muted-foreground px-1">הצעות שיבוץ חדרים</h2>
+          {roomUpdates.map((update) => {
+            const busy = resolving[update.id];
+            return (
+              <div key={update.id} className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
+                  <div>
+                    <span className="font-medium text-foreground">שיבוץ חדרים — כיתה {update.studentClass}</span>
+                    <span className="mr-2 text-xs text-muted-foreground">{update.proposedRooms?.length ?? 0} חדרים</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => reject(update)}
+                      disabled={busy}
+                      className="text-xs px-3 py-1.5 border border-border rounded-[var(--radius-sm)] text-muted-foreground hover:text-destructive hover:border-destructive/40 transition-colors disabled:opacity-40"
+                    >
+                      דחה
+                    </button>
+                    <button
+                      onClick={() => approve(update)}
+                      disabled={busy}
+                      className="text-xs px-3 py-1.5 bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors disabled:opacity-40"
+                    >
+                      {busy ? "מעדכן..." : "אשר ועדכן"}
+                    </button>
+                  </div>
+                </div>
+                <div className="px-4 py-3 space-y-2">
+                  {(update.proposedRooms ?? []).map((room) => {
+                    const roomStudents = room.studentIds
+                      .map((id) => studentById[id])
+                      .filter(Boolean);
+                    return (
+                      <div key={room.roomId} className="flex items-start gap-3 text-sm">
+                        <span className="text-xs text-muted-foreground whitespace-nowrap pt-0.5 w-24">
+                          חדר (מזהה {room.roomId.slice(-4)})
+                        </span>
+                        <div className="flex flex-wrap gap-1">
+                          {roomStudents.length === 0
+                            ? <span className="text-xs text-muted-foreground/50 italic">ריק</span>
+                            : roomStudents.map((s) => (
+                              <span key={s!.id} className={`text-xs rounded-full px-2 py-0.5 border ${
+                                s!.gender === "female" ? "bg-pink-50 border-pink-200 text-pink-800" : "bg-blue-50 border-blue-200 text-blue-800"
+                              }`}>
+                                {s!.lastName} {s!.firstName}
+                              </span>
+                            ))
+                          }
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

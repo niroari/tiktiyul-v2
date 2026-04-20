@@ -79,20 +79,24 @@ export type ClassToken = {
   expiresAt: Timestamp;
 };
 
-// ─── Pending update (teacher-proposed student change) ─────────────────────────
+// ─── Pending update (teacher-proposed student change OR room assignment) ────────
 
 export type PendingUpdate = {
   id: string;
   tripId: string;
-  token: string;       // which classToken was used
-  studentId: string;
-  studentFirstName: string;
-  studentLastName: string;
-  studentClass: string;
-  proposedIsGoing: boolean;
-  proposedDietaryFlags: { vegetarian: boolean; vegan: boolean; glutenFree: boolean };
-  proposedMedicalNotes: string;
-  proposedNotes: string;
+  token: string;
+  type?: "student" | "room-assignment"; // undefined = "student" (backward compat)
+  studentClass: string;                 // used for grouping in both types
+  // student-specific (type === "student" or undefined)
+  studentId?: string;
+  studentFirstName?: string;
+  studentLastName?: string;
+  proposedIsGoing?: boolean;
+  proposedDietaryFlags?: { vegetarian: boolean; vegan: boolean; glutenFree: boolean };
+  proposedMedicalNotes?: string;
+  proposedNotes?: string;
+  // room-assignment-specific
+  proposedRooms?: Array<{ roomId: string; studentIds: string[] }>;
   submittedAt: Timestamp;
   status: "pending" | "approved" | "rejected";
 };

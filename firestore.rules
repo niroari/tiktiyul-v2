@@ -29,6 +29,13 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Room-fill tokens (teacher room assignment links) ─────────────────────
+    match /roomFillTokens/{token} {
+      allow read: if true;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // ── Invite token reverse lookup ───────────────────────────────────────────
     // Public read so non-members can resolve a tripId from an invite token
     // without querying the protected trips collection.
@@ -87,8 +94,10 @@ service cloud.firestore {
       // trip members can read and update status (approve/reject).
       match /pendingUpdates/{updateId} {
         allow create: if
-          request.resource.data.status == "pending" &&
-          exists(/databases/$(database)/documents/classTokens/$(request.resource.data.token));
+          request.resource.data.status == "pending" && (
+            exists(/databases/$(database)/documents/classTokens/$(request.resource.data.token)) ||
+            exists(/databases/$(database)/documents/roomFillTokens/$(request.resource.data.token))
+          );
         allow read, update: if isMember(tripId);
       }
     }

@@ -6,6 +6,8 @@ import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
 import { AppendixActions } from "@/components/appendix-actions";
+import { createRoomFillToken, listRoomFillTokensForTrip } from "@/lib/firestore/room-fill-tokens";
+import type { RoomFillToken } from "@/lib/firestore/room-fill-tokens";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -493,7 +495,11 @@ export function RoomsClient() {
   const [hostelOpen,   setHostelOpen]   = useState(false);
   const [draggingId,   setDraggingId]   = useState<string | null>(null);
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null);
-  const [addMenuOpen,  setAddMenuOpen]  = useState<"male" | "female" | null>(null);
+  const [addMenuOpen,    setAddMenuOpen]    = useState<"male" | "female" | null>(null);
+  const [shareOpen,      setShareOpen]      = useState(false);
+  const [roomTokens,     setRoomTokens]     = useState<RoomFillToken[]>([]);
+  const [generatingClass, setGeneratingClass] = useState<string | null>(null);
+  const [copiedToken,    setCopiedToken]    = useState<string | null>(null);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending  = useRef(false);
@@ -693,6 +699,42 @@ export function RoomsClient() {
     updateRooms(newRooms);
   }
 
+  async function openShareDialog() {
+    setShareOpen(true);
+    const existing = await listRoomFillTokensForTrip(tripId);
+    setRoomTokens(existing);
+  }
+
+  async function generateRoomToken(className: string) {
+    setGeneratingClass(className);
+    try {
+      const classRooms = rooms
+        .filter((r) => r.classLabel === className)
+        .map((r) => ({ id: r.id, number: r.number, capacity: r.capacity, gender: r.gender }));
+      const token = await createRoomFillToken(
+        tripId, className, trip?.name ?? "", trip?.schoolName ?? "", classRooms
+      );
+      setRoomTokens((prev) => {
+        const filtered = prev.filter((t) => t.class !== className);
+        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", rooms: classRooms, createdAt: null as any, expiresAt: null as any }];
+      });
+    } finally {
+      setGeneratingClass(null);
+    }
+  }
+
+  function copyRoomLink(token: string) {
+    navigator.clipboard.writeText(`${window.location.origin}/room-fill/${token}`);
+    setCopiedToken(token);
+    setTimeout(() => setCopiedToken(null), 2000);
+  }
+
+  function shareRoomWhatsApp(token: string, className: string) {
+    const url = `${window.location.origin}/room-fill/${token}`;
+    const msg = `*תיק טיול — שיבוץ תלמידים לחדרים*\nשלום, אנא שבצי את תלמידי כיתה ${className} לחדרים עבור טיול "${trip?.name ?? ""}".\nלחץ/י על הקישור:\n${url}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank");
+  }
+
   function clearAll() {
     if (!confirm("לנקות את כל חלוקת החדרים?")) return;
     updateRooms([]);
@@ -862,9 +904,22 @@ export function RoomsClient() {
           <h1 className="text-xl font-semibold text-foreground">חלוקת חדרים</h1>
           <p className="text-sm text-muted-foreground mt-0.5">חלוקת תלמידים לחדרים באכסנייה — הפרדה בין בנים לבנות</p>
         </div>
-        <span className={`text-xs flex-shrink-0 pt-1 ${status === "saved" ? "text-green-600" : "text-muted-foreground"}`}>
-          {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-green-600" : "text-muted-foreground"}`}>
+            {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
+          </span>
+          {allClasses.length > 0 && (
+            <button
+              onClick={openShareDialog}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-primary text-primary rounded-[var(--radius-sm)] hover:bg-[var(--brand-light)] transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+              שתף לשיבוץ
+            </button>
+          )}
+        </div>
       </div>
 
       {students.length === 0 && (
@@ -1154,6 +1209,88 @@ export function RoomsClient() {
         initialStaffGroups={staffGroupsToDlg(staffGroups)}
         onSave={saveHostelConfig}
       />
+
+      {/* Share room-fill links dialog */}
+      {shareOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setShareOpen(false)} />
+          <div className="relative bg-white rounded-[var(--radius)] shadow-xl w-full max-w-md p-6 space-y-4" dir="rtl">
+            <div>
+              <h2 className="text-base font-semibold">שתף קישור שיבוץ לכיתה</h2>
+              <p className="text-sm text-muted-foreground mt-1">
+                שלח/י לכל מחנך/ת קישור — הם יוכלו לשבץ את תלמידיהם לחדרים שהוגדרו לכיתתם.
+                השיבוץ יועבר אליך לאישור לפני עדכון המערכת.
+              </p>
+            </div>
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+              {allClasses.map((className) => {
+                const existing      = roomTokens.find((t) => t.class === className);
+                const isGenerating  = generatingClass === className;
+                const classRoomCount = rooms.filter((r) => r.classLabel === className).length;
+                const url = existing ? `${window.location.origin}/room-fill/${existing.token}` : null;
+                return (
+                  <div key={className} className="flex items-center gap-2 border border-border rounded-[var(--radius-sm)] px-3 py-2">
+                    <div className="flex flex-col flex-shrink-0 w-20">
+                      <span className="text-sm font-medium">כיתה {className}</span>
+                      <span className="text-xs text-muted-foreground">{classRoomCount} חדרים</span>
+                    </div>
+                    {url ? (
+                      <>
+                        <input
+                          readOnly
+                          value={url}
+                          dir="ltr"
+                          className="flex-1 text-xs border border-border rounded px-2 py-1 bg-muted/30 focus:outline-none truncate"
+                          onClick={(e) => (e.target as HTMLInputElement).select()}
+                        />
+                        <button
+                          onClick={() => copyRoomLink(existing!.token)}
+                          className="text-xs px-2 py-1 border border-border rounded hover:bg-muted/50 transition-colors whitespace-nowrap flex-shrink-0"
+                        >
+                          {copiedToken === existing!.token ? "הועתק ✓" : "העתק"}
+                        </button>
+                        <button
+                          onClick={() => shareRoomWhatsApp(existing!.token, className)}
+                          className="text-green-600 hover:text-green-700 transition-colors flex-shrink-0"
+                          title="שתף בוואטסאפ"
+                        >
+                          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => generateRoomToken(className)}
+                          disabled={isGenerating}
+                          title="חדש קישור"
+                          className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 flex-shrink-0"
+                        >
+                          ↺
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => generateRoomToken(className)}
+                        disabled={isGenerating || classRoomCount === 0}
+                        className="text-xs text-primary hover:text-primary/80 transition-colors disabled:opacity-50"
+                      >
+                        {isGenerating ? "יוצר קישור..." : classRoomCount === 0 ? "אין חדרים לכיתה זו" : "צור קישור ↗"}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-end pt-2 border-t border-border">
+              <button
+                onClick={() => setShareOpen(false)}
+                className="text-sm px-4 py-2 border border-border rounded-[var(--radius-sm)] hover:bg-muted transition-colors"
+              >
+                סגור
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
