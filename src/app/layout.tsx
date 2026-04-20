@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Rubik } from "next/font/google";
 import { AuthProvider } from "@/components/auth-provider";
+import { SwRegister } from "@/components/sw-register";
 import "./globals.css";
 
 const rubik = Rubik({
@@ -12,6 +13,12 @@ const rubik = Rubik({
 export const metadata: Metadata = {
   title: "תיק טיול",
   description: "ניהול תיק טיול לבתי ספר",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "תיק טיול",
+  },
   openGraph: {
     title: "תיק טיול",
     description: "ניהול תיק טיול לבתי ספר",
@@ -32,7 +39,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="he" dir="rtl" className={`${rubik.variable} h-full antialiased`}>
+      <head>
+        <link rel="apple-touch-icon" href="/icon-180.png" />
+        <meta name="theme-color" content="#1b4332" />
+      </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
+        <SwRegister />
         <AuthProvider>{children}</AuthProvider>
       </body>
     </html>
