@@ -37,17 +37,32 @@ function buildSignHtml(bus: Bus, logo: string): string {
 }
 
 function openSignPrintWindow(bodyHtml: string) {
-  const win = window.open("", "_blank", "width=1000,height=750");
-  if (!win) return;
-  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><style>
+  const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><style>
     @page { size: A4 landscape; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { width: 100%; background: white; }
     .sign-page { width: 100%; height: 100vh; overflow: hidden; }
     .sign-page + .sign-page { page-break-before: always; }
-  </style></head><body>${bodyHtml}</body></html>`);
-  win.document.close();
-  win.onload = () => { win.focus(); win.print(); win.close(); };
+  </style></head><body>${bodyHtml}</body></html>`;
+
+  // Use a hidden iframe so mobile browsers don't block a popup window
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (!doc) { document.body.removeChild(iframe); return; }
+
+  doc.open();
+  doc.write(html);
+  doc.close();
+
+  // Give images a moment to load before printing
+  setTimeout(() => {
+    iframe.contentWindow?.focus();
+    iframe.contentWindow?.print();
+    setTimeout(() => document.body.removeChild(iframe), 1000);
+  }, 300);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
