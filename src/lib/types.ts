@@ -43,6 +43,7 @@ export type Student = {
   };
   medicalNotes?: string;
   notes?: string;
+  participationDays?: number[]; // undefined = all days; [1] = day 1 only; [2] = day 2 only; etc.
 };
 
 // ─── Staff ───────────────────────────────────────────────────────────────────

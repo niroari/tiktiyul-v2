@@ -33,6 +33,15 @@ export function AppendixZayinClient() {
   const [showNotGoing, setShowNotGoing] = useState(false);
 
   // Derived
+  const tripDayCount = trip?.startDate && trip?.endDate
+    ? Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86400000) + 1
+    : 1;
+
+  function dayLabel(s: Student): string {
+    if (!s.participationDays?.length || s.participationDays.length >= tripDayCount) return "";
+    return s.participationDays.map((d) => `יום ${d}`).join(", ");
+  }
+
   const classes = [...new Set(students.map((s) => s.class))].sort((a, b) => a.localeCompare(b, "he"));
   const sorted  = sortStudents(students, sortField);
   const visible = sorted.filter((s) => {
@@ -62,11 +71,16 @@ export function AppendixZayinClient() {
     for (const s of printStudents) {
       if (s.class !== lastClass) {
         const count = printStudents.filter((x) => x.class === s.class).length;
-        rows += `<tr class="cat-row"><td colspan="6" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
+        const colspan = tripDayCount > 1 ? "7" : "6";
+        rows += `<tr class="cat-row"><td colspan="${colspan}" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
         lastClass = s.class;
         rowInClass = 0;
       }
-      const gender = s.gender === "male" ? "זכר" : s.gender === "female" ? "נקבה" : "";
+      const gender  = s.gender === "male" ? "זכר" : s.gender === "female" ? "נקבה" : "";
+      const days    = dayLabel(s);
+      const daysCell = tripDayCount > 1
+        ? `<td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center${days ? ";color:#c2410c;font-weight:600" : ""}">${esc(days) || "—"}</td>`
+        : "";
       rows += `<tr style="${rowInClass % 2 === 0 ? "" : "background:#f0f7f4"}">
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr;text-align:left">${esc(s.idNumber)}</td>
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.lastName)}</td>
@@ -74,6 +88,7 @@ export function AppendixZayinClient() {
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(s.class)}</td>
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(gender)}</td>
         <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr">${esc(s.phone)}</td>
+        ${daysCell}
       </tr>`;
       rowInClass++;
     }
@@ -101,6 +116,7 @@ export function AppendixZayinClient() {
           <th style="width:60px;text-align:center">כיתה</th>
           <th style="width:55px;text-align:center">מין</th>
           <th style="width:90px">טלפון</th>
+          ${tripDayCount > 1 ? '<th style="width:60px;text-align:center">ימים</th>' : ""}
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
@@ -185,6 +201,7 @@ export function AppendixZayinClient() {
                   <th className="px-3 py-2.5 font-medium text-muted-foreground text-center w-16">כיתה</th>
                   <th className="px-3 py-2.5 font-medium text-muted-foreground text-center w-16">מין</th>
                   <th className="text-right px-4 py-2.5 font-medium text-muted-foreground w-28">טלפון</th>
+                  {tripDayCount > 1 && <th className="px-3 py-2.5 font-medium text-muted-foreground text-center w-20">ימים</th>}
                   <th className="px-3 py-2.5 font-medium text-muted-foreground text-center w-16">יוצא?</th>
                 </tr>
               </thead>
@@ -195,7 +212,7 @@ export function AppendixZayinClient() {
                     <>
                       {isClassHeader && sortField === "class" && (
                         <tr key={`header-${s.class}`} className="bg-[var(--brand-light)]">
-                          <td colSpan={8} className="px-4 py-1.5 text-xs font-semibold text-primary">
+                          <td colSpan={tripDayCount > 1 ? 9 : 8} className="px-4 py-1.5 text-xs font-semibold text-primary">
                             כיתה {s.class} — {sorted.filter((x) => x.class === s.class && x.isGoing).length} יוצאים
                           </td>
                         </tr>
@@ -216,6 +233,14 @@ export function AppendixZayinClient() {
                           ) : null}
                         </td>
                         <td className="px-4 py-2 text-xs font-mono text-muted-foreground" dir="ltr">{s.phone}</td>
+                        {tripDayCount > 1 && (
+                          <td className="px-3 py-2 text-center text-xs font-medium">
+                            {dayLabel(s)
+                              ? <span className="text-orange-600">{dayLabel(s)}</span>
+                              : <span className="text-muted-foreground/40">—</span>
+                            }
+                          </td>
+                        )}
                         <td className="px-3 py-2 text-center">
                           <input
                             type="checkbox"

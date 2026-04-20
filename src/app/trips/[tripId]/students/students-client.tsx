@@ -78,6 +78,7 @@ export function StudentsClient() {
   const [expandedNotes, setExpandedNotes]     = useState<Set<string>>(new Set());
   const [noteEdits, setNoteEdits]             = useState<Record<string, string>>({});
   const [showNotesOnly, setShowNotesOnly]     = useState(false);
+  const [showPartialOnly, setShowPartialOnly] = useState(false);
 
   function toggleMedical(id: string) {
     setExpandedMedical((prev) => {
@@ -110,10 +111,40 @@ export function StudentsClient() {
   const notGoing = students.length - going;
   const classes = [...new Set(students.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
 
-  const withNotes = students.filter((s) => !!s.notes?.trim());
+  const tripDayCount = trip?.startDate && trip?.endDate
+    ? Math.round((new Date(trip.endDate).getTime() - new Date(trip.startDate).getTime()) / 86400000) + 1
+    : 1;
+
+  function isOnDay(student: Student, day: number): boolean {
+    if (!student.participationDays?.length) return true;
+    return student.participationDays.includes(day);
+  }
+
+  function isPartial(student: Student): boolean {
+    return !!student.participationDays?.length && student.participationDays.length < tripDayCount;
+  }
+
+  async function toggleDay(student: Student, day: number) {
+    const allDays = Array.from({ length: tripDayCount }, (_, i) => i + 1);
+    const current = student.participationDays?.length ? student.participationDays : allDays;
+    const next = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b);
+    if (next.length === 0) {
+      await updateStudent(tripId, student.id, { isGoing: false, participationDays: undefined });
+    } else {
+      await updateStudent(tripId, student.id, {
+        participationDays: next.length === tripDayCount ? undefined : next,
+      });
+    }
+  }
+
+  const withNotes    = students.filter((s) => !!s.notes?.trim());
+  const partialCount = students.filter((s) => s.isGoing && isPartial(s)).length;
 
   const filtered = students.filter((s) => {
     if (showNotesOnly && !s.notes?.trim()) return false;
+    if (showPartialOnly && !(s.isGoing && isPartial(s))) return false;
     const q = search.toLowerCase();
     return (
       s.firstName.toLowerCase().includes(q) ||
@@ -296,6 +327,18 @@ export function StudentsClient() {
             {showNotesOnly ? "הצג הכל" : `הצג עם הערות (${withNotes.length})`}
           </button>
         )}
+        {tripDayCount > 1 && partialCount > 0 && (
+          <button
+            onClick={() => setShowPartialOnly((v) => !v)}
+            className={`text-xs px-2.5 py-1.5 rounded-[var(--radius-sm)] border transition-colors ${
+              showPartialOnly
+                ? "bg-orange-100 border-orange-300 text-orange-700"
+                : "border-border text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {showPartialOnly ? "הצג הכל" : `השתתפות חלקית (${partialCount})`}
+          </button>
+        )}
       </div>
 
       {/* Table */}
@@ -347,16 +390,39 @@ export function StudentsClient() {
                   </TableCell>
                   <TableCell className="text-muted-foreground">{student.phone || "—"}</TableCell>
                   <TableCell>
-                    <button
-                      onClick={() => toggleGoing(student)}
-                      className={`w-8 h-5 rounded-full transition-colors relative ${
-                        student.isGoing ? "bg-[var(--success)]" : "bg-border"
-                      }`}
-                    >
-                      <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${
-                        student.isGoing ? "right-0.5" : "left-0.5"
-                      }`} />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => toggleGoing(student)}
+                        className={`w-8 h-5 rounded-full transition-colors relative flex-shrink-0 ${
+                          student.isGoing ? "bg-[var(--success)]" : "bg-border"
+                        }`}
+                      >
+                        <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-all ${
+                          student.isGoing ? "right-0.5" : "left-0.5"
+                        }`} />
+                      </button>
+                      {student.isGoing && tripDayCount > 1 && (
+                        <div className="flex gap-0.5">
+                          {Array.from({ length: tripDayCount }, (_, i) => i + 1).map((day) => {
+                            const on = isOnDay(student, day);
+                            return (
+                              <button
+                                key={day}
+                                onClick={() => toggleDay(student, day)}
+                                title={`יום ${day}`}
+                                className={`w-5 h-5 rounded-full text-[10px] font-bold transition-colors ${
+                                  on
+                                    ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/80"
+                                }`}
+                              >
+                                {day}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1">
