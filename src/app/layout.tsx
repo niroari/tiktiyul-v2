@@ -14,6 +14,10 @@ export const metadata: Metadata = {
   title: "תיק טיול",
   description: "ניהול תיק טיול לבתי ספר",
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/icon-192.png",
+    apple: "/icon-180.png",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
