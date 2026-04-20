@@ -27,14 +27,14 @@ function computeDiff(update: PendingUpdate, current: Student | undefined): DiffR
   const dietLabels: Record<string, string> = { vegetarian: "צמחוני", vegan: "טבעוני", glutenFree: "ללא גלוטן" };
   for (const flag of ["vegetarian", "vegan", "glutenFree"] as const) {
     const before = current.dietaryFlags?.[flag] ?? false;
-    const after  = update.proposedDietaryFlags[flag];
+    const after  = update.proposedDietaryFlags?.[flag] ?? false;
     if (before !== after) {
       rows.push({ field: `מזון — ${dietLabels[flag]}`, before: before ? "✓" : "—", after: after ? "✓" : "—" });
     }
   }
 
   const beforeNotes = (current.medicalNotes ?? "").trim();
-  const afterNotes  = update.proposedMedicalNotes.trim();
+  const afterNotes  = (update.proposedMedicalNotes ?? "").trim();
   if (beforeNotes !== afterNotes) {
     rows.push({ field: "הערות רפואיות", before: beforeNotes || "—", after: afterNotes || "—" });
   }
@@ -91,7 +91,7 @@ export function PendingUpdatesClient() {
       await resolvePendingUpdate(tripId, update.id, "approved");
 
       // If medical notes are non-empty, ensure the student appears in appendix yod
-      if (update.proposedMedicalNotes.trim()) {
+      if ((update.proposedMedicalNotes ?? "").trim()) {
         const yod = await getAppendix(tripId, "yod");
         const currentRows = ((yod?.rows ?? []) as { studentId: string }[]);
         if (!currentRows.find((r) => r.studentId === update.studentId)) {
@@ -238,7 +238,7 @@ export function PendingUpdatesClient() {
         <div key={className} className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground px-1">כיתה {className}</h2>
           {byClass[className].map((update) => {
-            const current = studentById[update.studentId];
+            const current = studentById[update.studentId!];
             const diff = computeDiff(update, current);
             const busy = resolving[update.id];
 
