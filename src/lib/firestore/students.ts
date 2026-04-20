@@ -5,6 +5,7 @@ import {
   setDoc,
   updateDoc,
   deleteDoc,
+  deleteField,
   onSnapshot,
   serverTimestamp,
   type Unsubscribe,
@@ -34,7 +35,11 @@ export async function updateStudent(
   studentId: string,
   data: Partial<Omit<Student, "id">>
 ): Promise<void> {
-  await updateDoc(studentDoc(tripId, studentId), data);
+  // Convert undefined values to deleteField() so Firestore actually removes the field
+  const payload = Object.fromEntries(
+    Object.entries(data).map(([k, v]) => [k, v === undefined ? deleteField() : v])
+  );
+  await updateDoc(studentDoc(tripId, studentId), payload);
 }
 
 export async function deleteStudent(
