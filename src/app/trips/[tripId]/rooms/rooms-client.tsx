@@ -1037,8 +1037,8 @@ export function RoomsClient() {
           {/* Unassigned students */}
           {filteredUnassigned.length > 0 && (
             <div className="bg-amber-50 border border-amber-200 rounded-[var(--radius)] p-4">
-              <p className="text-sm font-semibold text-amber-800 mb-2">
-                תלמידים ללא חדר ({filteredUnassigned.length}
+              <div className="text-sm font-semibold text-amber-800 mb-2 leading-snug">
+                <span>תלמידים ללא חדר ({filteredUnassigned.length}
                 {(() => {
                   const boys  = filteredUnassigned.filter((s) => s.gender === "male").length;
                   const girls = filteredUnassigned.filter((s) => s.gender === "female").length;
@@ -1047,8 +1047,9 @@ export function RoomsClient() {
                   if (girls > 0) return ` — ${girls} בנות`;
                   return "";
                 })()}
-                ) — לחץ/י על תלמיד/ה לשיבוץ
-              </p>
+                )</span>
+                <span className="block sm:inline font-normal text-xs mt-0.5 sm:mt-0 sm:mr-1">לחץ/י על תלמיד/ה לשיבוץ</span>
+              </div>
               <div className="flex flex-wrap gap-2">
                 {filteredUnassigned.map((s) => {
                   const isGirl = s.gender === "female";
