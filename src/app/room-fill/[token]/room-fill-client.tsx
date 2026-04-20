@@ -191,7 +191,7 @@ export function RoomFillClient() {
             {unassigned.map((s) => {
               const isGirl    = s.gender === "female";
               const chipBg    = isGirl ? "bg-pink-100 border-pink-300 text-pink-900" : "bg-blue-100 border-blue-300 text-blue-900";
-              const eligible  = rooms.filter((r) => r.gender === s.gender);
+              const eligible  = rooms.filter((r) => !r.gender || r.gender === s.gender);
               return (
                 <div key={s.id} className="relative">
                   {assigningId === s.id ? (
@@ -294,7 +294,8 @@ export function RoomFillClient() {
                   const studentId = e.dataTransfer.getData("studentId");
                   if (!studentId) return;
                   const s = studentById[studentId];
-                  if (!s || s.gender !== room.gender) return;
+                  if (!s) return;
+                  if (room.gender && s.gender && s.gender !== room.gender) return;
                   assignStudent(studentId, room.id);
                 }}
               >
