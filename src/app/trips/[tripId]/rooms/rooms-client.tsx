@@ -500,6 +500,7 @@ export function RoomsClient() {
   const [roomTokens,     setRoomTokens]     = useState<RoomFillToken[]>([]);
   const [generatingClass, setGeneratingClass] = useState<string | null>(null);
   const [copiedToken,    setCopiedToken]    = useState<string | null>(null);
+  const [shareError,     setShareError]     = useState<string | null>(null);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending  = useRef(false);
@@ -707,9 +708,14 @@ export function RoomsClient() {
 
   async function generateRoomToken(className: string) {
     setGeneratingClass(className);
+    setShareError(null);
     try {
+      // Include rooms tagged with classLabel OR rooms that have students from this class
       const classRooms = rooms
-        .filter((r) => r.classLabel === className)
+        .filter((r) =>
+          r.classLabel === className ||
+          r.studentIds.some((id) => studentById[id]?.class === className)
+        )
         .map((r) => ({ id: r.id, number: r.number, capacity: r.capacity, gender: r.gender }));
       const token = await createRoomFillToken(
         tripId, className, trip?.name ?? "", trip?.schoolName ?? "", classRooms
@@ -718,6 +724,9 @@ export function RoomsClient() {
         const filtered = prev.filter((t) => t.class !== className);
         return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", rooms: classRooms, createdAt: null as any, expiresAt: null as any }];
       });
+    } catch (e) {
+      console.error("generateRoomToken error:", e);
+      setShareError("שגיאה ביצירת הקישור. ודא שהחיבור לרשת תקין.");
     } finally {
       setGeneratingClass(null);
     }
@@ -1226,7 +1235,10 @@ export function RoomsClient() {
               {allClasses.map((className) => {
                 const existing      = roomTokens.find((t) => t.class === className);
                 const isGenerating  = generatingClass === className;
-                const classRoomCount = rooms.filter((r) => r.classLabel === className).length;
+                const classRoomCount = rooms.filter((r) =>
+                  r.classLabel === className ||
+                  r.studentIds.some((id) => studentById[id]?.class === className)
+                ).length;
                 const url = existing ? `${window.location.origin}/room-fill/${existing.token}` : null;
                 return (
                   <div key={className} className="flex items-center gap-2 border border-border rounded-[var(--radius-sm)] px-3 py-2">
@@ -1280,6 +1292,9 @@ export function RoomsClient() {
                 );
               })}
             </div>
+            {shareError && (
+              <p className="text-xs text-destructive">{shareError}</p>
+            )}
             <div className="flex justify-end pt-2 border-t border-border">
               <button
                 onClick={() => setShareOpen(false)}
