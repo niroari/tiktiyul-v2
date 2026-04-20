@@ -908,7 +908,7 @@ export function RoomsClient() {
   return (
     <div className="space-y-6">
       {/* Page header */}
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-foreground">חלוקת חדרים</h1>
           <p className="text-sm text-muted-foreground mt-0.5">חלוקת תלמידים לחדרים באכסנייה — הפרדה בין בנים לבנות</p>
@@ -940,7 +940,7 @@ export function RoomsClient() {
       {students.length > 0 && (
         <>
           {/* Toolbar */}
-          <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] px-4 py-3 flex flex-wrap items-center gap-3">
+          <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] px-4 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
 
             {/* Hostel capacity button */}
             <button
