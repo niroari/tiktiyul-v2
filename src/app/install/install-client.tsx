@@ -3,22 +3,34 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 
-type Platform = "ios-safari" | "ios-other" | "android" | "desktop" | "unknown";
+type Platform =
+  | "ios-safari"
+  | "ios-other"
+  | "android"
+  | "desktop-chrome"   // Chrome or Edge on Mac/Windows — supports beforeinstallprompt
+  | "desktop-safari"   // Safari on macOS — File → Add to Dock (Sonoma+)
+  | "desktop-other"    // Firefox etc. on desktop — no install support
+  | "unknown";
 
 function detectPlatform(): Platform {
   if (typeof navigator === "undefined") return "unknown";
   const ua = navigator.userAgent;
-  const isIOS = /iPhone|iPad|iPod/.test(ua);
-  const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS/.test(ua);
+  const isIOS     = /iPhone|iPad|iPod/.test(ua);
   const isAndroid = /Android/.test(ua);
-  if (isIOS && isSafari) return "ios-safari";
-  if (isIOS) return "ios-other";
-  if (isAndroid) return "android";
-  if (!/Mobi/.test(ua)) return "desktop";
+  const isMobile  = /Mobi/.test(ua);
+  const isSafari  = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|Edg/.test(ua);
+  const isChrome  = /Chrome/.test(ua) || /Edg/.test(ua);
+
+  if (isIOS && isSafari)  return "ios-safari";
+  if (isIOS)              return "ios-other";
+  if (isAndroid)          return "android";
+  if (!isMobile && isChrome) return "desktop-chrome";
+  if (!isMobile && isSafari) return "desktop-safari";
+  if (!isMobile)          return "desktop-other";
   return "unknown";
 }
 
-// ─── Step component ───────────────────────────────────────────────────────────
+// ─── Step ─────────────────────────────────────────────────────────────────────
 
 function Step({ n, children }: { n: number; children: React.ReactNode }) {
   return (
@@ -30,8 +42,6 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
     </div>
   );
 }
-
-// ─── Icon chip ────────────────────────────────────────────────────────────────
 
 function Chip({ children }: { children: React.ReactNode }) {
   return (
@@ -47,7 +57,7 @@ function IosSafariInstructions() {
   return (
     <div className="space-y-5">
       <Step n={1}>
-        גלול/י למטה לסוף הדף הזה ולחץ/י על כפתור השיתוף —
+        לחץ/י על כפתור השיתוף —
         <Chip>
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
@@ -60,9 +70,7 @@ function IosSafariInstructions() {
         <Chip>הוסף למסך הבית</Chip>
       </Step>
       <Step n={3}>
-        לחץ/י על
-        <Chip>הוסף</Chip>
-        בפינה הימנית העליונה
+        לחץ/י על <Chip>הוסף</Chip> בפינה הימנית העליונה
       </Step>
       <p className="text-xs text-muted-foreground text-center pt-2">
         האפליקציה תופיע על מסך הבית שלך כמו כל אפליקציה רגילה ✓
@@ -76,7 +84,7 @@ function IosOtherInstructions() {
     <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 space-y-3">
       <p className="font-semibold text-amber-800">פתח/י ב-Safari</p>
       <p className="text-sm text-amber-700">
-        הדפדפן הנוכחי שלך לא תומך בהתקנה. כדי להוסיף לנייד, יש לפתוח את הקישור הזה דווקא ב-<strong>Safari</strong>.
+        הדפדפן הנוכחי לא תומך בהתקנה. פתח/י את הקישור דווקא ב-<strong>Safari</strong>.
       </p>
       <button
         onClick={() => navigator.clipboard.writeText(window.location.href).then(() => alert("הקישור הועתק — הדבק אותו ב-Safari"))}
@@ -91,7 +99,6 @@ function IosOtherInstructions() {
 function AndroidInstructions({ installed }: { installed: boolean }) {
   const [prompted, setPrompted] = useState(false);
 
-  // The beforeinstallprompt event is stored on window by sw-register
   function triggerInstall() {
     const deferredPrompt = (window as any).__pwaInstallPrompt;
     if (deferredPrompt) {
@@ -105,13 +112,9 @@ function AndroidInstructions({ installed }: { installed: boolean }) {
     }
   }
 
-  if (installed) {
-    return (
-      <p className="text-sm text-green-700 text-center font-medium">
-        ✓ האפליקציה כבר מותקנת על המכשיר שלך
-      </p>
-    );
-  }
+  if (installed) return (
+    <p className="text-sm text-green-700 text-center font-medium">✓ האפליקציה כבר מותקנת</p>
+  );
 
   return (
     <div className="space-y-5">
@@ -130,30 +133,103 @@ function AndroidInstructions({ installed }: { installed: boolean }) {
           </p>
         </>
       ) : (
-        <p className="text-sm text-green-700 text-center font-medium">
-          ✓ בדוק/י את מסך הבית שלך
-        </p>
+        <p className="text-sm text-green-700 text-center font-medium">✓ בדוק/י את מסך הבית שלך</p>
       )}
     </div>
   );
 }
 
-function DesktopInstructions() {
+function DesktopChromeInstructions({ installed }: { installed: boolean }) {
+  const [prompted, setPrompted] = useState(false);
+
+  function triggerInstall() {
+    const deferredPrompt = (window as any).__pwaInstallPrompt;
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(() => {
+        (window as any).__pwaInstallPrompt = null;
+        setPrompted(true);
+      });
+    } else {
+      setPrompted(true);
+    }
+  }
+
+  if (installed) return (
+    <p className="text-sm text-green-700 text-center font-medium">✓ האפליקציה כבר מותקנת</p>
+  );
+
   return (
-    <div className="space-y-4 text-sm text-muted-foreground text-center">
-      <p>הדף הזה מיועד להתקנה על נייד.</p>
-      <p>
-        שלח/י את הקישור לטלפון שלך ופתח/י אותו שם:
+    <div className="space-y-5">
+      {!prompted ? (
+        <>
+          <Step n={1}>לחץ/י על הכפתור הירוק למטה</Step>
+          <Step n={2}>בחלון שנפתח, לחץ/י <Chip>התקן</Chip></Step>
+          <button
+            onClick={triggerInstall}
+            className="w-full py-3.5 text-sm font-semibold bg-[#1b4332] text-white rounded-xl hover:bg-[#1b4332]/90 transition-colors"
+          >
+            התקן עכשיו
+          </button>
+          <p className="text-xs text-muted-foreground text-center">
+            לחלופין — חפש/י את סמל ההתקנה
+            <Chip>
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            </Chip>
+            בסרגל הכתובות
+          </p>
+        </>
+      ) : (
+        <p className="text-sm text-green-700 text-center font-medium">✓ האפליקציה הותקנה</p>
+      )}
+    </div>
+  );
+}
+
+function DesktopSafariInstructions() {
+  return (
+    <div className="space-y-5">
+      <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+        דורש macOS Sonoma (2023) ומעלה
+      </div>
+      <Step n={1}>
+        בסרגל התפריטים למעלה, לחץ/י על <Chip>קובץ</Chip>
+      </Step>
+      <Step n={2}>
+        בחר/י <Chip>הוסף ל-Dock</Chip>
+      </Step>
+      <Step n={3}>
+        לחץ/י <Chip>הוסף</Chip> בחלון האישור
+      </Step>
+      <p className="text-xs text-muted-foreground text-center pt-1">
+        האפליקציה תופיע ב-Dock ובתיקיית היישומים ✓
       </p>
-      <button
-        onClick={() => navigator.clipboard.writeText(window.location.origin + "/install")}
-        className="mx-auto flex items-center gap-2 px-4 py-2 border border-border rounded-lg hover:bg-muted transition-colors text-foreground text-sm"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-        העתק קישור
-      </button>
+    </div>
+  );
+}
+
+function DesktopOtherInstructions() {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        הדפדפן הנוכחי לא תומך בהתקנה. נסה/י להתקין דרך:
+      </p>
+      <ul className="space-y-2 text-sm">
+        <li className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+          <strong>Chrome</strong> — תומך בהתקנה כאפליקציה
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+          <strong>Edge</strong> — תומך בהתקנה כאפליקציה
+        </li>
+        <li className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0" />
+          <strong>Safari (Mac)</strong> — דורש macOS Sonoma
+        </li>
+      </ul>
     </div>
   );
 }
@@ -168,7 +244,6 @@ export function InstallClient() {
     setPlatform(detectPlatform());
     setIsInstalled(window.matchMedia("(display-mode: standalone)").matches);
 
-    // Capture Android install prompt
     const handler = (e: Event) => {
       e.preventDefault();
       (window as any).__pwaInstallPrompt = e;
@@ -178,11 +253,13 @@ export function InstallClient() {
   }, []);
 
   const titles: Record<Platform, string> = {
-    "ios-safari": "הוסף למסך הבית",
-    "ios-other":  "פתח ב-Safari",
-    "android":    "התקן את האפליקציה",
-    "desktop":    "התקנה על נייד",
-    "unknown":    "התקן את האפליקציה",
+    "ios-safari":     "הוסף למסך הבית",
+    "ios-other":      "פתח ב-Safari",
+    "android":        "התקן את האפליקציה",
+    "desktop-chrome": "התקן כאפליקציה",
+    "desktop-safari": "הוסף ל-Dock",
+    "desktop-other":  "התקנה כאפליקציה",
+    "unknown":        "התקן את האפליקציה",
   };
 
   return (
@@ -206,15 +283,15 @@ export function InstallClient() {
 
         {/* Instruction card */}
         <div className="bg-white rounded-2xl border border-border shadow-sm p-6 space-y-4">
-          <h2 className="font-semibold text-foreground text-base">
-            {titles[platform]}
-          </h2>
+          <h2 className="font-semibold text-foreground text-base">{titles[platform]}</h2>
 
-          {platform === "ios-safari"  && <IosSafariInstructions />}
-          {platform === "ios-other"   && <IosOtherInstructions />}
-          {platform === "android"     && <AndroidInstructions installed={isInstalled} />}
-          {platform === "desktop"     && <DesktopInstructions />}
-          {platform === "unknown"     && <DesktopInstructions />}
+          {platform === "ios-safari"     && <IosSafariInstructions />}
+          {platform === "ios-other"      && <IosOtherInstructions />}
+          {platform === "android"        && <AndroidInstructions installed={isInstalled} />}
+          {platform === "desktop-chrome" && <DesktopChromeInstructions installed={isInstalled} />}
+          {platform === "desktop-safari" && <DesktopSafariInstructions />}
+          {platform === "desktop-other"  && <DesktopOtherInstructions />}
+          {platform === "unknown"        && <DesktopOtherInstructions />}
         </div>
 
         <p className="text-center text-xs text-muted-foreground">
