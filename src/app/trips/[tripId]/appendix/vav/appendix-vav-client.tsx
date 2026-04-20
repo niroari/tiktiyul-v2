@@ -455,8 +455,8 @@ export function AppendixVavClient() {
       <td style="padding:3px 8px;border:1px solid #ccc;font-size:9px;text-align:center;width:50px">${val}</td>
     </tr>`).join("");
 
-    const daysHTML = data.days.map((day) => `
-      <div style="margin-bottom:20px;break-inside:avoid">
+    const daysHTML = data.days.map((day, di) => `
+      <div style="margin-bottom:20px;${di > 0 ? "page-break-before:always;break-before:page;" : ""}">
         <div style="font-size:11px;font-weight:bold;padding:5px 8px;background:#1b4332;color:white;border-radius:4px 4px 0 0;margin-bottom:6px">
           ${esc(day.label)} — ${day.buses.length} אוטובוסים
         </div>
