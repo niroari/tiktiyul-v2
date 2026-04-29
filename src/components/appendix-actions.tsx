@@ -42,7 +42,8 @@ function buildDoc(innerHTML: string, title: string) {
     .header .ministry { font-size: 8px; color: #555; }
     .header .title { font-size: 15px; font-weight: bold; margin-top: 4px; }
     .footer { font-size: 8px; color: #888; margin-top: 8px; border-top: 1px solid #ccc; padding-top: 6px; }
-    .meta { display: flex; gap: 24px; font-size: 9.5px; margin-bottom: 8px; }
+    .meta { display: flex; gap: 16px; font-size: 9.5px; margin-bottom: 8px; flex-wrap: nowrap; }
+    .meta span { white-space: nowrap; }
     .section-title { font-weight: bold; font-size: 12px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
     .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 16px 20px; line-height: 2.2; font-size: 12px; margin: 10px 0; }
     @media print { body { padding: 10px; } @page { margin: 10mm; } }

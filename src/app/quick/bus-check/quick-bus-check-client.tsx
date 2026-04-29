@@ -138,20 +138,25 @@ function buildBusHTML(bus: BusEntry): string {
 
     <table style="width:100%;border:none;border-collapse:collapse;margin-top:20px">
       <tr>
-        <td style="border:none;width:25%;text-align:center;padding-top:8px;font-size:9px">
-          <div style="border-top:1px solid #555;padding-top:4px">${esc(bus.inspectorName)}<br>שם הבודק</div>
+        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+          <div style="padding-bottom:4px;min-height:20px">${esc(bus.inspectorName)}</div>
+          <div style="border-top:1px solid #555;padding-top:3px">שם הבודק</div>
         </td>
-        <td style="border:none;width:25%;text-align:center;padding-top:8px;font-size:9px">
-          <div style="border-top:1px solid #555;padding-top:4px">${esc(bus.inspectorRole)}<br>תפקיד</div>
+        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+          <div style="padding-bottom:4px;min-height:20px">${esc(bus.inspectorRole)}</div>
+          <div style="border-top:1px solid #555;padding-top:3px">תפקיד</div>
         </td>
-        <td style="border:none;width:25%;text-align:center;padding-top:8px;font-size:9px">
-          <div style="border-top:1px solid #555;padding-top:4px">${esc(bus.inspectorPhone)}<br>מספר טלפון</div>
+        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+          <div style="padding-bottom:4px;min-height:20px;direction:ltr">${esc(bus.inspectorPhone)}</div>
+          <div style="border-top:1px solid #555;padding-top:3px">מספר טלפון</div>
         </td>
-        <td style="border:none;width:25%;text-align:center;padding-top:8px;font-size:9px">
-          ${safeSigUrl(bus.signature)
-            ? `<img src="${safeSigUrl(bus.signature)}" style="max-height:50px;max-width:120px;object-fit:contain;display:block;margin:0 auto 4px">`
-            : `<div style="border-top:1px solid #555;height:50px"></div>`}
-          <span>חתימה</span>
+        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+          <div style="min-height:50px;padding-bottom:4px;display:flex;align-items:flex-end;justify-content:center">
+            ${safeSigUrl(bus.signature)
+              ? `<img src="${safeSigUrl(bus.signature)}" style="max-height:50px;max-width:120px;object-fit:contain;display:block">`
+              : ``}
+          </div>
+          <div style="border-top:1px solid #555;padding-top:3px">חתימה</div>
         </td>
       </tr>
     </table>`;
