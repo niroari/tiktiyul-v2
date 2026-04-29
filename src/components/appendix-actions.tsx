@@ -68,43 +68,29 @@ export function printHTML(innerHTML: string, title: string) {
   });
 }
 
-const PDF_STYLE = `
-  #_pdf_root * { box-sizing: border-box; margin: 0; padding: 0; }
-  #_pdf_root { font-family: 'Arial Hebrew', 'Arial', sans-serif; direction: rtl; text-align: right;
-               padding: 20px; font-size: 11px; color: #111; background: #fff; width: 794px; }
-  #_pdf_root table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-  #_pdf_root th, #_pdf_root td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 10px; }
-  #_pdf_root th { background: #1b4332; color: white; font-weight: 600; }
-  #_pdf_root .cat-row td { background: #d4edda; font-weight: bold; font-size: 10.5px; }
-  #_pdf_root .header { text-align: center; border-bottom: 2px solid #1b4332; padding-bottom: 8px; margin-bottom: 12px; }
-  #_pdf_root .header .ministry { font-size: 8px; color: #555; }
-  #_pdf_root .header .title { font-size: 15px; font-weight: bold; margin-top: 4px; }
-  #_pdf_root .footer { font-size: 8px; color: #888; margin-top: 8px; border-top: 1px solid #ccc; padding-top: 6px; }
-  #_pdf_root .meta { display: flex; gap: 24px; font-size: 9.5px; margin-bottom: 8px; }
-  #_pdf_root .section-title { font-weight: bold; font-size: 12px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
-  #_pdf_root .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 16px 20px; line-height: 2.2; font-size: 12px; margin: 10px 0; }
-`;
-
 // Renders the print HTML to a PDF and shares it via Web Share API (mobile) or downloads it (desktop).
-// Renders in the main document (not an iframe) with foreignObjectRendering so the browser's native
-// layout engine handles RTL Hebrew text — html2canvas's own text renderer drops spaces in Hebrew.
+// Uses a hidden same-origin iframe so the body element sits at (0,0) in its own document coordinate
+// space. foreignObjectRendering routes text through the browser's native SVG layout engine, which
+// correctly preserves spaces in Hebrew RTL text — html2canvas's own text renderer drops them.
 export async function sharePDF(innerHTML: string, title: string): Promise<void> {
-  const styleEl = document.createElement("style");
-  styleEl.textContent = PDF_STYLE;
-  const container = document.createElement("div");
-  container.id = "_pdf_root";
-  container.style.cssText = "position:fixed;top:0;left:-9999px;pointer-events:none;z-index:99999;";
-  container.innerHTML = innerHTML;
-
-  document.head.appendChild(styleEl);
-  document.body.appendChild(container);
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;top:0;left:0;width:794px;height:1px;border:none;visibility:hidden;";
+  document.body.appendChild(iframe);
 
   try {
-    await document.fonts.ready;
-    await new Promise<void>((r) => setTimeout(r, 200));
+    const iDoc = iframe.contentDocument!;
+    iDoc.open();
+    iDoc.write(buildDoc(innerHTML, title));
+    iDoc.close();
+
+    await iDoc.fonts.ready;
+    await new Promise<void>((r) => setTimeout(r, 400));
+
+    // Expand to full content height before capture
+    iframe.style.height = iDoc.body.scrollHeight + "px";
 
     const h2c = (await import("html2canvas-pro")).default;
-    const canvas = await h2c(container, {
+    const canvas = await h2c(iDoc.body, {
       scale: 2,
       useCORS: true,
       backgroundColor: "#fff",
@@ -151,8 +137,7 @@ export async function sharePDF(innerHTML: string, title: string): Promise<void> 
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
   } finally {
-    document.head.removeChild(styleEl);
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 
