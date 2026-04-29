@@ -247,7 +247,7 @@ function EmptyState({ onNew }: { onNew: () => void }) {
 function QuickFormsSection() {
   return (
     <div className="mt-10 pt-8 border-t border-border">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <a href="/quick/bus-check"
           className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
           <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
@@ -269,6 +269,19 @@ function QuickFormsSection() {
             </svg>
           </div>
           <p className="flex-1 text-sm font-medium text-foreground group-hover:text-primary transition-colors">כתב מינוי לאחראי טיול</p>
+          <svg className="w-4 h-4 text-muted-foreground flex-shrink-0 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </a>
+
+        <a href="/quick"
+          className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
+          <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4.5 h-4.5 text-[#1b4332]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
+          </div>
+          <p className="flex-1 text-sm font-medium text-foreground group-hover:text-primary transition-colors">טפסים שמורים</p>
           <svg className="w-4 h-4 text-muted-foreground flex-shrink-0 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>

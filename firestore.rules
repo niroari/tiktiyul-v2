@@ -53,6 +53,12 @@ service cloud.firestore {
       allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
     }
 
+    // ── Named saved forms ─────────────────────────────────────────────────────
+    match /quick-saved/{formId} {
+      allow read, delete: if request.auth != null && resource.data.uid == request.auth.uid;
+      allow create, update: if request.auth != null && request.resource.data.uid == request.auth.uid;
+    }
+
     // ── Trips ─────────────────────────────────────────────────────────────────
 
     // For reads: check ownership directly on the document being read (no get() needed)

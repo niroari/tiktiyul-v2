@@ -2,8 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { saveQuickForm, subscribeToQuickForm } from "@/lib/firestore/quick-forms";
+import {
+  saveQuickForm,
+  subscribeToQuickForm,
+  saveNamedForm,
+  updateNamedForm,
+  subscribeToNamedForm,
+} from "@/lib/firestore/quick-forms";
 import { sigDocId, subscribeToSignature } from "@/lib/firestore/signatures";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,16 +38,27 @@ function formatDateHe(iso: string) {
   return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
 }
 
-export function QuickGimelClient() {
+function todayLabel() {
+  return new Date().toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
+}
+
+export function QuickGimelClient({ savedId }: { savedId?: string }) {
+  const router = useRouter();
   const { user } = useAuth();
   const uid = user?.uid ?? "";
-  // Synthetic ID used for the signature doc (no real trip)
+  const isDraft = !savedId;
   const syntheticTripId = uid ? `q_${uid}` : "";
 
   const [form, setForm] = useState<FormData>(INITIAL);
+  const [formName, setFormName] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const [principalSig, setPrincipalSig] = useState<string | null>(null);
+
+  // Save-as dialog state
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState("");
+  const [saveAsPending, setSaveAsPending] = useState(false);
 
   useEffect(() => {
     if (!syntheticTripId) return;
@@ -51,20 +69,26 @@ export function QuickGimelClient() {
 
   useEffect(() => {
     if (!uid) return;
-    const unsub = subscribeToQuickForm(uid, "gimel", (raw) => {
-      if (raw) setForm({
-        date:          String(raw.date ?? ""),
-        leaderName:    String(raw.leaderName ?? ""),
-        principalName: String(raw.principalName ?? ""),
-        area:          String(raw.area ?? ""),
-        schoolName:    String(raw.schoolName ?? ""),
-        classes:       String(raw.classes ?? ""),
-        tripDateFrom:  String(raw.tripDateFrom ?? ""),
-        tripDateTo:    String(raw.tripDateTo ?? ""),
-      });
-    });
+    const handler = (raw: Record<string, unknown> | null) => {
+      if (raw) {
+        setForm({
+          date:          String(raw.date ?? ""),
+          leaderName:    String(raw.leaderName ?? ""),
+          principalName: String(raw.principalName ?? ""),
+          area:          String(raw.area ?? ""),
+          schoolName:    String(raw.schoolName ?? ""),
+          classes:       String(raw.classes ?? ""),
+          tripDateFrom:  String(raw.tripDateFrom ?? ""),
+          tripDateTo:    String(raw.tripDateTo ?? ""),
+        });
+        if (raw.name) setFormName(String(raw.name));
+      }
+    };
+    const unsub = isDraft
+      ? subscribeToQuickForm(uid, "gimel", handler)
+      : subscribeToNamedForm(savedId!, handler);
     return () => unsub();
-  }, [uid]);
+  }, [uid, isDraft, savedId]);
 
   function setField(key: keyof FormData, value: string) {
     const updated = { ...form, [key]: value };
@@ -72,7 +96,11 @@ export function QuickGimelClient() {
     setStatus("saving");
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await saveQuickForm(uid, "gimel", updated as unknown as Record<string, unknown>);
+      if (isDraft) {
+        await saveQuickForm(uid, "gimel", updated as unknown as Record<string, unknown>);
+      } else {
+        await updateNamedForm(savedId!, { ...(updated as unknown as Record<string, unknown>), uid, type: "gimel" });
+      }
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);
     }, 1200);
@@ -107,31 +135,77 @@ export function QuickGimelClient() {
     `;
   }
 
+  function openSaveAs() {
+    setSaveAsName(`כתב מינוי — ${todayLabel()}`);
+    setSaveAsOpen(true);
+  }
+
+  async function confirmSaveAs() {
+    if (!saveAsName.trim()) return;
+    setSaveAsPending(true);
+    try {
+      await saveNamedForm(uid, "gimel", saveAsName.trim(), form as unknown as Record<string, unknown>);
+      router.push("/quick");
+    } finally {
+      setSaveAsPending(false);
+    }
+  }
+
   const dateRange = form.tripDateFrom && form.tripDateTo
     ? `${formatDateHe(form.tripDateFrom)} עד ${formatDateHe(form.tripDateTo)}`
     : form.tripDateFrom ? formatDateHe(form.tripDateFrom) : "—";
 
   return (
     <div className="min-h-screen bg-muted">
-      <header className="sticky top-0 z-10 bg-white border-b border-border h-14 flex items-center justify-between px-6 shadow-[var(--shadow-card)]">
-        <Link href="/trips" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          הטיולים שלי
-        </Link>
-        <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
-          {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
-        </span>
+      <header className="sticky top-0 z-10 bg-white border-b border-border shadow-[var(--shadow-card)]">
+        <div className="h-14 flex items-center justify-between px-6 gap-4">
+          <Link href={isDraft ? "/trips" : "/quick"} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+            <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {isDraft ? "הטיולים שלי" : "טפסים שמורים"}
+          </Link>
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className={`text-xs ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
+              {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
+            </span>
+            {isDraft && (
+              <button onClick={openSaveAs}
+                className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors">
+                שמור
+              </button>
+            )}
+          </div>
+        </div>
+
+        {saveAsOpen && (
+          <div className="border-t border-border px-6 py-3 flex items-center gap-3 bg-muted/30">
+            <span className="text-xs text-muted-foreground flex-shrink-0">שם:</span>
+            <input
+              autoFocus
+              className="flex-1 text-sm border border-border rounded-[var(--radius-sm)] px-3 py-1.5 focus:outline-none focus:border-primary bg-white"
+              value={saveAsName}
+              onChange={(e) => setSaveAsName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") confirmSaveAs(); if (e.key === "Escape") setSaveAsOpen(false); }}
+            />
+            <button onClick={confirmSaveAs} disabled={saveAsPending || !saveAsName.trim()}
+              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors disabled:opacity-50 flex-shrink-0">
+              {saveAsPending ? "שומר..." : "אשר"}
+            </button>
+            <button onClick={() => setSaveAsOpen(false)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">✕</button>
+          </div>
+        )}
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ג׳ — כתב מינוי לאחראי/ת טיול</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">מילוי מהיר ללא טיול</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {isDraft ? "מילוי מהיר ללא טיול" : (formName || "...")}
+          </p>
         </div>
 
-        {/* Fields */}
         <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
@@ -169,7 +243,6 @@ export function QuickGimelClient() {
           </div>
         </div>
 
-        {/* Letter preview */}
         <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
           <h2 className="text-sm font-semibold text-foreground mb-4">נוסח כתב המינוי</h2>
           <div className="bg-muted/30 border border-border rounded-[var(--radius-sm)] p-6 text-sm leading-loose space-y-4">
@@ -199,7 +272,6 @@ export function QuickGimelClient() {
 
         <AppendixActions title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" filename="נספח-ג" getHTML={getHTML} />
 
-        {/* Signature */}
         <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
           <h2 className="text-sm font-semibold text-foreground mb-4">חתימת מנהל/ת ביה"ס</h2>
           {syntheticTripId && (

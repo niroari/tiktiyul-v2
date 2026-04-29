@@ -2,8 +2,15 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth-provider";
-import { saveQuickForm, subscribeToQuickForm } from "@/lib/firestore/quick-forms";
+import {
+  saveQuickForm,
+  subscribeToQuickForm,
+  saveNamedForm,
+  updateNamedForm,
+  subscribeToNamedForm,
+} from "@/lib/firestore/quick-forms";
 import { SignatureCanvas, SignatureCanvasHandle } from "@/components/signature-canvas";
 import { printHTML, esc, safeSigUrl } from "@/components/appendix-actions";
 
@@ -54,6 +61,10 @@ function emptyBus(num: string): BusEntry {
     inspectorName: "", inspectorRole: "", inspectorPhone: "",
     signature: "",
   };
+}
+
+function todayLabel() {
+  return new Date().toLocaleDateString("he-IL", { day: "numeric", month: "numeric", year: "numeric" });
 }
 
 // ─── Sub-components (module scope) ────────────────────────────────────────────
@@ -148,35 +159,51 @@ function buildBusHTML(bus: BusEntry): string {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function QuickBusCheckClient() {
+export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
+  const router = useRouter();
   const { user } = useAuth();
   const uid = user?.uid ?? "";
+  const isDraft = !savedId;
 
   const [buses, setBuses] = useState<BusEntry[]>([]);
+  const [formName, setFormName] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
   const sigRefs = useRef<Record<string, SignatureCanvasHandle | null>>({});
 
+  // Save-as dialog state
+  const [saveAsOpen, setSaveAsOpen] = useState(false);
+  const [saveAsName, setSaveAsName] = useState("");
+  const [saveAsPending, setSaveAsPending] = useState(false);
+
   // ── Load ───────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!uid) return;
-    const unsub = subscribeToQuickForm(uid, "bus-check", (raw) => {
+    const handler = (raw: Record<string, unknown> | null) => {
       if (isPending.current) return;
       if (raw?.buses) setBuses(raw.buses as BusEntry[]);
-    });
+      if (raw?.name) setFormName(String(raw.name));
+    };
+    const unsub = isDraft
+      ? subscribeToQuickForm(uid, "bus-check", handler)
+      : subscribeToNamedForm(savedId!, handler);
     return () => unsub();
-  }, [uid]);
+  }, [uid, isDraft, savedId]);
 
-  // ── Save ───────────────────────────────────────────────────────────────────
+  // ── Persist ────────────────────────────────────────────────────────────────
 
   function scheduleSave(updated: BusEntry[]) {
     isPending.current = true;
     setStatus("saving");
     clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      await saveQuickForm(uid, "bus-check", { buses: updated });
+      if (isDraft) {
+        await saveQuickForm(uid, "bus-check", { buses: updated });
+      } else {
+        await updateNamedForm(savedId!, { buses: updated, uid, type: "bus-check" });
+      }
       isPending.current = false;
       setStatus("saved");
       setTimeout(() => setStatus("idle"), 2000);
@@ -212,6 +239,24 @@ export function QuickBusCheckClient() {
     scheduleSave(updated);
   }
 
+  // ── Save as named ──────────────────────────────────────────────────────────
+
+  function openSaveAs() {
+    setSaveAsName(`בדיקת אוטובוס — ${todayLabel()}`);
+    setSaveAsOpen(true);
+  }
+
+  async function confirmSaveAs() {
+    if (!saveAsName.trim()) return;
+    setSaveAsPending(true);
+    try {
+      await saveNamedForm(uid, "bus-check", saveAsName.trim(), { buses });
+      router.push("/quick");
+    } finally {
+      setSaveAsPending(false);
+    }
+  }
+
   // ── Print ──────────────────────────────────────────────────────────────────
 
   function printAll() {
@@ -234,36 +279,66 @@ export function QuickBusCheckClient() {
 
   return (
     <div className="min-h-screen bg-muted">
-      <header className="sticky top-0 z-10 bg-white border-b border-border h-14 flex items-center justify-between px-6 shadow-[var(--shadow-card)]">
-        <Link href="/trips" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          הטיולים שלי
-        </Link>
-        <div className="flex items-center gap-3">
-          <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
-            {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
-          </span>
-          {buses.length > 1 && (
-            <button onClick={printAll}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-              </svg>
-              הדפס הכל
-            </button>
-          )}
+      <header className="sticky top-0 z-10 bg-white border-b border-border shadow-[var(--shadow-card)]">
+        <div className="h-14 flex items-center justify-between px-6 gap-4">
+          <Link href={isDraft ? "/trips" : "/quick"} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+            <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            {isDraft ? "הטיולים שלי" : "טפסים שמורים"}
+          </Link>
+
+          <div className="flex items-center gap-3 flex-shrink-0">
+            <span className={`text-xs ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
+              {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
+            </span>
+            {buses.length > 1 && (
+              <button onClick={printAll}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                הדפס הכל
+              </button>
+            )}
+            {isDraft && (
+              <button onClick={openSaveAs}
+                className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors">
+                שמור
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Save-as inline panel */}
+        {saveAsOpen && (
+          <div className="border-t border-border px-6 py-3 flex items-center gap-3 bg-muted/30">
+            <span className="text-xs text-muted-foreground flex-shrink-0">שם:</span>
+            <input
+              autoFocus
+              className="flex-1 text-sm border border-border rounded-[var(--radius-sm)] px-3 py-1.5 focus:outline-none focus:border-primary bg-white"
+              value={saveAsName}
+              onChange={(e) => setSaveAsName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") confirmSaveAs(); if (e.key === "Escape") setSaveAsOpen(false); }}
+            />
+            <button onClick={confirmSaveAs} disabled={saveAsPending || !saveAsName.trim()}
+              className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors disabled:opacity-50 flex-shrink-0">
+              {saveAsPending ? "שומר..." : "אשר"}
+            </button>
+            <button onClick={() => setSaveAsOpen(false)}
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">✕</button>
+          </div>
+        )}
       </header>
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ט"ו — בדיקת אוטובוס לפני היציאה לטיול</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">מילוי מהיר ללא טיול</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            {isDraft ? "מילוי מהיר ללא טיול" : (formName || "...")}
+          </p>
         </div>
 
-        {/* Empty state */}
         {buses.length === 0 && (
           <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-10 text-center space-y-4">
             <p className="text-sm text-muted-foreground">טרם הוגדרו אוטובוסים</p>
@@ -274,7 +349,6 @@ export function QuickBusCheckClient() {
           </div>
         )}
 
-        {/* Bus forms */}
         {buses.map((bus, idx) => (
           <div key={bus.id} className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 bg-[#1b4332] text-white">
