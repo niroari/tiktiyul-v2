@@ -66,9 +66,6 @@ export function TripMetadataForm() {
     setField("classes", updated);
   }
 
-  function addClass() {
-    setField("classes", [...form.classes, { name: "", studentCount: 0 }]);
-  }
 
   function removeClass(index: number) {
     setField("classes", form.classes.filter((_, i) => i !== index));

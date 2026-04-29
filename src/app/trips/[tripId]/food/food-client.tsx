@@ -114,7 +114,7 @@ export function FoodClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">העדפות מזון — תלמידים עם הגבלות תזונתיות</div>
         ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
       </div>
@@ -273,7 +273,7 @@ export function FoodClient() {
         </div>
       )}
 
-      <AppendixActions title="העדפות מזון" filename="העדפות-מזון" getHTML={getHTML} />
+      <AppendixActions title="העדפות מזון" getHTML={getHTML} />
     </div>
   );
 }

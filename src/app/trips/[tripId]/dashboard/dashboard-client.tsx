@@ -37,7 +37,7 @@ const APPENDICES = [
   { letter: "ח", label: "אישור הורים",       slug: "chet" },
   { letter: "ט", label: "ציוד חובה",         slug: "tet" },
   { letter: "י", label: "מגבלות רפואיות",    slug: "yod" },
-  { letter: 'ט"ו', label: "בדיקת אוטובוס",   slug: "bus-check" },
+  { letter: 'ט&quot;ו', label: "בדיקת אוטובוס",   slug: "bus-check" },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────

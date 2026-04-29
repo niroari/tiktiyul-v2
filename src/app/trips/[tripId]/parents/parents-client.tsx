@@ -126,7 +126,7 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: stri
         <th style="border: 1px solid #000; padding: 6px; text-align: right;">תאריך</th>
         <th style="border: 1px solid #000; padding: 6px; text-align: right;">שם נותן ההפניה</th>
         <th style="border: 1px solid #000; padding: 6px; text-align: right;">תפקידו</th>
-        <th style="border: 1px solid #000; padding: 6px; text-align: right;">חותמת ביה"ס וחתימה</th>
+        <th style="border: 1px solid #000; padding: 6px; text-align: right;">חותמת ביה&quot;ס וחתימה</th>
       </tr>
     </thead>
     <tbody>
@@ -171,7 +171,7 @@ function getVolunteerFormHTML(parent: Parent, trip: Trip | null, idNumber?: stri
     </table>
   </div>
 
-  <p style="font-size: 12px; color: #444;">העתק : תיק טיולים של ביה"ס.</p>
+  <p style="font-size: 12px; color: #444;">העתק : תיק טיולים של ביה&quot;ס.</p>
 </div>`;
 }
 

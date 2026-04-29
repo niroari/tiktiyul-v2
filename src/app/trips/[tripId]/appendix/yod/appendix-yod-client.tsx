@@ -150,7 +150,7 @@ export function AppendixYodClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">נספח י׳ — תלמידים בעלי מגבלות רפואיות</div>
         ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
       </div>
@@ -335,7 +335,7 @@ export function AppendixYodClient() {
         מסמך זה הינו סודי — לעיון אחראי הטיול והצוות הרפואי בלבד
       </div>
 
-      <AppendixActions title="נספח י׳ — מגבלות רפואיות" filename="נספח-י" getHTML={getHTML} />
+      <AppendixActions title="נספח י׳ — מגבלות רפואיות" getHTML={getHTML} />
     </div>
   );
 }

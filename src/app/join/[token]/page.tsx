@@ -19,13 +19,17 @@ export default function JoinPage() {
       router.replace("/login");
       return;
     }
-    setState("joining");
-    joinTripByToken(token, user.uid)
-      .then((tripId) => {
+    async function doJoin() {
+      setState("joining");
+      try {
+        const tripId = await joinTripByToken(token, user!.uid);
         if (!tripId) { setState("not_found"); return; }
         router.replace(`/trips/${tripId}`);
-      })
-      .catch(() => setState("error"));
+      } catch {
+        setState("error");
+      }
+    }
+    doJoin();
   }, [loading, user, token, router]);
 
   // After login, check if there's a pending join token

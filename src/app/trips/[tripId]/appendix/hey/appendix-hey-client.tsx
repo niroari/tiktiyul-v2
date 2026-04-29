@@ -191,7 +191,7 @@ export function AppendixHeyClient() {
         </Button>
       </div>
 
-      <AppendixActions title="נספח ה׳ — טלפונים חיוניים בטיול" filename="נספח-ה" getHTML={getHTML} />
+      <AppendixActions title="נספח ה׳ — טלפונים חיוניים בטיול" getHTML={getHTML} />
     </div>
   );
 }

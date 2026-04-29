@@ -99,12 +99,12 @@ export function AppendixZayinClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">נספח ז׳ — רשימת תלמידים${goingOnly ? " (יוצאים)" : ""}</div>
         <div class="ministry">${esc(trip?.name)} | ${esc(trip?.schoolName)}</div>
       </div>
       <div class="meta">
-        <span>סה"כ יוצאים: <strong>${going}</strong></span>
+        <span>סה&quot;כ יוצאים: <strong>${going}</strong></span>
         <span>בנים: <strong>${boys}</strong></span>
         <span>בנות: <strong>${girls}</strong></span>
       </div>
@@ -120,7 +120,7 @@ export function AppendixZayinClient() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="footer">רשימה זו מהווה 3 עותקים: אחראי הטיול / אחראי אוטובוס וכיתה / מזכירות ביה"ס</div>
+      <div class="footer">רשימה זו מהווה 3 עותקים: אחראי הטיול / אחראי אוטובוס וכיתה / מזכירות ביה&quot;ס</div>
     `;
   }
 

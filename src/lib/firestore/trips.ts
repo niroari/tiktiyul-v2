@@ -11,7 +11,6 @@ import {
   query,
   orderBy,
   where,
-  limit,
   arrayUnion,
   type Unsubscribe,
 } from "firebase/firestore";

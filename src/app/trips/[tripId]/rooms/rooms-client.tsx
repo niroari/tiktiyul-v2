@@ -722,7 +722,7 @@ export function RoomsClient() {
       );
       setRoomTokens((prev) => {
         const filtered = prev.filter((t) => t.class !== className);
-        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", rooms: classRooms, createdAt: null as any, expiresAt: null as any }];
+        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", rooms: classRooms, createdAt: null as unknown as import("firebase/firestore").Timestamp, expiresAt: null as unknown as import("firebase/firestore").Timestamp }];
       });
     } catch (e) {
       console.error("generateRoomToken error:", e);
@@ -891,7 +891,7 @@ export function RoomsClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">חלוקת חדרים</div>
         ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
       </div>
@@ -1224,7 +1224,7 @@ export function RoomsClient() {
         </>
       )}
 
-      <AppendixActions title="חלוקת חדרים" filename="חלוקת-חדרים" getHTML={getHTML} />
+      <AppendixActions title="חלוקת חדרים" getHTML={getHTML} />
 
       <HostelDialog
         open={hostelOpen}

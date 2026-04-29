@@ -165,7 +165,7 @@ export function AppendixChetClient() {
           <textarea
             value={data.text}
             onChange={(e) => update({ text: e.target.value })}
-            placeholder={`הורים יקרים,\n\nביה"ס מתכנן טיול לתלמידי...\n\nאנו מבקשים את אישורכם להשתתפות בנכם / בתכם בטיול.\n\nהצהרת בריאות: בנ/י בריא/ה ומסוגל/ת להשתתף בפעילות גופנית.\n\nחתימה: ___________________`}
+            placeholder={`הורים יקרים,\n\nביה&quot;ס מתכנן טיול לתלמידי...\n\nאנו מבקשים את אישורכם להשתתפות בנכם / בתכם בטיול.\n\nהצהרת בריאות: בנ/י בריא/ה ומסוגל/ת להשתתף בפעילות גופנית.\n\nחתימה: ___________________`}
             rows={14}
             className="w-full text-sm border border-border rounded-[var(--radius-sm)] px-3 py-2.5 resize-y focus:outline-none focus:border-primary leading-loose"
             dir="rtl"

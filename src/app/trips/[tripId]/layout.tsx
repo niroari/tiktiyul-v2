@@ -13,7 +13,6 @@ export default function TripLayout({ children }: { children: React.ReactNode }) 
       tripId={tripId}
       tripName={trip?.name ?? ""}
       schoolName={trip?.schoolName ?? ""}
-      inviteToken={trip?.inviteToken}
     >
       {children}
     </TripShell>

@@ -69,7 +69,7 @@ function buildBusHTML(bus: BusEntry): string {
 
   return `
     <div class="header">
-      <div class="title">נספח ט"ו — בדיקת אוטובוס לפני היציאה לטיול</div>
+      <div class="title">נספח ט&quot;ו — בדיקת אוטובוס לפני היציאה לטיול</div>
     </div>
     <div class="meta" style="margin-bottom:16px">
       <span>אזור הטיול: <strong>${esc(bus.area)}</strong></span>
@@ -211,11 +211,11 @@ export function AppendixBusCheckClient() {
     const body = buses.map((b) =>
       `<div style="page-break-after:always">${buildBusHTML(b)}</div>`
     ).join("");
-    printHTML(body, 'נספח ט"ו — בדיקת אוטובוס לפני היציאה לטיול');
+    printHTML(body, 'נספח ט&quot;ו — בדיקת אוטובוס לפני היציאה לטיול');
   }
 
   function printOne(bus: BusEntry) {
-    printHTML(buildBusHTML(bus), `נספח ט"ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
+    printHTML(buildBusHTML(bus), `נספח ט&quot;ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
   }
 
   // ── Field helpers ──────────────────────────────────────────────────────────
@@ -249,7 +249,7 @@ export function AppendixBusCheckClient() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">נספח ט"ו — בדיקת אוטובוס לפני היציאה לטיול</h1>
+          <h1 className="text-xl font-semibold text-foreground">נספח ט&quot;ו — בדיקת אוטובוס לפני היציאה לטיול</h1>
           <p className="text-sm text-muted-foreground mt-0.5">{trip?.name ?? ""}</p>
         </div>
         <div className="flex items-center gap-3">

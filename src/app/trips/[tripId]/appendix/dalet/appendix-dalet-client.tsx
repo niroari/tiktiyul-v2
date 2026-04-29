@@ -174,7 +174,7 @@ export function AppendixDaletClient() {
           הוסף שורה
         </Button>
       </div>
-      <AppendixActions title="נספח ד׳ — תוכנית הטיול — לוח זמנים" filename="נספח-ד" getHTML={getHTML} />
+      <AppendixActions title="נספח ד׳ — תוכנית הטיול — לוח זמנים" getHTML={getHTML} />
     </div>
   );
 }

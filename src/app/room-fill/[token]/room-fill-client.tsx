@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { getRoomFillToken } from "@/lib/firestore/room-fill-tokens";
 import { getStudents } from "@/lib/firestore/students";
 import { submitPendingUpdate } from "@/lib/firestore/pending-updates";
-import type { RoomFillToken, RoomForToken } from "@/lib/firestore/room-fill-tokens";
+import type { RoomFillToken } from "@/lib/firestore/room-fill-tokens";
 import type { Student } from "@/lib/types";
 
 // ─── Shell ────────────────────────────────────────────────────────────────────

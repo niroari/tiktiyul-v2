@@ -8,7 +8,7 @@ A full rebuild of the Tik Tiyul school trip folder management app, using a moder
 - **Original app (v1):** https://tiktiyul.vercel.app
 
 ## Stack
-- **Framework:** Next.js 15 (App Router), TypeScript
+- **Framework:** Next.js 16.2.2 (App Router), React 19.2.4, TypeScript
 - **Styling:** Tailwind CSS v4, shadcn/ui
 - **Backend:** Firebase Auth + Firestore + Storage (Blaze plan)
 - **Font:** Rubik (Hebrew subset)
@@ -30,13 +30,30 @@ trips/{tripId}
   ├── ownerUid, collaborators[], inviteToken
   ├── students/{studentId}
   │   └── firstName, lastName, class, gender, phone, isGoing, dietaryFlags, medicalNotes
+  │       notes, participationDays (undefined = all days, [1] = day 1 only, etc.)
   ├── staff/{staffId}
   │   └── name, role, phone
-  └── appendices/{appendixId}
-      └── items, savedAt
+  ├── appendices/{appendixId}
+  │   └── items, savedAt
+  └── pending-updates/{updateId}
+      └── tripId, token, type ("student" | "room-assignment")
+          studentId?, studentFirstName?, studentLastName?, studentClass
+          proposedIsGoing?, proposedDietaryFlags?, proposedMedicalNotes?, proposedNotes?
+          proposedRooms? [{ roomId, studentIds[] }]
+          submittedAt, status (pending|approved|rejected)
+
+class-tokens/{token}
+  └── tripId, class, schoolName, tripName, expiresAt
+
+roomFillTokens/{token}
+  └── tripId, class, schoolName, tripName, rooms[], createdAt, expiresAt
+
+inviteTokens/{token}
+  └── tripId (reverse-lookup for join flow)
 
 signatures/{tripId}_{role}
   └── tripId, role, roleName, tripName, schoolName, leaderName
+      previewHTML, requiresId, idNumber, address
       status (pending|signed), signature (base64 PNG), createdAt, expiresAt, signedAt
 ```
 
@@ -58,9 +75,13 @@ trips/{tripId}/
 ```
 src/
 ├── app/
+│   ├── manifest.ts                 # PWA manifest (icons, theme color, display mode)
 │   ├── login/                      # Google OAuth + email/password login
+│   ├── install/                    # PWA install instructions page (per-platform)
 │   ├── join/[token]/               # Invite link join flow
 │   ├── sign/[docId]/               # Public remote signing page (no auth)
+│   ├── class-edit/[token]/         # Public teacher form — update student details (no auth)
+│   ├── room-fill/[token]/          # Public teacher form — room assignments (no auth)
 │   ├── trips/
 │   │   ├── layout.tsx              # Auth guard — redirects to /login
 │   │   ├── page.tsx                # Trip list (filtered by owner/collaborator)
@@ -68,10 +89,11 @@ src/
 │   │       ├── layout.tsx          # Loads trip via useTrip hook (client)
 │   │       ├── dashboard/          # Stats, appendix grid, alerts
 │   │       ├── settings/           # Trip metadata form
-│   │       ├── students/           # Student list + Excel import
+│   │       ├── students/           # Student list + Excel import + participation days
 │   │       ├── staff/              # Staff roster
 │   │       ├── food/               # Dietary preferences
-│   │       ├── rooms/              # Room assignments
+│   │       ├── parents/            # הורים מלווים — parent chaperones + remote signatures
+│   │       ├── rooms/              # Room assignments + hostel capacity specs + drag-and-drop
 │   │       ├── masa/               # הודעת מסע (2-page official form)
 │   │       ├── signs/              # Bus signs print export
 │   │       ├── security/           # Security clearance PDF upload
@@ -81,18 +103,20 @@ src/
 │   │           ├── gimel/          # ג — Leader appointment letter + principal sig
 │   │           ├── dalet/          # ד — Itinerary timeline
 │   │           ├── hey/            # ה — Essential contacts
-│   │           ├── vav/            # ו — Bus control table
+│   │           ├── vav/            # ו — Bus control table (multi-day, collapsible)
 │   │           ├── zayin/          # ז — Student list
 │   │           ├── chet/           # ח — Parental permission upload
 │   │           ├── tet/            # ט — Equipment checklist
-│   │           └── yod/            # י — Medical restrictions + cert upload
+│   │           ├── yod/            # י — Medical restrictions + cert upload
+│   │           └── bus-check/      # ט"ו — Pre-departure bus inspection checklist
 ├── components/
 │   ├── auth-provider.tsx           # AuthContext + useAuth hook
 │   ├── trip-shell.tsx              # Layout shell (topbar + sidebar + share button)
 │   ├── signature-canvas.tsx        # Touch/mouse canvas for local signatures
-│   ├── remote-signature.tsx        # Send link + WhatsApp share + live status
+│   ├── remote-signature.tsx        # Send link + WhatsApp share + live status + print form
 │   ├── appendix-actions.tsx        # printHTML, esc(), safeSigUrl() shared helpers
 │   ├── excel-import.tsx            # SheetJS Excel importer
+│   ├── sw-register.tsx             # Service worker registration on mount
 │   └── ui/                         # shadcn components
 ├── hooks/
 │   ├── use-auth.ts                 # Auth state hook
@@ -106,10 +130,20 @@ src/
     ├── nav.ts                      # Sidebar nav config
     └── firestore/
         ├── trips.ts                # Trip CRUD + subscribeToUserTrips + invite token
-        ├── students.ts             # Student CRUD + subscriptions
+        ├── students.ts             # Student CRUD + subscriptions (uses deleteField for undefined)
         ├── staff.ts                # Staff CRUD + subscriptions
         ├── appendix.ts             # Generic appendix save/subscribe
-        └── signatures.ts           # Remote signature requests + submission
+        ├── signatures.ts           # Remote signature requests + submission
+        ├── class-tokens.ts         # Read class tokens for teacher edit flow
+        ├── room-fill-tokens.ts     # Read room-fill tokens for teacher room assignment flow
+        └── pending-updates.ts      # submitPendingUpdate() — teacher-proposed student/room changes
+
+public/
+├── sw.js                           # Service worker — precaches /, serves /offline.html fallback
+├── offline.html                    # Hebrew offline fallback page
+├── icon-180.png                    # apple-touch-icon (180×180, white background)
+├── icon-192.png                    # PWA icon 192×192
+└── icon-512.png                    # PWA icon 512×512 (maskable)
 ```
 
 ## Build Plan Progress
@@ -149,10 +183,18 @@ src/
 - Public signing page at `/sign/[docId]` (no auth required)
 - PDF/print export on all appendices via shared `printHTML` + `esc()` helper
 - הודעת מסע — 2-page official form with pixel-exact image overlay, html2canvas-pro
-- Room assignment — unassigned bar, auto-assign by gender+class, colored chips
-- Bus signs — adaptive font, A4 landscape print
+- Room assignment — hostel capacity specs, constrained add-room dropdown, drag-and-drop chips, capacity badges
+- Bus signs — adaptive font, A4 landscape print (mobile-safe hidden iframe print)
 - Food preferences — dietary flags, per-student notes
 - Security clearance — PDF upload + iframe preview
+- הורים מלווים — parent chaperone list with remote signature per parent, referrer config dialog, print form with ID boxes
+- Class-edit token flow — tokenized teacher form at `/class-edit/[token]` for student updates without an account; updates queue as pending-updates for admin approval
+- Room-fill token flow — tokenized teacher form at `/room-fill/[token]` for room assignments without an account; drag-and-drop chips, gender-aware allocation
+- Student participation days — per-student day selection; `undefined` = all days, `[1,2]` = specific days only
+- Student notes field — free-text notes per student stored alongside dietary/medical data
+- נספח ו׳ multi-day — bus control table supports multiple named days; collapsible day accordion; each day prints as a separate page
+- נספח ט"ו — pre-departure bus inspection checklist
+- PWA — installable as home screen app on iOS, Android, and desktop; manifest, service worker, offline fallback, per-platform `/install` instructions page
 
 ### Phase 6 — Auth & Production ✅
 - Firebase Auth: Google OAuth + email/password login page
@@ -224,6 +266,23 @@ A chat interface allowing users to ask questions answered strictly from the offi
 5. Add nav item to `src/lib/nav.ts`
 
 **Cost:** ~$0.01–0.03 per question (billed to your Anthropic account). All users share the same API key. Consider adding per-user rate limiting if opened to many users.
+
+## Known Pitfalls
+
+### React focus-loss anti-pattern
+Defining components inside another component's render function causes unmount/remount on every state change, breaking text inputs. **Always define components at module scope.** Files where this was fixed: `sign-client.tsx`, `class-edit-client.tsx`, `rooms-client.tsx`.
+
+### Print layout in window.open
+`window.open()` print exports are sensitive to RTL layout. Use nested `<table>` with `border-bottom` on content cells for "content above a line" layouts — flexbox is unreliable in print rendering. Digit strings (ID numbers) need `dir="ltr" display:inline-block` to render left-to-right within an RTL page.
+
+### window.open() blocked on mobile
+iOS and Android browsers block `window.open()` when called outside a direct user gesture (e.g., inside a `setTimeout` or async callback). Use a hidden `<iframe>` instead: inject it into `document.body`, write the HTML, call `iframe.contentWindow.print()`, then remove it after a short delay. This works in both mobile browsers and PWA standalone mode.
+
+### Hostel room spec pattern
+The rooms page uses a two-type system for hostel capacity:
+- **`DlgStaffGroup`** (specs: `{ count, size }[]`) — what the dialog edits
+- **`StaffGroup`** (rooms: `Room[]`) — what gets stored/displayed
+Convert between them via `staffGroupsToDlg()` and `saveHostelConfig()`.
 
 ## Common Commands
 ```bash

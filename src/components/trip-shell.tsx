@@ -15,11 +15,10 @@ type Props = {
   tripId: string;
   tripName: string;
   schoolName: string;
-  inviteToken?: string;
   children: React.ReactNode;
 };
 
-export function TripShell({ tripId, tripName, schoolName, inviteToken, children }: Props) {
+export function TripShell({ tripId, tripName, schoolName, children }: Props) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [generating, setGenerating] = useState(false);

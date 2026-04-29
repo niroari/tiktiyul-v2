@@ -144,12 +144,11 @@ export async function sharePDF(innerHTML: string, title: string): Promise<void> 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 type Props = {
-  filename: string;
   title: string;
   getHTML: () => string;
 };
 
-export function AppendixActions({ filename: _filename, title, getHTML }: Props) {
+export function AppendixActions({ title, getHTML }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false);
 
   async function handleSharePDF() {

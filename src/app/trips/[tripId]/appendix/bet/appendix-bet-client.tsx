@@ -191,7 +191,7 @@ export function AppendixBetClient() {
       <div class="section-title">חתימות</div>
       <table style="margin-top:8px">
         <tr>
-          <th>מורה אחראי/ת</th><th>רכז/ת טיולים</th><th>מנהל/ת ביה"ס</th>
+          <th>מורה אחראי/ת</th><th>רכז/ת טיולים</th><th>מנהל/ת ביה&quot;ס</th>
         </tr>
         <tr>
           <td style="height:70px;text-align:center;vertical-align:middle">
@@ -220,7 +220,7 @@ export function AppendixBetClient() {
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ב׳ — אישור תוכנית הטיול</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            ימולא ע"י האחראי/ת על הטיול ויועבר לאישור מנהל/ת ביה"ס ורכז/ת הטיולים
+            ימולא ע&quot;י האחראי/ת על הטיול ויועבר לאישור מנהל/ת ביה&quot;ס ורכז/ת הטיולים
           </p>
         </div>
         <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
@@ -380,7 +380,7 @@ export function AppendixBetClient() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label>הערות מנהל/ת ביה"ס</Label>
+          <Label>הערות מנהל/ת ביה&quot;ס</Label>
           <textarea
             value={form.principalNotes}
             onChange={(e) => setField("principalNotes", e.target.value)}
@@ -391,7 +391,7 @@ export function AppendixBetClient() {
         </div>
       </div>
 
-      <AppendixActions title="נספח ב׳ — אישור תוכנית הטיול" filename="נספח-ב" getHTML={getHTML} />
+      <AppendixActions title="נספח ב׳ — אישור תוכנית הטיול" getHTML={getHTML} />
 
       {/* Signatures */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5 space-y-5">
@@ -430,8 +430,8 @@ export function AppendixBetClient() {
           <RemoteSignature
             tripId={tripId}
             role="b_principal"
-            roleName='מנהל/ת ביה"ס'
-            label='מנהל/ת ביה"ס'
+            roleName='מנהל/ת ביה&quot;ס'
+            label='מנהל/ת ביה&quot;ס'
             tripName={trip?.name ?? ""}
             schoolName={trip?.schoolName ?? ""}
             leaderName={form.leaderName || trip?.name || ""}

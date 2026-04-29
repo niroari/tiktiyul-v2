@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -248,7 +249,7 @@ function QuickFormsSection() {
   return (
     <div className="mt-10 pt-8 border-t border-border">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <a href="/quick/bus-check"
+        <Link href="/quick/bus-check"
           className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
           <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
             <svg className="w-4.5 h-4.5 text-[#1b4332]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -259,9 +260,9 @@ function QuickFormsSection() {
           <svg className="w-4 h-4 text-muted-foreground flex-shrink-0 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-        </a>
+        </Link>
 
-        <a href="/quick/gimel"
+        <Link href="/quick/gimel"
           className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
           <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
             <svg className="w-4.5 h-4.5 text-[#1b4332]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,9 +273,9 @@ function QuickFormsSection() {
           <svg className="w-4 h-4 text-muted-foreground flex-shrink-0 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-        </a>
+        </Link>
 
-        <a href="/quick"
+        <Link href="/quick"
           className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
           <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
             <svg className="w-4.5 h-4.5 text-[#1b4332]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -285,7 +286,7 @@ function QuickFormsSection() {
           <svg className="w-4 h-4 text-muted-foreground flex-shrink-0 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-        </a>
+        </Link>
       </div>
     </div>
   );

@@ -83,7 +83,7 @@ export function StudentsClient() {
   function toggleMedical(id: string) {
     setExpandedMedical((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   }
@@ -209,7 +209,7 @@ export function StudentsClient() {
       const token = await createClassToken(tripId, className, trip?.name ?? "", trip?.schoolName ?? "");
       setTokens((prev) => {
         const filtered = prev.filter((t) => t.class !== className);
-        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", createdAt: null as any, expiresAt: null as any }];
+        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", createdAt: null as unknown as import("firebase/firestore").Timestamp, expiresAt: null as unknown as import("firebase/firestore").Timestamp }];
       });
     } finally {
       setGeneratingClass(null);
@@ -254,7 +254,7 @@ export function StudentsClient() {
               <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
-              קישור לפי כיתה למילוי ע"י מחנכים/ות
+              קישור לפי כיתה למילוי ע&quot;י מחנכים/ות
             </Button>
           )}
           {students.length > 0 && (

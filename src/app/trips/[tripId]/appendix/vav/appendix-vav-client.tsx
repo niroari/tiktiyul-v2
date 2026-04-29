@@ -164,7 +164,7 @@ export function AppendixVavClient() {
   function toggleCollapse(dayId: string) {
     setCollapsed((prev) => {
       const next = new Set(prev);
-      next.has(dayId) ? next.delete(dayId) : next.add(dayId);
+      if (next.has(dayId)) { next.delete(dayId); } else { next.add(dayId); }
       return next;
     });
   }
@@ -407,13 +407,13 @@ export function AppendixVavClient() {
               ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${calcEscorts(b) || ""}</td>`).join("")}
             </tr>
             <tr style="background:#d4edda;font-weight:bold">
-              <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px">סה"כ באוטובוס</td>
+              <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px">סה&quot;כ באוטובוס</td>
               ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;font-weight:bold">${(busStudentCount(b) + calcEscorts(b)) || ""}</td>`).join("")}
             </tr>
           </tbody>
         </table>
         <div style="font-size:9px;color:#555;margin-top:4px">
-          סה"כ ביום: <strong>${dt.students}</strong> תלמידים · <strong>${dt.escorts}</strong> מלווים · <strong>${dt.total}</strong> סה"כ
+          סה&quot;כ ביום: <strong>${dt.students}</strong> תלמידים · <strong>${dt.escorts}</strong> מלווים · <strong>${dt.total}</strong> סה&quot;כ
         </div>`;
     }
 
@@ -449,7 +449,7 @@ export function AppendixVavClient() {
     const summaryRows = [
       ["תלמידים", totalStudents || ""],
       ["מורים ומלווים", totalEscorts || ""],
-      ['סה"כ נוכחים', totalStudents + totalEscorts || ""],
+      ['סה&quot;כ נוכחים', totalStudents + totalEscorts || ""],
     ].map(([label, val], i) => `<tr style="${i === 2 ? "font-weight:bold;background:#d4edda" : ""}">
       <td style="padding:3px 8px;border:1px solid #ccc;font-size:9px">${label}</td>
       <td style="padding:3px 8px;border:1px solid #ccc;font-size:9px;text-align:center;width:50px">${val}</td>
@@ -465,7 +465,7 @@ export function AppendixVavClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">נספח ו׳ — טבלת שליטה בטיול</div>
         ${t ? `<div class="ministry">${t.name ?? ""} | ${t.schoolName ?? ""}</div>` : ""}
       </div>
@@ -842,7 +842,7 @@ export function AppendixVavClient() {
             </tbody>
             <tfoot>
               <tr className="bg-[var(--brand-light)] border-t-2 border-border">
-                <td className="px-4 py-2 font-semibold text-primary text-sm">סה"כ</td>
+                <td className="px-4 py-2 font-semibold text-primary text-sm">סה&quot;כ</td>
                 <td className="px-4 py-2 text-center font-bold text-primary">{goingStudents.length}</td>
                 <td className="px-4 py-2 text-center font-bold text-primary">
                   {Object.values(data.actual).reduce((s, v) => s + (parseInt(v) || 0), 0) || ""}
@@ -854,7 +854,7 @@ export function AppendixVavClient() {
         </div>
       )}
 
-      <AppendixActions title="נספח ו׳ — טבלת שליטה בטיול" filename="נספח-ו" getHTML={getHTML} />
+      <AppendixActions title="נספח ו׳ — טבלת שליטה בטיול" getHTML={getHTML} />
     </div>
   );
 }

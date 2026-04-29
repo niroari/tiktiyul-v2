@@ -101,7 +101,7 @@ function buildBusHTML(bus: BusEntry): string {
 
   return `
     <div class="header">
-      <div class="title">נספח ט"ו — בדיקת אוטובוס לפני היציאה לטיול</div>
+      <div class="title">נספח ט&quot;ו — בדיקת אוטובוס לפני היציאה לטיול</div>
     </div>
     <div class="meta" style="margin-bottom:16px">
       <span>אזור הטיול: <strong>${esc(bus.area)}</strong></span>
@@ -261,13 +261,13 @@ export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
   // ── Print ──────────────────────────────────────────────────────────────────
 
   function printOne(bus: BusEntry) {
-    printHTML(buildBusHTML(bus), `נספח ט"ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
+    printHTML(buildBusHTML(bus), `נספח ט&quot;ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
   }
 
   async function sharePDFOne(bus: BusEntry) {
     setPdfLoadingId(bus.id);
     try {
-      await sharePDF(buildBusHTML(bus), `נספח ט"ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
+      await sharePDF(buildBusHTML(bus), `נספח ט&quot;ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
     } finally {
       setPdfLoadingId(null);
     }
@@ -327,7 +327,7 @@ export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
 
       <main className="max-w-4xl mx-auto px-4 py-8 space-y-6">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">נספח ט"ו — בדיקת אוטובוס לפני היציאה לטיול</h1>
+          <h1 className="text-xl font-semibold text-foreground">נספח ט&quot;ו — בדיקת אוטובוס לפני היציאה לטיול</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {isDraft ? "מילוי מהיר ללא טיול" : (formName || "...")}
           </p>

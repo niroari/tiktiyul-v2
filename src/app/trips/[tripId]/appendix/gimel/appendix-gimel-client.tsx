@@ -69,7 +69,7 @@ export function AppendixGimelClient() {
     return `
       <div class="header">
         <div class="title">נספח ג׳ — כתב מינוי לאחראי/ת טיול</div>
-        <div class="ministry">בחתימת מנהל/ת ביה"ס</div>
+        <div class="ministry">בחתימת מנהל/ת ביה&quot;ס</div>
       </div>
       <div class="meta"><span>תאריך: <strong>${form.date ? formatDateHe(form.date) : ""}</strong></span></div>
       <div class="letter-body">
@@ -81,7 +81,7 @@ export function AppendixGimelClient() {
         <br/>
         <p>בכבוד רב,</p>
         <p><strong>${esc(form.principalName)}</strong></p>
-        <p>מנהל/ת ביה"ס — ${esc(trip?.schoolName)}</p>
+        <p>מנהל/ת ביה&quot;ס — ${esc(trip?.schoolName)}</p>
         <br/>
         <p>חתימה:</p>
         ${safeSigUrl(principalSig)
@@ -101,7 +101,7 @@ export function AppendixGimelClient() {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ג׳ — כתב מינוי לאחראי/ת טיול</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">בחתימת מנהל/ת ביה"ס</p>
+          <p className="text-sm text-muted-foreground mt-0.5">בחתימת מנהל/ת ביה&quot;ס</p>
         </div>
         <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
           {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
@@ -126,7 +126,7 @@ export function AppendixGimelClient() {
             <Input value={form.leaderName} onChange={(e) => setField("leaderName", e.target.value)} placeholder="שם מלא" />
           </div>
           <div className="space-y-1.5">
-            <Label>שם מנהל/ת ביה"ס</Label>
+            <Label>שם מנהל/ת ביה&quot;ס</Label>
             <Input value={form.principalName} onChange={(e) => setField("principalName", e.target.value)} placeholder="שם מלא" />
           </div>
           <div className="space-y-1.5 col-span-2">
@@ -159,21 +159,21 @@ export function AppendixGimelClient() {
           <div className="pt-4 border-t border-border">
             <p className="text-muted-foreground text-xs mb-1">בכבוד רב,</p>
             <p className="font-semibold">{form.principalName || "—"}</p>
-            <p className="text-xs text-muted-foreground">מנהל/ת ביה"ס</p>
+            <p className="text-xs text-muted-foreground">מנהל/ת ביה&quot;ס</p>
           </div>
         </div>
       </div>
 
-      <AppendixActions title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" filename="נספח-ג" getHTML={getHTML} />
+      <AppendixActions title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" getHTML={getHTML} />
 
       {/* Signature */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
-        <h2 className="text-sm font-semibold text-foreground mb-4">חתימת מנהל/ת ביה"ס</h2>
+        <h2 className="text-sm font-semibold text-foreground mb-4">חתימת מנהל/ת ביה&quot;ס</h2>
         <RemoteSignature
           tripId={tripId}
           role="c_principal"
-          roleName='מנהל/ת ביה"ס'
-          label='חתימת מנהל/ת ביה"ס'
+          roleName='מנהל/ת ביה&quot;ס'
+          label='חתימת מנהל/ת ביה&quot;ס'
           tripName={trip?.name ?? ""}
           schoolName={trip?.schoolName ?? ""}
           leaderName={form.leaderName}

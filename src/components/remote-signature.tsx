@@ -79,7 +79,7 @@ body { font-family: 'David', Arial, sans-serif; direction: rtl; background: #fff
     setSending(true);
     try {
       await createSignatureRequest(docId, { tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: getPreviewHTML?.() ?? null, requiresId: requiresId ?? false });
-      setSigDoc({ tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: null, status: "pending", signature: null, createdAt: null as any, expiresAt: null as any });
+      setSigDoc({ tripId, role, roleName, tripName, schoolName, leaderName, previewHTML: null, status: "pending", signature: null, createdAt: null as unknown as import("firebase/firestore").Timestamp, expiresAt: null as unknown as import("firebase/firestore").Timestamp });
       subscribeNow();
       const url = `${window.location.origin}/sign/${docId}`;
       setShareUrl(url);

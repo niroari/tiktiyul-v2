@@ -113,7 +113,7 @@ export function QuickGimelClient({ savedId }: { savedId?: string }) {
     return `
       <div class="header">
         <div class="title">נספח ג׳ — כתב מינוי לאחראי/ת טיול</div>
-        <div class="ministry">בחתימת מנהל/ת ביה"ס</div>
+        <div class="ministry">בחתימת מנהל/ת ביה&quot;ס</div>
       </div>
       <div class="meta"><span>תאריך: <strong>${form.date ? formatDateHe(form.date) : ""}</strong></span></div>
       <div class="letter-body">
@@ -125,7 +125,7 @@ export function QuickGimelClient({ savedId }: { savedId?: string }) {
         <br/>
         <p>בכבוד רב,</p>
         <p><strong>${esc(form.principalName)}</strong></p>
-        <p>מנהל/ת ביה"ס — ${esc(form.schoolName)}</p>
+        <p>מנהל/ת ביה&quot;ס — ${esc(form.schoolName)}</p>
         <br/>
         <p>חתימה:</p>
         ${safeSigUrl(principalSig)
@@ -221,7 +221,7 @@ export function QuickGimelClient({ savedId }: { savedId?: string }) {
               <Input value={form.leaderName} onChange={(e) => setField("leaderName", e.target.value)} placeholder="שם מלא" />
             </div>
             <div className="space-y-1.5">
-              <Label>שם מנהל/ת ביה"ס</Label>
+              <Label>שם מנהל/ת ביה&quot;ס</Label>
               <Input value={form.principalName} onChange={(e) => setField("principalName", e.target.value)} placeholder="שם מלא" />
             </div>
             <div className="space-y-1.5">
@@ -265,21 +265,21 @@ export function QuickGimelClient({ savedId }: { savedId?: string }) {
             <div className="pt-4 border-t border-border">
               <p className="text-muted-foreground text-xs mb-1">בכבוד רב,</p>
               <p className="font-semibold">{form.principalName || "—"}</p>
-              <p className="text-xs text-muted-foreground">מנהל/ת ביה"ס{form.schoolName ? ` — ${form.schoolName}` : ""}</p>
+              <p className="text-xs text-muted-foreground">מנהל/ת ביה&quot;ס{form.schoolName ? ` — ${form.schoolName}` : ""}</p>
             </div>
           </div>
         </div>
 
-        <AppendixActions title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" filename="נספח-ג" getHTML={getHTML} />
+        <AppendixActions title="נספח ג׳ — כתב מינוי לאחראי/ת טיול" getHTML={getHTML} />
 
         <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-4">חתימת מנהל/ת ביה"ס</h2>
+          <h2 className="text-sm font-semibold text-foreground mb-4">חתימת מנהל/ת ביה&quot;ס</h2>
           {syntheticTripId && (
             <RemoteSignature
               tripId={syntheticTripId}
               role="c_principal"
-              roleName='מנהל/ת ביה"ס'
-              label='חתימת מנהל/ת ביה"ס'
+              roleName='מנהל/ת ביה&quot;ס'
+              label='חתימת מנהל/ת ביה&quot;ס'
               tripName={form.area || "טיול"}
               schoolName={form.schoolName}
               leaderName={form.leaderName}

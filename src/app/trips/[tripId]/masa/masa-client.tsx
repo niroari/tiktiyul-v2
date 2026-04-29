@@ -300,7 +300,7 @@ export function MasaClient() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-semibold text-foreground">הודעת מסע של"ח</h1>
+          <h1 className="text-xl font-semibold text-foreground">הודעת מסע של&quot;ח</h1>
           <p className="text-sm text-muted-foreground mt-0.5">טופס הודעה רשמי למינהל חברה ונוער</p>
         </div>
         <div className="flex items-center gap-3">
@@ -328,7 +328,7 @@ export function MasaClient() {
       <Section title="פרטי הכותרת">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="תאריך" value={data.date} onChange={(v) => update({ date: v })} placeholder="DD.MM.YY" />
-          <Field label='אל תחום של"ח – מחוז' value={data.district} onChange={(v) => update({ district: v })} />
+          <Field label='אל תחום של&quot;ח – מחוז' value={data.district} onChange={(v) => update({ district: v })} />
           <Field label="מאת (שם בית הספר)" value={data.principal} onChange={(v) => update({ principal: v })} />
         </div>
       </Section>

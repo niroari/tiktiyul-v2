@@ -100,11 +100,12 @@ function AndroidInstructions({ installed }: { installed: boolean }) {
   const [prompted, setPrompted] = useState(false);
 
   function triggerInstall() {
-    const deferredPrompt = (window as any).__pwaInstallPrompt;
+    const win = window as Window & { __pwaInstallPrompt?: { prompt: () => void; userChoice: Promise<unknown> } };
+    const deferredPrompt = win.__pwaInstallPrompt;
     if (deferredPrompt) {
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(() => {
-        (window as any).__pwaInstallPrompt = null;
+        win.__pwaInstallPrompt = undefined;
         setPrompted(true);
       });
     } else {
@@ -143,11 +144,12 @@ function DesktopChromeInstructions({ installed }: { installed: boolean }) {
   const [prompted, setPrompted] = useState(false);
 
   function triggerInstall() {
-    const deferredPrompt = (window as any).__pwaInstallPrompt;
+    const win = window as Window & { __pwaInstallPrompt?: { prompt: () => void; userChoice: Promise<unknown> } };
+    const deferredPrompt = win.__pwaInstallPrompt;
     if (deferredPrompt) {
       deferredPrompt.prompt();
       deferredPrompt.userChoice.then(() => {
-        (window as any).__pwaInstallPrompt = null;
+        win.__pwaInstallPrompt = undefined;
         setPrompted(true);
       });
     } else {
@@ -241,12 +243,17 @@ export function InstallClient() {
   const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    setPlatform(detectPlatform());
-    setIsInstalled(window.matchMedia("(display-mode: standalone)").matches);
+    async function init() {
+      setPlatform(detectPlatform());
+      setIsInstalled(window.matchMedia("(display-mode: standalone)").matches);
+    }
+    init();
+  }, []);
 
+  useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
-      (window as any).__pwaInstallPrompt = e;
+      (window as Window & { __pwaInstallPrompt?: Event }).__pwaInstallPrompt = e;
     };
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);

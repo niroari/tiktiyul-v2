@@ -86,7 +86,7 @@ export function AppendixTetClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
+        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">נספח ט׳ — ציוד חובה לטיול</div>
         ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
       </div>
@@ -153,7 +153,7 @@ export function AppendixTetClient() {
         הוסף פריט
       </Button>
 
-      <AppendixActions title="נספח ט׳ — ציוד חובה לטיול" filename="נספח-ט" getHTML={getHTML} />
+      <AppendixActions title="נספח ט׳ — ציוד חובה לטיול" getHTML={getHTML} />
     </div>
   );
 }
