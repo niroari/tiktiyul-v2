@@ -30,10 +30,12 @@ function buildDoc(innerHTML: string, title: string) {
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'Frank Ruhl Libre', 'Times New Roman', serif; direction: rtl; text-align: right;
-           padding: 20px; font-size: 11px; color: #111; background: #fff; }
+    body { font-family: 'Frank Ruhl Libre', 'Arial Hebrew', 'Arial', sans-serif; direction: rtl; text-align: right;
+           padding: 20px; font-size: 11px; color: #111; background: #fff;
+           word-spacing: normal; letter-spacing: normal; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-    th, td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 10px; }
+    th, td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 10px;
+             word-spacing: normal; letter-spacing: normal; }
     th { background: #1b4332; color: white; font-weight: 600; }
     .cat-row td { background: #d4edda; font-weight: bold; font-size: 10.5px; }
     .header { text-align: center; border-bottom: 2px solid #1b4332; padding-bottom: 8px; margin-bottom: 12px; }
@@ -50,19 +52,20 @@ function buildDoc(innerHTML: string, title: string) {
 </html>`;
 }
 
-// Uses hidden iframe so print works on mobile (window.open is blocked outside direct gestures)
+// Uses hidden iframe so print works on mobile (window.open is blocked outside direct gestures).
+// Waits for fonts.ready so characters don't fall back to a font that drops word spacing.
 export function printHTML(innerHTML: string, title: string) {
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;top:0;left:-9999px;width:210mm;height:1px;border:none;visibility:hidden;";
+  iframe.style.cssText = "position:fixed;top:0;left:-9999px;width:210mm;height:297mm;border:none;";
   document.body.appendChild(iframe);
   const iDoc = iframe.contentDocument!;
   iDoc.open();
   iDoc.write(buildDoc(innerHTML, title));
   iDoc.close();
-  setTimeout(() => {
+  iDoc.fonts.ready.then(() => {
     iframe.contentWindow!.print();
     setTimeout(() => document.body.removeChild(iframe), 2000);
-  }, 600);
+  });
 }
 
 // Renders the print HTML to a PDF and shares it via Web Share API (mobile) or downloads it (desktop)
