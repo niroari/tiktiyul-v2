@@ -168,7 +168,7 @@ export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
   const [buses, setBuses] = useState<BusEntry[]>([]);
   const [formName, setFormName] = useState("");
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
-  const [pdfLoading, setPdfLoading] = useState(false);
+  const [pdfLoadingId, setPdfLoadingId] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
   const sigRefs = useRef<Record<string, SignatureCanvasHandle | null>>({});
@@ -260,27 +260,17 @@ export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
 
   // ── Print ──────────────────────────────────────────────────────────────────
 
-  function printAll() {
-    const body = buses.map((b) =>
-      `<div style="page-break-after:always">${buildBusHTML(b)}</div>`
-    ).join("");
-    printHTML(body, 'נספח ט"ו — בדיקת אוטובוס לפני היציאה לטיול');
-  }
-
-  async function shareAllPDF() {
-    setPdfLoading(true);
-    try {
-      const body = buses.map((b) =>
-        `<div style="page-break-after:always">${buildBusHTML(b)}</div>`
-      ).join("");
-      await sharePDF(body, 'נספח ט"ו — בדיקת אוטובוס');
-    } finally {
-      setPdfLoading(false);
-    }
-  }
-
   function printOne(bus: BusEntry) {
     printHTML(buildBusHTML(bus), `נספח ט"ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
+  }
+
+  async function sharePDFOne(bus: BusEntry) {
+    setPdfLoadingId(bus.id);
+    try {
+      await sharePDF(buildBusHTML(bus), `נספח ט"ו — אוטובוס ${bus.busNum || buses.indexOf(bus) + 1}`);
+    } finally {
+      setPdfLoadingId(null);
+    }
   }
 
   // ── Field helpers ──────────────────────────────────────────────────────────
@@ -305,30 +295,6 @@ export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
             <span className={`text-xs ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
               {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
             </span>
-            {buses.length > 0 && (
-              <>
-                <button onClick={printAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                  </svg>
-                  הדפס
-                </button>
-                <button onClick={shareAllPDF} disabled={pdfLoading}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors disabled:opacity-50">
-                  {pdfLoading ? (
-                    <svg className="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
-                    </svg>
-                  ) : (
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                    </svg>
-                  )}
-                  {pdfLoading ? "מכין..." : "שתף PDF"}
-                </button>
-              </>
-            )}
             {isDraft && (
               <button onClick={openSaveAs}
                 className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors">
@@ -388,6 +354,19 @@ export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                   </svg>
                   הדפס
+                </button>
+                <button onClick={() => sharePDFOne(bus)} disabled={pdfLoadingId === bus.id}
+                  className="text-xs px-3 py-1 border border-white/40 rounded hover:bg-white/10 transition-colors flex items-center gap-1 disabled:opacity-50">
+                  {pdfLoadingId === bus.id ? (
+                    <svg className="w-3 h-3 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                    </svg>
+                  ) : (
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                    </svg>
+                  )}
+                  {pdfLoadingId === bus.id ? "מכין..." : "שתף PDF"}
                 </button>
                 <button onClick={() => removeBus(bus.id)}
                   className="text-xs px-2 py-1 border border-white/40 rounded hover:bg-white/10 transition-colors">✕</button>
