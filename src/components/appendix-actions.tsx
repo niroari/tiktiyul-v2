@@ -93,7 +93,7 @@ export async function sharePDF(innerHTML: string, title: string): Promise<void> 
   styleEl.textContent = PDF_STYLE;
   const container = document.createElement("div");
   container.id = "_pdf_root";
-  container.style.cssText = "position:fixed;top:0;left:-9999px;opacity:0;pointer-events:none;z-index:99999;";
+  container.style.cssText = "position:fixed;top:0;left:-9999px;pointer-events:none;z-index:99999;";
   container.innerHTML = innerHTML;
 
   document.head.appendChild(styleEl);
