@@ -11,6 +11,7 @@ const rubik = Rubik({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://tiktiyul-v2.vercel.app"),
   title: "תיק טיול",
   description: "ניהול תיק טיול לבתי ספר",
   manifest: "/manifest.webmanifest",
