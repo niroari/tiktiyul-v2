@@ -255,6 +255,7 @@ export function AppendixZayinClient() {
             <div class="meta-bar">
               <span><strong>כיתה:</strong> ${esc(page.className)}${page.metaSub}</span>
               <span><strong>תלמידים בדף:</strong> ${page.students.length}</span>
+              <span><strong>נוכחים בפועל:</strong> ________</span>
               <span><strong>מורה מלווה:</strong> ____________________</span>
               <span><strong>יעד הטיול:</strong> ${trip?.accommodation ? esc(trip.accommodation) : "____________________"}</span>
             </div>
@@ -354,7 +355,7 @@ export function AppendixZayinClient() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          font-size: 9.5px;
+          font-size: 9px;
           font-weight: 500;
           background: #f2f2f2;
           border: 1px solid #000000;
@@ -362,6 +363,8 @@ export function AppendixZayinClient() {
           padding: 3px 8px;
           margin-top: 5px;
           color: #000000;
+          white-space: nowrap;
+          gap: 8px;
         }
         .fs-table {
           width: 100%;
