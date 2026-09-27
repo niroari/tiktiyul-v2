@@ -150,7 +150,6 @@ export function AppendixYodClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">נספח י׳ — תלמידים בעלי מגבלות רפואיות</div>
         ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
       </div>

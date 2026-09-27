@@ -161,7 +161,6 @@ export function AppendixBetClient() {
       </tr>`).join("");
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער</div>
         <div class="title">נספח ב׳ — אישור תוכנית הטיול</div>
       </div>
       <div class="meta">

@@ -109,7 +109,6 @@ export function buildAlef(data: ChecklistData, trip: Trip | null): string {
   });
   return `
     <div class="header">
-      <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
       <div class="title">נספח א׳ — טופס ביקורת יציאה לטיול</div>
     </div>
     <table>
@@ -151,7 +150,6 @@ export function buildBet(
     </tr>`).join("");
   return `
     <div class="header">
-      <div class="ministry">משרד החינוך — מינהל חברה ונוער</div>
       <div class="title">נספח ב׳ — אישור תוכנית הטיול</div>
     </div>
     <div class="meta">
@@ -383,7 +381,6 @@ export function buildVav(data: VavData, students: Student[], trip: Trip | null):
 
   return `
     <div class="header">
-      <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
       <div class="title">נספח ו׳ — טבלת שליטה בטיול</div>
       ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
     </div>
@@ -459,7 +456,6 @@ export function buildZayin(students: Student[], trip: Trip | null): string {
   }
   return `
     <div class="header">
-      <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
       <div class="title">נספח ז׳ — רשימת תלמידים (יוצאים)</div>
       <div class="ministry">${esc(trip?.name ?? "")} | ${esc(trip?.schoolName ?? "")}</div>
     </div>
@@ -508,7 +504,6 @@ export function buildTet(items: TetItem[], trip: Trip | null): string {
     </tr>`).join("");
   return `
     <div class="header">
-      <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
       <div class="title">נספח ט׳ — ציוד חובה לטיול</div>
       ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
     </div>
@@ -537,7 +532,6 @@ export function buildYod(rows: YodRow[], trip: Trip | null): string {
     </tr>`).join("");
   return `
     <div class="header">
-      <div class="ministry">משרד החינוך — מינהל חברה ונוער — של"ח וידיעת הארץ</div>
       <div class="title">נספח י׳ — תלמידים בעלי מגבלות רפואיות</div>
       ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
     </div>

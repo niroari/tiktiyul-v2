@@ -77,7 +77,6 @@ function Shell({ title, children }: { title?: string; children: React.ReactNode 
     <div className="min-h-screen bg-[#f6faf8] flex flex-col items-center py-10 px-4" dir="rtl">
       <div className="w-full max-w-lg space-y-5">
         <div className="text-center space-y-1">
-          <div className="text-xs text-muted-foreground">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
           {title && <h1 className="text-xl font-bold text-[#1b4332]">{title}</h1>}
         </div>
         {children}

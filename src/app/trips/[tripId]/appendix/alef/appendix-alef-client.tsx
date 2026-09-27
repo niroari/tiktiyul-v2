@@ -142,7 +142,6 @@ export function AppendixAlefClient() {
     });
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">נספח א׳ — טופס ביקורת יציאה לטיול</div>
       </div>
       <table>

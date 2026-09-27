@@ -15,7 +15,6 @@ function Shell({ tokenDoc, children }: { tokenDoc: RoomFillToken | null; childre
     <div className="min-h-screen bg-[#f6faf8] px-4 py-8" dir="rtl">
       <div className="max-w-2xl mx-auto space-y-5">
         <div className="text-center space-y-1">
-          <div className="text-xs text-muted-foreground">משרד החינוך — מינהל חברה ונוער</div>
           <h1 className="text-xl font-bold text-[#1b4332]">שיבוץ תלמידים לחדרים</h1>
           {tokenDoc && (
             <p className="text-sm text-muted-foreground">

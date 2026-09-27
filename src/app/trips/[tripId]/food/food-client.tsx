@@ -114,7 +114,6 @@ export function FoodClient() {
 
     return `
       <div class="header">
-        <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
         <div class="title">העדפות מזון — תלמידים עם הגבלות תזונתיות</div>
         ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
       </div>
