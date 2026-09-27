@@ -214,7 +214,7 @@ export function AppendixZayinClient() {
             continuousClassIndex = 0;
             rowsHTML += `
               <tr class="fs-cat-row">
-                <td colspan="7" style="background:#2d6a4f;color:#ffffff;font-size:9px;font-weight:bold;padding:2px 6px">
+                <td colspan="7" style="background:#000000;color:#ffffff;font-size:9px;font-weight:bold;padding:2px 6px;text-shadow:0 0 1px #000,0 0 2px #000">
                   כיתה ${esc(s.class)}
                 </td>
               </tr>
@@ -226,10 +226,10 @@ export function AppendixZayinClient() {
 
         const days = dayLabel(s);
         const daysBadge = days
-          ? `<span style="font-size:8px;color:#c2410c;font-weight:bold;margin-right:3px">(${esc(days)})</span>`
+          ? `<span style="font-size:8px;color:#000000;font-weight:bold;margin-right:3px">(${esc(days)})</span>`
           : "";
         const notGoingBadge = !s.isGoing
-          ? `<span style="font-size:8px;color:#b91c1c;font-weight:bold;margin-right:3px">(לא יוצא)</span>`
+          ? `<span style="font-size:8px;color:#000000;font-weight:bold;margin-right:3px">[לא יוצא]</span>`
           : "";
 
         rowsHTML += `
@@ -258,19 +258,19 @@ export function AppendixZayinClient() {
               <span><strong>כיתה:</strong> ${esc(page.className)}${page.metaSub}</span>
               <span><strong>תלמידים בדף:</strong> ${page.students.length}</span>
               <span><strong>מורה מלווה:</strong> ____________________</span>
-              <span><strong>חתימה:</strong> ____________</span>
+              <span><strong>יעד הטיול:</strong> ${trip?.accommodation ? esc(trip.accommodation) : "____________________"}</span>
             </div>
           </div>
 
           <table class="fs-table">
             <colgroup>
-              <col style="width:28px" />
-              <col style="width:76px" />
-              <col style="width:105px" />
-              <col style="width:105px" />
-              <col style="width:58px" />
+              <col style="width:26px" />
+              <col style="width:72px" />
+              <col style="width:95px" />
+              <col style="width:95px" />
+              <col style="width:52px" />
               <col style="width:auto" />
-              <col style="width:86px" />
+              <col style="width:84px" />
             </colgroup>
             <thead>
               <tr>
@@ -301,13 +301,14 @@ export function AppendixZayinClient() {
       <style>
         @page {
           size: A4 portrait;
-          margin: 8mm 8mm 8mm 8mm;
+          margin: 15mm 15mm 15mm 15mm;
         }
         @media print {
           html, body {
             padding: 0 !important;
             margin: 0 !important;
             background: #fff !important;
+            color: #000 !important;
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
@@ -319,6 +320,7 @@ export function AppendixZayinClient() {
           break-after: page;
           margin-bottom: 24px;
           background: #fff;
+          color: #000;
         }
         .fs-page:last-child {
           page-break-after: auto;
@@ -326,27 +328,27 @@ export function AppendixZayinClient() {
           margin-bottom: 0;
         }
         .fs-header {
-          border-bottom: 2px solid #1b4332;
+          border-bottom: 2px solid #000000;
           padding-bottom: 4px;
           margin-bottom: 6px;
         }
         .fs-header .ministry {
           font-size: 8px;
-          color: #555;
+          color: #222222;
           text-align: center;
           line-height: 1.2;
         }
         .fs-header .title {
           font-size: 14.5px;
           font-weight: bold;
-          color: #1b4332;
+          color: #000000;
           text-align: center;
           margin: 2px 0;
           line-height: 1.2;
         }
         .fs-header .sub {
           font-size: 9.5px;
-          color: #333;
+          color: #111111;
           text-align: center;
           line-height: 1.2;
         }
@@ -356,11 +358,12 @@ export function AppendixZayinClient() {
           align-items: center;
           font-size: 9.5px;
           font-weight: 500;
-          background: #eef5f1;
-          border: 1px solid #cce3d5;
+          background: #f2f2f2;
+          border: 1px solid #000000;
           border-radius: 3px;
           padding: 3px 8px;
           margin-top: 5px;
+          color: #000000;
         }
         .fs-table {
           width: 100%;
@@ -368,35 +371,39 @@ export function AppendixZayinClient() {
           table-layout: fixed;
         }
         .fs-table th {
-          background: #1b4332 !important;
+          background-color: #000000 !important;
           color: #ffffff !important;
+          text-shadow: 0 0 1px #000000, 0 0 2px #000000;
           font-weight: bold;
           font-size: 9.5px;
           padding: 3.5px 4px;
-          border: 1px solid #1b4332;
+          border: 1px solid #000000;
           text-align: right;
           line-height: 1.15;
           box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
         }
         .fs-table td {
-          border: 1px solid #666;
+          border: 1px solid #000000;
           padding: 2px 4px;
           font-size: 9px;
           line-height: 1.15;
           height: 20px;
           vertical-align: middle;
           box-sizing: border-box;
+          color: #000000;
         }
         .fs-table tr:nth-child(even) td {
-          background: #f7faf8;
+          background: #fafafa;
         }
         .fs-footer {
           display: flex;
           justify-content: space-between;
           font-size: 8px;
-          color: #777;
+          color: #333333;
           margin-top: 5px;
-          border-top: 1px solid #ccc;
+          border-top: 1px solid #000000;
           padding-top: 3px;
         }
       </style>
