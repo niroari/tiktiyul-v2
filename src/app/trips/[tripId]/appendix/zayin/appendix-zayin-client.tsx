@@ -251,7 +251,6 @@ export function AppendixZayinClient() {
       pagesHTML += `
         <div class="fs-page">
           <div class="fs-header">
-            <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
             <div class="title">נספח ז׳ — רשימת תלמידים (דף מורה בשטח)</div>
             <div class="sub">${esc(trip?.name)} | ${esc(trip?.schoolName)}</div>
             <div class="meta-bar">
