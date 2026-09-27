@@ -7,6 +7,14 @@ import { useTrip } from "@/hooks/use-trip";
 import { updateStudent } from "@/lib/firestore/students";
 import { printHTML, esc } from "@/components/appendix-actions";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import type { Student } from "@/lib/types";
 
 type SortField = "class" | "lastName" | "firstName";
@@ -31,6 +39,12 @@ export function AppendixZayinClient() {
   const [sortField, setSortField]       = useState<SortField>("class");
   const [classFilter, setClassFilter]   = useState("");
   const [showNotGoing, setShowNotGoing] = useState(false);
+
+  // Field sheet dialog state
+  const [fieldSheetOpen, setFieldSheetOpen]         = useState(false);
+  const [fsSplitByClass, setFsSplitByClass]         = useState(true);
+  const [fsGoingOnly, setFsGoingOnly]               = useState(true);
+  const [fsClass, setFsClass]                       = useState("");
 
   // Derived
   const tripDayCount = trip?.startDate && trip?.endDate
@@ -121,6 +135,272 @@ export function AppendixZayinClient() {
         <tbody>${rows}</tbody>
       </table>
       <div class="footer">רשימה זו מהווה 3 עותקים: אחראי הטיול / אחראי אוטובוס וכיתה / מזכירות ביה&quot;ס</div>
+    `;
+  }
+
+  function getFieldSheetHTML(opts: {
+    splitByClass: boolean;
+    goingOnly: boolean;
+    targetClass?: string;
+  }) {
+    const { splitByClass, goingOnly, targetClass } = opts;
+    const MAX_PER_PAGE = 40;
+
+    const baseStudents = students.filter((s) => {
+      if (goingOnly && !s.isGoing) return false;
+      if (targetClass && s.class !== targetClass) return false;
+      return true;
+    });
+
+    const targetClasses = targetClass
+      ? [targetClass]
+      : [...new Set(baseStudents.map((s) => s.class))].sort((a, b) => a.localeCompare(b, "he"));
+
+    type SheetPage = {
+      className: string;
+      metaSub: string;
+      students: Student[];
+      startNumber: number;
+    };
+
+    const pages: SheetPage[] = [];
+
+    if (splitByClass) {
+      for (const c of targetClasses) {
+        const inClass = sortStudents(baseStudents.filter((s) => s.class === c), "lastName");
+        if (inClass.length === 0) continue;
+
+        for (let i = 0; i < inClass.length; i += MAX_PER_PAGE) {
+          const slice = inClass.slice(i, i + MAX_PER_PAGE);
+          const partNum = Math.floor(i / MAX_PER_PAGE) + 1;
+          const totalParts = Math.ceil(inClass.length / MAX_PER_PAGE);
+          pages.push({
+            className: c,
+            metaSub: totalParts > 1 ? ` (חלק ${partNum} מתוך ${totalParts})` : "",
+            students: slice,
+            startNumber: i + 1,
+          });
+        }
+      }
+    } else {
+      const allSorted = sortStudents(baseStudents, "class");
+      for (let i = 0; i < allSorted.length; i += MAX_PER_PAGE) {
+        const slice = allSorted.slice(i, i + MAX_PER_PAGE);
+        pages.push({
+          className: targetClass ? targetClass : "כל הכיתות",
+          metaSub: "",
+          students: slice,
+          startNumber: i + 1,
+        });
+      }
+    }
+
+    const totalPages = pages.length || 1;
+    const printDate = new Date().toLocaleDateString("he-IL");
+
+    let pagesHTML = "";
+    let continuousLastClass = "";
+    let continuousClassIndex = 0;
+
+    pages.forEach((page, pIdx) => {
+      const pageNum = pIdx + 1;
+      let rowsHTML = "";
+      let currentNumber = page.startNumber;
+
+      page.students.forEach((s) => {
+        if (!splitByClass) {
+          if (s.class !== continuousLastClass) {
+            continuousLastClass = s.class;
+            continuousClassIndex = 0;
+            rowsHTML += `
+              <tr class="fs-cat-row">
+                <td colspan="7" style="background:#2d6a4f;color:#ffffff;font-size:9px;font-weight:bold;padding:2px 6px">
+                  כיתה ${esc(s.class)}
+                </td>
+              </tr>
+            `;
+          }
+          continuousClassIndex++;
+          currentNumber = continuousClassIndex;
+        }
+
+        const days = dayLabel(s);
+        const daysBadge = days
+          ? `<span style="font-size:8px;color:#c2410c;font-weight:bold;margin-right:3px">(${esc(days)})</span>`
+          : "";
+        const notGoingBadge = !s.isGoing
+          ? `<span style="font-size:8px;color:#b91c1c;font-weight:bold;margin-right:3px">(לא יוצא)</span>`
+          : "";
+
+        rowsHTML += `
+          <tr>
+            <td style="text-align:center;font-weight:bold;font-size:9px">${currentNumber}</td>
+            <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:9px">${esc(s.idNumber) || "—"}</td>
+            <td style="font-weight:bold;white-space:nowrap;overflow:hidden">${esc(s.lastName)}</td>
+            <td style="white-space:nowrap;overflow:hidden">${esc(s.firstName)}${daysBadge}${notGoingBadge}</td>
+            <td style="text-align:center"></td>
+            <td></td>
+            <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:9px">${esc(s.phone) || "—"}</td>
+          </tr>
+        `;
+        if (splitByClass) {
+          currentNumber++;
+        }
+      });
+
+      pagesHTML += `
+        <div class="fs-page">
+          <div class="fs-header">
+            <div class="ministry">משרד החינוך — מינהל חברה ונוער — של&quot;ח וידיעת הארץ</div>
+            <div class="title">נספח ז׳ — רשימת תלמידים (דף מורה בשטח)</div>
+            <div class="sub">${esc(trip?.name)} | ${esc(trip?.schoolName)}</div>
+            <div class="meta-bar">
+              <span><strong>כיתה:</strong> ${esc(page.className)}${page.metaSub}</span>
+              <span><strong>תלמידים בדף:</strong> ${page.students.length}</span>
+              <span><strong>מורה מלווה:</strong> ____________________</span>
+              <span><strong>חתימה:</strong> ____________</span>
+            </div>
+          </div>
+
+          <table class="fs-table">
+            <colgroup>
+              <col style="width:28px" />
+              <col style="width:76px" />
+              <col style="width:105px" />
+              <col style="width:105px" />
+              <col style="width:58px" />
+              <col style="width:auto" />
+              <col style="width:86px" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th style="text-align:center">מס׳</th>
+                <th style="text-align:center">ת.ז</th>
+                <th>שם משפחה</th>
+                <th>שם פרטי</th>
+                <th style="text-align:center">נוכחות</th>
+                <th>הערות</th>
+                <th style="text-align:center">טלפון</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rowsHTML}
+            </tbody>
+          </table>
+
+          <div class="fs-footer">
+            <span>דף מורה בשטח ${page.className ? `— כיתה ${esc(page.className)}` : ""}</span>
+            <span>עמוד ${pageNum} מתוך ${totalPages}</span>
+            <span>תאריך הפקה: ${printDate}</span>
+          </div>
+        </div>
+      `;
+    });
+
+    return `
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 8mm 8mm 8mm 8mm;
+        }
+        @media print {
+          html, body {
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #fff !important;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+        .fs-page {
+          box-sizing: border-box;
+          width: 100%;
+          page-break-after: always;
+          break-after: page;
+          margin-bottom: 24px;
+          background: #fff;
+        }
+        .fs-page:last-child {
+          page-break-after: auto;
+          break-after: auto;
+          margin-bottom: 0;
+        }
+        .fs-header {
+          border-bottom: 2px solid #1b4332;
+          padding-bottom: 4px;
+          margin-bottom: 6px;
+        }
+        .fs-header .ministry {
+          font-size: 8px;
+          color: #555;
+          text-align: center;
+          line-height: 1.2;
+        }
+        .fs-header .title {
+          font-size: 14.5px;
+          font-weight: bold;
+          color: #1b4332;
+          text-align: center;
+          margin: 2px 0;
+          line-height: 1.2;
+        }
+        .fs-header .sub {
+          font-size: 9.5px;
+          color: #333;
+          text-align: center;
+          line-height: 1.2;
+        }
+        .fs-header .meta-bar {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          font-size: 9.5px;
+          font-weight: 500;
+          background: #eef5f1;
+          border: 1px solid #cce3d5;
+          border-radius: 3px;
+          padding: 3px 8px;
+          margin-top: 5px;
+        }
+        .fs-table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+        }
+        .fs-table th {
+          background: #1b4332 !important;
+          color: #ffffff !important;
+          font-weight: bold;
+          font-size: 9.5px;
+          padding: 3.5px 4px;
+          border: 1px solid #1b4332;
+          text-align: right;
+          line-height: 1.15;
+          box-sizing: border-box;
+        }
+        .fs-table td {
+          border: 1px solid #666;
+          padding: 2px 4px;
+          font-size: 9px;
+          line-height: 1.15;
+          height: 20px;
+          vertical-align: middle;
+          box-sizing: border-box;
+        }
+        .fs-table tr:nth-child(even) td {
+          background: #f7faf8;
+        }
+        .fs-footer {
+          display: flex;
+          justify-content: space-between;
+          font-size: 8px;
+          color: #777;
+          margin-top: 5px;
+          border-top: 1px solid #ccc;
+          padding-top: 3px;
+        }
+      </style>
+      ${pagesHTML}
     `;
   }
 
@@ -262,6 +542,19 @@ export function AppendixZayinClient() {
       {/* Actions */}
       {students.length > 0 && (
         <div className="flex items-center gap-2 mt-6 pt-4 border-t border-border flex-wrap">
+          <Button
+            size="sm"
+            onClick={() => {
+              setFsClass(classFilter);
+              setFieldSheetOpen(true);
+            }}
+            className="bg-primary text-primary-foreground hover:bg-primary/90"
+          >
+            <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+            </svg>
+            דף מורה בשטח (להדפסה)
+          </Button>
           <Button variant="outline" size="sm" onClick={() => printHTML(getHTML(true), "נספח ז׳ — רשימת תלמידים יוצאים")}>
             <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -278,6 +571,123 @@ export function AppendixZayinClient() {
           )}
         </div>
       )}
+
+      {/* Field Sheet Options Dialog */}
+      <Dialog open={fieldSheetOpen} onOpenChange={setFieldSheetOpen}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-right text-base font-bold text-foreground">
+              הדפסת דף מורה בשטח
+            </DialogTitle>
+            <DialogDescription className="text-right text-xs text-muted-foreground">
+              רשימה מותאמת לשימוש פיסי על גבי קלסר בשטח (עד 40 תלמידים בעמוד A4), כולל טורים מוקטנים ומשבצות ריקות לסימון נוכחות והערות.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2 text-sm">
+            {/* Page division */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">חלוקת עמודים</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFsSplitByClass(true)}
+                  className={`p-2.5 text-xs rounded-lg border text-right transition-colors ${
+                    fsSplitByClass
+                      ? "bg-primary/10 border-primary text-primary font-semibold"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="font-medium text-foreground">עמוד נפרד לכל כיתה</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">דף עצמאי לכל מחנך/ת</div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFsSplitByClass(false)}
+                  className={`p-2.5 text-xs rounded-lg border text-right transition-colors ${
+                    !fsSplitByClass
+                      ? "bg-primary/10 border-primary text-primary font-semibold"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  <div className="font-medium text-foreground">רשימה רציפה</div>
+                  <div className="text-[10px] text-muted-foreground mt-0.5">חיסכון בדפים (40 בעמוד)</div>
+                </button>
+              </div>
+            </div>
+
+            {/* Students population */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">אוכלוסיית תלמידים</label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFsGoingOnly(true)}
+                  className={`p-2 text-xs rounded-lg border text-center transition-colors ${
+                    fsGoingOnly
+                      ? "bg-primary/10 border-primary text-primary font-semibold"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  יוצאים בלבד ({students.filter((s) => s.isGoing).length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFsGoingOnly(false)}
+                  className={`p-2 text-xs rounded-lg border text-center transition-colors ${
+                    !fsGoingOnly
+                      ? "bg-primary/10 border-primary text-primary font-semibold"
+                      : "border-border text-muted-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  כולל לא יוצאים ({students.length})
+                </button>
+              </div>
+            </div>
+
+            {/* Class filter */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-foreground">כיתה להדפסה</label>
+              <select
+                value={fsClass}
+                onChange={(e) => setFsClass(e.target.value)}
+                className="w-full text-xs border border-border rounded-lg px-2.5 py-2 bg-white focus:outline-none focus:border-primary"
+              >
+                <option value="">כל הכיתות ({classes.length} כיתות)</option>
+                {classes.map((c) => {
+                  const count = (fsGoingOnly ? students.filter((s) => s.isGoing) : students).filter((s) => s.class === c).length;
+                  return <option key={c} value={c}>כיתה {c} ({count} תלמידים)</option>;
+                })}
+              </select>
+            </div>
+          </div>
+
+          <DialogFooter className="flex-row items-center justify-between sm:justify-between gap-2 pt-2">
+            <Button variant="outline" size="sm" onClick={() => setFieldSheetOpen(false)}>
+              ביטול
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => {
+                setFieldSheetOpen(false);
+                printHTML(
+                  getFieldSheetHTML({
+                    splitByClass: fsSplitByClass,
+                    goingOnly: fsGoingOnly,
+                    targetClass: fsClass,
+                  }),
+                  `נספח ז׳ — רשימת תלמידים (דף מורה בשטח)${fsClass ? ` — כיתה ${fsClass}` : ""}`
+                );
+              }}
+            >
+              <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              הדפס עכשיו
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
