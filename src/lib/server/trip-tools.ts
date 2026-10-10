@@ -32,11 +32,20 @@ export interface TripOverviewData {
   }>;
 }
 
+export interface BusStaffMember {
+  role: string;
+  name: string;
+  phone: string;
+}
+
 export interface BusManifestItem {
   busNumber: number;
   classes: string[];
-  crew: Array<{ name: string; phone: string }>;
-  extraTeachers?: Array<{ role: string; name: string; phone: string }>;
+  driver?: { name: string; phone: string };
+  medicOrGuard?: { name: string; phone: string };
+  guide?: { name: string; phone: string };
+  teachers: BusStaffMember[];
+  allCrew: BusStaffMember[];
 }
 
 export interface RoomAllocationItem {
@@ -461,6 +470,55 @@ interface RawBus {
   extraTeachers?: Array<{ role: string; name: string; phone: string }>;
 }
 
+const CREW_ROLES = ["מורה אחראי/ת", "מורה נוסף", "נהג", "מאבטח/חובש", "מדריך"];
+
+function parseBusManifestItem(b: RawBus, busNumber: number): BusManifestItem {
+  let driver: { name: string; phone: string } | undefined = undefined;
+  let medicOrGuard: { name: string; phone: string } | undefined = undefined;
+  let guide: { name: string; phone: string } | undefined = undefined;
+  const teachers: BusStaffMember[] = [];
+  const allCrew: BusStaffMember[] = [];
+
+  (b.crew || []).forEach((c, idx) => {
+    const role = CREW_ROLES[idx] || "מלווה";
+    const name = (c.name || "").trim();
+    const phone = (c.phone || "").trim();
+    if (!name && !phone) return;
+
+    allCrew.push({ role, name, phone });
+
+    if (role === "נהג") {
+      driver = { name, phone };
+    } else if (role === "מאבטח/חובש") {
+      medicOrGuard = { name, phone };
+    } else if (role === "מדריך") {
+      guide = { name, phone };
+    } else {
+      teachers.push({ role, name, phone });
+    }
+  });
+
+  (b.extraTeachers || []).forEach((t) => {
+    const name = (t.name || "").trim();
+    const phone = (t.phone || "").trim();
+    const role = (t.role || "מורה").trim();
+    if (name || phone) {
+      teachers.push({ role, name, phone });
+      allCrew.push({ role, name, phone });
+    }
+  });
+
+  return {
+    busNumber,
+    classes: (b.classSelections || []).filter(Boolean),
+    driver,
+    medicOrGuard,
+    guide,
+    teachers,
+    allCrew,
+  };
+}
+
 export async function getBusManifest(
   tripId: string,
   busNumberQuery?: number | string
@@ -473,11 +531,11 @@ export async function getBusManifest(
     .doc("vav")
     .get();
 
-  if (!vavDoc.exists) return { message: "לא הוזנו עדיין נתוני אוטובוסים (נספח ו׳)" };
+  if (!vavDoc.exists) return { message: "לא הוזנו עדיין נתוני אוטובוסים בטבלת השליטה (נספח ו׳)" };
 
   const vavData = vavDoc.data() as { days?: Array<{ buses?: RawBus[] }> };
   const days = vavData?.days || [];
-  if (days.length === 0) return { message: "אין ימים מוגדרים בטבלת אוטובוסים" };
+  if (days.length === 0) return { message: "אין ימים מוגדרים בטבלת השליטה" };
 
   const currentDay = days[0];
   const buses: RawBus[] = currentDay.buses || [];
@@ -489,21 +547,12 @@ export async function getBusManifest(
         : parseInt(busNumberQuery.toString(), 10) - 1;
 
     const b = buses[targetIdx];
-    if (!b) return { message: `לא נמצא אוטובוס מספר ${busNumberQuery}` };
+    if (!b) return { message: `לא נמצא אוטובוס מספר ${busNumberQuery} בטבלת השליטה` };
 
-    return {
-      busNumber: targetIdx + 1,
-      classes: b.classSelections?.filter(Boolean) || [],
-      crew: b.crew?.filter((c) => c.name || c.phone) || [],
-      extraTeachers: b.extraTeachers || [],
-    };
+    return parseBusManifestItem(b, targetIdx + 1);
   }
 
-  return buses.map((b, idx) => ({
-    busNumber: idx + 1,
-    classes: b.classSelections?.filter(Boolean) || [],
-    crew: b.crew?.filter((c) => c.name || c.phone) || [],
-  }));
+  return buses.map((b, idx) => parseBusManifestItem(b, idx + 1));
 }
 
 interface RawRoom {
