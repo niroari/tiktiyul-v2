@@ -59,141 +59,96 @@ export function TelegramAssistantCard() {
   }
 
   return (
-    <Card className="border-sky-500/30 bg-gradient-to-br from-sky-500/5 via-background to-sky-500/10 shadow-sm">
-      <CardHeader>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-500 text-white shadow-md shadow-sky-500/20">
-              <Send className="h-5 w-5" />
+    <Card className="border-sky-500/20 bg-sky-500/5 shadow-sm">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500 text-white shadow-sm">
+              <Send className="h-4 w-4" />
             </div>
             <div>
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
+              <CardTitle className="text-base font-semibold">
                 סוכן טלגרם לשטח (AI) — חיליק 🎒
               </CardTitle>
-              <CardDescription className="text-xs text-muted-foreground mt-0.5">
-                עוזר שטח מבצעי 360° המסונכרן בזמן אמת עם כל נתוני הטיול, טבלת השליטה וחוזרי מנכ״ל
+              <CardDescription className="text-xs text-muted-foreground">
+                מענה מבצעי מיידי: טבלת שליטה, אישור ביטחוני, אלרגיות, מזג אוויר וחוזרי מנכ״ל
               </CardDescription>
             </div>
           </div>
-          <Badge variant="outline" className="w-fit bg-sky-50 text-sky-700 border-sky-300">
-            פעיל ומסונכרן בזמן אמת
+          <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200 text-[11px]">
+            שטח ובטיחות
           </Badge>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-5">
+      <CardContent className="space-y-3.5 pt-0">
         {error && (
-          <div className="rounded-md bg-destructive/15 p-3 text-xs text-destructive">
+          <div className="rounded-md bg-destructive/15 p-2.5 text-xs text-destructive">
             {error}
           </div>
         )}
 
-        {/* ── Updated Capabilities Grid ── */}
-        <div className="rounded-lg border bg-card p-3.5 space-y-2.5">
-          <span className="text-xs font-semibold text-foreground block">
-            מה חיליק יודע לעשות עבורך בשטח?
-          </span>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-muted-foreground">
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none">🚌</span>
-              <div>
-                <strong className="text-foreground">טבלת שליטה ואוטובוסים:</strong> נהגים, מורים מלווים, חובשים ומספרי טלפון ישירים (נספח ו׳).
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none">🛡️</span>
-              <div>
-                <strong className="text-foreground">פענוח אישור ביטחוני (PDF):</strong> כמות מאבטחים, דרישות נשק ביום ובלינה והנחיות חדר מצב.
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none">🚨</span>
-              <div>
-                <strong className="text-foreground">מגבלות רפואיות (נספח י׳):</strong> איתור מיידי של נשאי מזרק אפיפן, אלרגיות ומחלות כרוניות.
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none">🥗</span>
-              <div>
-                <strong className="text-foreground">העדפות מזון והסעדה:</strong> סיכומי מנות צמחוניות, טבעוניות וללא גלוטן (צליאק) למטבח.
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none">⛅</span>
-              <div>
-                <strong className="text-foreground">מזג אוויר ועומס חום:</strong> תחזית חיה ליעד וכללי חוזרי מנכ״ל לעומס חום והליכה בטוחה.
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <span className="text-base leading-none">🌲</span>
-              <div>
-                <strong className="text-foreground">מסלולים וידיעת הארץ:</strong> מסלולים חלופיים מוצלים, שעות פתיחה, ופרטי קשר לאכסניה ולספקים.
-              </div>
-            </div>
+        {/* ── Compact Capabilities ── */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-muted-foreground rounded-lg border bg-background/80 p-2.5">
+          <div className="flex items-center gap-1.5">
+            <span>🚌</span>
+            <span><strong className="text-foreground">טבלת שליטה:</strong> נהגים, מורים וטלפונים ישירים</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span>🛡️</span>
+            <span><strong className="text-foreground">אישור ביטחוני:</strong> פענוח דרישות נשק ואבטחה (PDF)</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span>🚨</span>
+            <span><strong className="text-foreground">בריאות ומזון:</strong> מזרקי אפיפן (נספח י׳) והסעדה</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span>⛅</span>
+            <span><strong className="text-foreground">שטח ומסלולים:</strong> עומס חום, מסלולים חלופיים ואכסניה</span>
           </div>
         </div>
 
-        {/* ── How to find the bot in Telegram ── */}
-        <div className="rounded-lg border border-sky-500/20 bg-sky-50/50 dark:bg-sky-950/20 p-3.5 space-y-2">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-              <span>איך מוצאים את חיליק בטלגרם?</span>
-            </span>
+        {/* ── Compact How-to & Link ── */}
+        <div className="flex items-center justify-between text-xs bg-sky-100/50 dark:bg-sky-950/30 border border-sky-500/20 rounded-md px-3 py-2">
+          <span className="text-muted-foreground">
+            חיפוש בטלגרם:{" "}
             <a
               href={`https://t.me/${botUsername}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-xs font-medium text-sky-600 hover:text-sky-700 hover:underline inline-flex items-center gap-1"
+              className="font-medium text-sky-700 dark:text-sky-400 hover:underline inline-flex items-center gap-1"
             >
-              <span>@{botUsername}</span>
+              @{botUsername}
               <ExternalLink className="h-3 w-3" />
             </a>
-          </div>
-
-          <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1">
-            <li>
-              פתחו את טלגרם וחפשו{" "}
-              <strong className="text-foreground">@{botUsername}</strong> (או לחצו על הקישור הישיר:{" "}
-              <a
-                href={`https://t.me/${botUsername}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-sky-600 hover:underline font-mono"
-              >
-                t.me/{botUsername}
-              </a>
-              ).
-            </li>
-            <li>
-              הפיקו קוד חיבור למטה והדביקו אותו בצ׳אט (או התחברו בלחיצה אחת).
-            </li>
-            <li>
-              <span className="text-foreground font-medium">שיתוף עם הצוות:</span> הקוד תקף ל-48 שעות וניתן לשתף אותו עם כל המורים המלווים בקבוצת הוואטסאפ של הטיול!
-            </li>
-          </ol>
+          </span>
+          <span className="text-[11px] text-muted-foreground hidden sm:inline">
+            (קוד החיבור משמש את כל המורים המלווים)
+          </span>
         </div>
 
-        {/* ── PIN Generation & 1-Click Action ── */}
+        {/* ── PIN Action ── */}
         {!pin ? (
-          <div className="pt-1">
+          <div>
             <Button
               type="button"
               onClick={handleGeneratePin}
               disabled={loading}
+              size="sm"
               className="gap-2 bg-sky-600 hover:bg-sky-700 text-white shadow-sm"
             >
-              <Key className="h-4 w-4" />
-              {loading ? "מייצר קוד חיבור..." : "הפק קוד חיבור לטלגרם"}
+              <Key className="h-3.5 w-3.5" />
+              {loading ? "מייצר קוד..." : "הפק קוד חיבור לטלגרם"}
             </Button>
           </div>
         ) : (
-          <div className="space-y-4 rounded-lg bg-background p-4 border border-sky-500/30 shadow-sm">
+          <div className="space-y-3 rounded-lg bg-background p-3.5 border shadow-sm">
             <div className="flex items-center justify-between">
               <div>
-                <span className="text-xs text-muted-foreground block">
-                  קוד חיבור לטיול זה (תקף ל-48 שעות לכל צוות המורים):
+                <span className="text-[11px] text-muted-foreground block">
+                  קוד חיבור (תקף ל-48 שעות לכל הצוות):
                 </span>
-                <span className="text-3xl font-mono font-bold tracking-widest text-primary">
+                <span className="text-2xl font-mono font-bold tracking-widest text-primary">
                   {pin}
                 </span>
               </div>
@@ -202,17 +157,17 @@ export function TelegramAssistantCard() {
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
-                className="gap-1.5"
+                className="gap-1.5 h-8 text-xs"
               >
                 {copied ? (
                   <>
-                    <Check className="h-4 w-4 text-emerald-600" />
+                    <Check className="h-3.5 w-3.5 text-emerald-600" />
                     <span>הועתק</span>
                   </>
                 ) : (
                   <>
-                    <Copy className="h-4 w-4" />
-                    <span>העתק קוד</span>
+                    <Copy className="h-3.5 w-3.5" />
+                    <span>העתק</span>
                   </>
                 )}
               </Button>
@@ -223,14 +178,15 @@ export function TelegramAssistantCard() {
                 href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="block pt-1"
+                className="block"
               >
                 <Button
                   type="button"
-                  className="w-full gap-2 bg-sky-600 hover:bg-sky-700 text-white shadow-sm text-sm"
+                  size="sm"
+                  className="w-full gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs"
                 >
-                  <Send className="h-4 w-4" />
-                  פתח שיחה בטלגרם והתחבר בלחיצה אחת
+                  <Send className="h-3.5 w-3.5" />
+                  פתח בטלגרם והתחבר בלחיצה אחת
                 </Button>
               </a>
             )}
