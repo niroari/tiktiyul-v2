@@ -228,18 +228,159 @@ export async function searchStudents(
   return results.slice(0, 20); // Cap for WhatsApp brevity
 }
 
-export async function getAllergiesAndMedical(
+export interface MedicalRestrictionItem {
+  name: string;
+  class: string;
+  issue: string;
+  notes?: string;
+  phone?: string;
+  hasEpipen: boolean;
+  hasCert: boolean;
+}
+
+export interface MedicalRestrictionsResult {
+  totalRestrictions: number;
+  epipenCarriersCount: number;
+  epipenStudents: Array<{ name: string; class: string; phone?: string; details: string }>;
+  otherMedicalStudents: MedicalRestrictionItem[];
+}
+
+export async function getMedicalRestrictions(
   tripId: string,
-  classFilter?: string
-): Promise<
-  Array<{
-    name: string;
-    class: string;
-    allergies: string[];
-    medicalNotes?: string;
-    phone?: string;
-  }>
-> {
+  classFilter?: string,
+  onlyEpipen?: boolean
+): Promise<MedicalRestrictionsResult> {
+  const db = getAdminDb();
+
+  // 1. Fetch Appendix Yod (נספח י׳ - מגבלות רפואיות)
+  const yodDoc = await db
+    .collection("trips")
+    .doc(tripId)
+    .collection("appendices")
+    .doc("yod")
+    .get();
+
+  const yodRows = (yodDoc.exists ? (yodDoc.data()?.rows || []) : []) as Array<{
+    id?: string;
+    studentId?: string;
+    firstName?: string;
+    lastName?: string;
+    class?: string;
+    issue?: string;
+    notes?: string;
+    certUrl?: string;
+  }>;
+
+  // 2. Fetch Students for phone numbers & any stray medicalNotes
+  const studentsSnap = await db
+    .collection("trips")
+    .doc(tripId)
+    .collection("students")
+    .get();
+
+  const studentMap = new Map<string, Student>();
+  const studentByNameMap = new Map<string, Student>();
+  studentsSnap.forEach((d) => {
+    const s = d.data() as Student;
+    studentMap.set(d.id, s);
+    const fullName = `${s.firstName || ""} ${s.lastName || ""}`.trim();
+    if (fullName) studentByNameMap.set(fullName, s);
+  });
+
+  const processedIds = new Set<string>();
+  const allRestrictions: MedicalRestrictionItem[] = [];
+
+  for (const r of yodRows) {
+    const s =
+      (r.studentId ? studentMap.get(r.studentId) : undefined) ||
+      studentByNameMap.get(`${r.firstName || ""} ${r.lastName || ""}`.trim());
+    if (s?.id) processedIds.add(s.id);
+    if (r.studentId) processedIds.add(r.studentId);
+
+    const cls = r.class || s?.class || "";
+    if (classFilter && cls !== classFilter) continue;
+
+    const issueText = (r.issue || "").trim();
+    const notesText = (r.notes || "").trim();
+    const fullText = `${issueText} ${notesText}`;
+    const hasEpipen = /אפיפן|epipen/i.test(fullText);
+
+    if (onlyEpipen && !hasEpipen) continue;
+
+    allRestrictions.push({
+      name: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
+      class: cls,
+      issue: issueText,
+      notes: notesText || undefined,
+      phone: s?.phone,
+      hasEpipen,
+      hasCert: Boolean(r.certUrl && r.certUrl.trim()),
+    });
+  }
+
+  // Also include students who have medicalNotes on their record but were not in Appendix Yod
+  studentsSnap.forEach((d) => {
+    if (processedIds.has(d.id)) return;
+    const s = d.data() as Student;
+    if (!s.medicalNotes || !s.medicalNotes.trim()) return;
+    if (classFilter && s.class !== classFilter) return;
+
+    const fullText = s.medicalNotes.trim();
+    const hasEpipen = /אפיפן|epipen/i.test(fullText);
+    if (onlyEpipen && !hasEpipen) return;
+
+    allRestrictions.push({
+      name: `${s.firstName || ""} ${s.lastName || ""}`.trim(),
+      class: s.class || "",
+      issue: fullText,
+      phone: s.phone,
+      hasEpipen,
+      hasCert: false,
+    });
+  });
+
+  const epipenStudents = allRestrictions
+    .filter((m) => m.hasEpipen)
+    .map((m) => ({
+      name: m.name,
+      class: m.class,
+      phone: m.phone,
+      details: [m.issue, m.notes].filter(Boolean).join(" - "),
+    }));
+
+  const otherMedicalStudents = allRestrictions.filter((m) => !m.hasEpipen);
+
+  return {
+    totalRestrictions: allRestrictions.length,
+    epipenCarriersCount: epipenStudents.length,
+    epipenStudents,
+    otherMedicalStudents,
+  };
+}
+
+export interface DietaryPreferenceItem {
+  name: string;
+  class: string;
+  phone?: string;
+  vegetarian: boolean;
+  vegan: boolean;
+  glutenFree: boolean;
+  preferenceSummary: string;
+}
+
+export interface DietaryPreferencesResult {
+  totalWithDietary: number;
+  totalVegetarian: number;
+  totalVegan: number;
+  totalGlutenFree: number;
+  students: DietaryPreferenceItem[];
+}
+
+export async function getDietaryPreferences(
+  tripId: string,
+  classFilter?: string,
+  preferenceType?: "all" | "vegetarian" | "vegan" | "glutenFree"
+): Promise<DietaryPreferencesResult> {
   const db = getAdminDb();
   const studentsSnap = await db
     .collection("trips")
@@ -247,38 +388,70 @@ export async function getAllergiesAndMedical(
     .collection("students")
     .get();
 
-  const results: Array<{
-    name: string;
-    class: string;
-    allergies: string[];
-    medicalNotes?: string;
-    phone?: string;
-  }> = [];
+  let totalVegetarian = 0;
+  let totalVegan = 0;
+  let totalGlutenFree = 0;
+  const students: DietaryPreferenceItem[] = [];
 
-  studentsSnap.forEach((doc) => {
-    const s = doc.data() as Student;
+  studentsSnap.forEach((d) => {
+    const s = d.data() as Student;
     if (classFilter && s.class !== classFilter) return;
 
-    const allergies: string[] = [];
-    if (s.dietaryFlags?.vegetarian) allergies.push("צמחוני");
-    if (s.dietaryFlags?.vegan) allergies.push("טבעוני");
-    if (s.dietaryFlags?.glutenFree) allergies.push("ללא גלוטן (צליאק)");
+    const isVeg = Boolean(s.dietaryFlags?.vegetarian);
+    const isVegan = Boolean(s.dietaryFlags?.vegan);
+    const isGlutenFree = Boolean(s.dietaryFlags?.glutenFree);
 
-    const hasDietary = allergies.length > 0;
-    const hasMedical = Boolean(s.medicalNotes && s.medicalNotes.trim());
+    if (isVeg) totalVegetarian++;
+    if (isVegan) totalVegan++;
+    if (isGlutenFree) totalGlutenFree++;
 
-    if (hasDietary || hasMedical) {
-      results.push({
-        name: `${s.firstName || ""} ${s.lastName || ""}`.trim(),
-        class: s.class || "",
-        allergies,
-        medicalNotes: s.medicalNotes,
-        phone: s.phone,
-      });
-    }
+    if (!isVeg && !isVegan && !isGlutenFree) return;
+
+    if (preferenceType === "vegetarian" && !isVeg) return;
+    if (preferenceType === "vegan" && !isVegan) return;
+    if (preferenceType === "glutenFree" && !isGlutenFree) return;
+
+    const labels: string[] = [];
+    if (isVeg) labels.push("צמחוני 🥗");
+    if (isVegan) labels.push("טבעוני 🌱");
+    if (isGlutenFree) labels.push("ללא גלוטן (צליאק) 🌾");
+
+    students.push({
+      name: `${s.firstName || ""} ${s.lastName || ""}`.trim(),
+      class: s.class || "",
+      phone: s.phone,
+      vegetarian: isVeg,
+      vegan: isVegan,
+      glutenFree: isGlutenFree,
+      preferenceSummary: labels.join(", "),
+    });
   });
 
-  return results;
+  return {
+    totalWithDietary: students.length,
+    totalVegetarian,
+    totalVegan,
+    totalGlutenFree,
+    students,
+  };
+}
+
+export async function getAllergiesAndMedical(
+  tripId: string,
+  classFilter?: string
+): Promise<{
+  medicalRestrictions: MedicalRestrictionsResult;
+  dietaryPreferences: DietaryPreferencesResult;
+}> {
+  const [medical, dietary] = await Promise.all([
+    getMedicalRestrictions(tripId, classFilter),
+    getDietaryPreferences(tripId, classFilter),
+  ]);
+
+  return {
+    medicalRestrictions: medical,
+    dietaryPreferences: dietary,
+  };
 }
 
 interface RawBus {

@@ -3,6 +3,8 @@ import {
   getTripOverview,
   searchStudents,
   getAllergiesAndMedical,
+  getMedicalRestrictions,
+  getDietaryPreferences,
   getBusManifest,
   getRoomAllocation,
   getStaffAndContacts,
@@ -41,16 +43,21 @@ const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי ש
    - ⛅ למזג אוויר ועומס חום.
    - 🌲 למסלולי טיול, אתרי טבע ונקודות עניין.
    - ✍️ לחתימות דיגיטליות ומסמכים.
-4. שימוש בכלים הייעודיים:
+4. שימוש בכלים הייעודיים והפרדה ברורה בין רפואי להסעדה:
+   - 🚨 מגבלות רפואיות, אלרגיות מסכנות חיים, מזרקי אפיפן, מחלות כרוניות, נכויות, פציעות, תרופות (נספח י'): השתמש אך ורק ב-'get_medical_restrictions'. זהו נספח י' הרשמי!
+     * הדגש מיד באימוג'י 🚨 ובאופן בולט כל תלמיד שנושא מזרק אפיפן (Epipen).
+     * פרט את שם התלמיד, כיתתו, המגבלה הרפואית המדויקת, הנחיות מיוחדות ומספר טלפון לחירום.
+   - 🥗 העדפות מזון, תזונה ומנות מיוחדות (צמחוני, טבעוני, ללא גלוטן/צליאק): השתמש ב-'get_dietary_preferences'.
+     * לעולם, בשום אופן, אל תציג תלמידים צמחוניים או טבעוניים כבעלי "מגבלה רפואית"! אלו העדפות מזון לצורכי קייטרינג/הסעדה ולא נספח רפואי.
+   - 🔒 אבטחת מידע וסודיות רפואית: המידע הרפואי של התלמידים מנספח י' הוא מידע אישי מוגן ורגיש. הצג אותו אך ורק בתשובה לשאלות מפורשות של הצוות החינוכי המחובר. איסור מוחלט: לעולם אל תעביר שמות תלמידים או פרטים רפואיים אישיים כחלק משאילתות חיפוש ברשת ('search_web_and_sites_info')!
    - כמויות תלמידים, כמה יוצאים/לא יוצאים, שמות מי שלא יוצא, חלוקת בנים/בנות: 'get_trip_overview'.
    - תחזית מזג אוויר ועומס חום: 'get_weather_and_climate' ובדיקת תקנות ב-'search_safety_regulations' (חוזר אקלים).
    - סטטוס חתימות ומוכנות נספחים: 'get_trip_documents_and_signatures'.
-   - דרישות אבטחה, נשק, כמה מאבטחים נדרשים, חובשים, או הנחיות מהאישור הביטחוני: 'get_security_approval_details' (כלי זה קורא ומפענח ישירות את קובץ ה-PDF של האישור הביטחוני שהועלה לטיול).
+   - דרישות אבטחה, נשק, כמה מאבטחים נדרשים, חובשים, או הנחיות מהאישור הביטחוני: 'get_security_approval_details'.
    - מסלולים חלופיים, אתרי טבע, שעות פתיחה, התרעות: 'search_web_and_sites_info'.
    - הורים מלווים: 'get_accompanying_parents'.
    - אוטובוסים, נהגים, חובשים: 'get_bus_manifest'.
    - שיבוץ חדרים: 'get_room_allocation'.
-   - אלרגיות ומגבלות רפואיות: 'get_allergies_and_medical'.
    - לוח זמנים: 'get_itinerary'.
 5. נאמנות מוחלטת למידע: אם פרט כלשהו לא עודכן בתיק הטיול, ציין זאת במפורש.`;
 
@@ -85,8 +92,42 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "get_medical_restrictions",
+    description: "שליפת נספח י׳ הרשמי ('מגבלות רפואיות') של הטיול: רשימת תלמידים עם בעיות בריאותיות, מחלות כרוניות, נכויות, פציעות, והכי חשוב - אלרגיות מסכנות חיים ונשאי מזרק אפיפן (🚨). כלי זה מיועד אך ורק לבטיחות וחירום רפואי.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        classFilter: {
+          type: Type.STRING,
+          description: "סינון אופציונלי לפי כיתה (לדוגמה 'ט׳2', 'ט׳3')",
+        },
+        onlyEpipen: {
+          type: Type.BOOLEAN,
+          description: "האם להציג רק תלמידים הנושאים מזרק אפיפן / אלרגיות מסכנות חיים",
+        },
+      },
+    },
+  },
+  {
+    name: "get_dietary_preferences",
+    description: "שליפת העדפות מזון ותזונה של תלמידים לצורכי הסעדה, קייטרינג, מטבח והזמנת מנות (צמחוני, טבעוני, ללא גלוטן/צליאק). כלי זה נועד אך ורק להסעדה ואינו מחליף את נספח י׳ הרפואי.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        classFilter: {
+          type: Type.STRING,
+          description: "סינון אופציונלי לפי כיתה",
+        },
+        preferenceType: {
+          type: Type.STRING,
+          description: "סינון לפי סוג העדפה: all, vegetarian, vegan, glutenFree",
+        },
+      },
+    },
+  },
+  {
     name: "get_allergies_and_medical",
-    description: "שליפת כל התלמידים עם אלרגיות למזון, רגישויות (צליאק, צמחוני, טבעוני) והערות רפואיות/תרופות.",
+    description: "שליפת כל המידע המשלים על מגבלות רפואיות (נספח י') והעדפות מזון (צמחוני, טבעוני, צליאק).",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -267,6 +308,21 @@ async function executeTool(
           typeof args.classFilter === "string" ? args.classFilter : undefined,
           typeof args.onlyNotGoing === "boolean" ? args.onlyNotGoing : undefined
         );
+        return JSON.stringify(data);
+      }
+      case "get_medical_restrictions": {
+        const cls = typeof args.classFilter === "string" ? args.classFilter : undefined;
+        const onlyEpipen = typeof args.onlyEpipen === "boolean" ? args.onlyEpipen : undefined;
+        const data = await getMedicalRestrictions(tripId, cls, onlyEpipen);
+        return JSON.stringify(data);
+      }
+      case "get_dietary_preferences": {
+        const cls = typeof args.classFilter === "string" ? args.classFilter : undefined;
+        const prefType =
+          typeof args.preferenceType === "string"
+            ? (args.preferenceType as "all" | "vegetarian" | "vegan" | "glutenFree")
+            : undefined;
+        const data = await getDietaryPreferences(tripId, cls, prefType);
         return JSON.stringify(data);
       }
       case "get_allergies_and_medical": {
