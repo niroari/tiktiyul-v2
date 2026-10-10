@@ -14,6 +14,12 @@ import {
   getAccompanyingParents,
   getSecurityApprovalDetails,
 } from "./trip-tools";
+import {
+  scheduleReminder,
+  broadcastToStaff,
+  listActiveReminders,
+  cancelReminder,
+} from "./reminders";
 import { searchSafetyRegulations, CircularType } from "./safety-guidelines/search";
 
 function getGeminiClient(): GoogleGenAI | null {
@@ -43,7 +49,14 @@ const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי ש
    - ⛅ למזג אוויר ועומס חום.
    - 🌲 למסלולי טיול, אתרי טבע ונקודות עניין.
    - ✍️ לחתימות דיגיטליות ומסמכים.
-4. שימוש בכלים הייעודיים והפרדה ברורה בין רפואי להסעדה:
+   - ⏰ לתזכורות ושעונים.
+   - 📢 לשידורים והודעות קבוצתיות לצוות.
+4. שימוש בכלים הייעודיים, תזכורות ושידורים:
+   - ⏰ תזכורות עתידיות (אישיות או לצוות): 'schedule_reminder'. כלי זה מתזמן הודעה שתשלח בטלגרם בשעה ובתאריך המבוקשים.
+     * כאשר המשתמש מבקש "תזכיר לי מחר ב-9:00...", "שלח לי תזכורת בעוד שעתיים...", "תזכיר לי ביום ראשון..." - חשב תמיד את מועד ה-scheduledAt בפורמט ISO מדויק לפי התאריך והשעה הנוכחיים בישראל!
+     * אשר למשתמש בצורה נעימה וברורה את מועד התזכורת המדויק שנקבע (⏰).
+   - 📢 שידור מיידי לכל המורים המלווים בטיול: 'broadcast_to_staff'. משמש כאשר המשתמש מבקש לשלוח הודעה דחופה לכל המורים המחוברים לטיול (למשל: "שלח לכל המורים שהיציאה נדחתה", "שדר לצוות להתכנס בלובי").
+   - 📋 תזכורות פעילות וביטול: 'list_my_reminders' ו-'cancel_reminder'.
    - 🚨 מגבלות רפואיות, אלרגיות מסכנות חיים, מזרקי אפיפן, מחלות כרוניות, נכויות, פציעות, תרופות (נספח י'): השתמש אך ורק ב-'get_medical_restrictions'. זהו נספח י' הרשמי!
      * הדגש מיד באימוג'י 🚨 ובאופן בולט כל תלמיד שנושא מזרק אפיפן (Epipen).
      * פרט את שם התלמיד, כיתתו, המגבלה הרפואית המדויקת, הנחיות מיוחדות ומספר טלפון לחירום.
@@ -260,6 +273,64 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       },
     },
   },
+  {
+    name: "schedule_reminder",
+    description: "קביעת תזכורת עתידית או התרעה שתישלח בטלגרם. יכולה להישלח למשתמש עצמו (targetType: 'self') או כהודעה לכל צוות המורים המלווה המחובר לטיול (targetType: 'all_staff').",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        text: {
+          type: Type.STRING,
+          description: "תוכן התזכורת או ההודעה (למשל: 'להזמין מאבטחים', 'תדריך צוות בלובי בעוד חצי שעה')",
+        },
+        scheduledAt: {
+          type: Type.STRING,
+          description: "מועד השליחה המבוקש בפורמט ISO 8601 (למשל: 2026-10-11T09:00:00+03:00 או UTC). יש לחשב על בסיס שעון ישראל הנוכחי.",
+        },
+        targetType: {
+          type: Type.STRING,
+          description: "למי לשלוח: 'self' עבור תזכורת אישית למשתמש, או 'all_staff' לתפוצת כל המורים והמלווים.",
+        },
+      },
+      required: ["text", "scheduledAt"],
+    },
+  },
+  {
+    name: "broadcast_to_staff",
+    description: "שידור הודעה מיידית (עכשיו) לכל צוות המורים והמלווים המחוברים לטיול בטלגרם.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        text: {
+          type: Type.STRING,
+          description: "נוסח ההודעה המיידית שתישלח לכל הצוות",
+        },
+      },
+      required: ["text"],
+    },
+  },
+  {
+    name: "list_my_reminders",
+    description: "הצגת רשימת כל התזכורות הפעילות/הממתינות לביצוע עבור המשתמש או הטיול.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
+  {
+    name: "cancel_reminder",
+    description: "ביטול תזכורת קיימת לפי מזהה (reminderId).",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        reminderId: {
+          type: Type.STRING,
+          description: "מזהה התזכורת (reminderId) לביטול",
+        },
+      },
+      required: ["reminderId"],
+    },
+  },
 ];
 
 async function searchWebWithGrounding(query: string): Promise<string> {
@@ -299,7 +370,9 @@ async function searchWebWithGrounding(query: string): Promise<string> {
 async function executeTool(
   toolName: string,
   args: Record<string, unknown>,
-  tripId: string
+  tripId: string,
+  chatId?: string,
+  userName?: string
 ): Promise<string> {
   try {
     switch (toolName) {
@@ -393,6 +466,51 @@ async function executeTool(
         const data = await getSecurityApprovalDetails(tripId, q);
         return JSON.stringify(data);
       }
+      case "schedule_reminder": {
+        if (!chatId) {
+          return JSON.stringify({ error: "פעולה זו זמינה רק בשיחה ישירה בטלגרם." });
+        }
+        const text = typeof args.text === "string" ? args.text : "";
+        const scheduledAt = typeof args.scheduledAt === "string" ? args.scheduledAt : "";
+        const targetType = (args.targetType === "all_staff" ? "all_staff" : "self") as "self" | "all_staff";
+        if (!text || !scheduledAt) {
+          return JSON.stringify({ error: "חסר תוכן תזכורת או תאריך ושעה לביצוע." });
+        }
+        const res = await scheduleReminder({
+          tripId,
+          senderChatId: chatId,
+          targetType,
+          text,
+          scheduledAt,
+        });
+        return JSON.stringify(res);
+      }
+      case "broadcast_to_staff": {
+        if (!chatId) {
+          return JSON.stringify({ error: "פעולה זו זמינה רק בשיחה ישירה בטלגרם." });
+        }
+        const text = typeof args.text === "string" ? args.text : "";
+        if (!text) {
+          return JSON.stringify({ error: "חסר תוכן הודעה לשידור." });
+        }
+        const res = await broadcastToStaff(tripId, text, chatId, userName);
+        return JSON.stringify(res);
+      }
+      case "list_my_reminders": {
+        if (!chatId) {
+          return JSON.stringify({ error: "פעולה זו זמינה רק בשיחה ישירה בטלגרם." });
+        }
+        const reminders = await listActiveReminders(tripId, chatId);
+        return JSON.stringify(reminders);
+      }
+      case "cancel_reminder": {
+        const reminderId = typeof args.reminderId === "string" ? args.reminderId : "";
+        if (!reminderId) {
+          return JSON.stringify({ error: "חסר מזהה תזכורת (reminderId) לביטול." });
+        }
+        const res = await cancelReminder(reminderId);
+        return JSON.stringify(res);
+      }
       default:
         return JSON.stringify({ error: `כלי לא מוכר: ${toolName}` });
     }
@@ -407,18 +525,35 @@ export async function askTripAgent(
   userMessage: string,
   tripId: string,
   tripName?: string,
-  history?: Array<{ role: "user" | "model"; text: string }>
+  history?: Array<{ role: "user" | "model"; text: string }>,
+  chatId?: string,
+  userName?: string
 ): Promise<string> {
   const ai = getGeminiClient();
   if (!ai) {
     return "⚠️ שירות ה-AI טרם הוגדר: אנא הוסף את מפתח ה-API (GEMINI_API_KEY) לקובץ .env.local.";
   }
 
+  const now = new Date();
+  const israelTimeStr = now.toLocaleString("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    dateStyle: "full",
+    timeStyle: "medium",
+  });
+  const israelIsoStr = now.toISOString();
+
   const systemWithContext = `${SYSTEM_PROMPT}
+
+זמן ומקום נוכחי:
+- שעון ישראל הנוכחי: ${israelTimeStr}
+- תאריך ושעה ב-ISO (UTC): ${israelIsoStr}
+- כאשר המשתמש מבקש תזכורת (למשל 'מחר ב-9:00', 'בעוד חצי שעה', 'ביום שלישי בבוקר'), עליך לחשב במדויק את המועד המבוקש ב-ISO 8601 ביחס לשעון ישראל הנוכחי ולהפעיל את הכלי schedule_reminder.
 
 נתוני הטיול הנוכחי שהמשתמש מחובר אליו:
 - מזהה הטיול (tripId): ${tripId}
 ${tripName ? `- שם הטיול: ${tripName}` : ""}
+${chatId ? `- מזהה שיחת טלגרם (chatId): ${chatId}` : ""}
+${userName ? `- שם המשתמש: ${userName}` : ""}
 זכור לשמור על רציפות השיחה עם המשתמש, להבין שאלות המשך וכינויי גוף (כגון 'שלהם', 'של המקום', 'האכסניה') לפי הודעות קודמות בשיחה.`;
 
   try {
@@ -454,7 +589,9 @@ ${tripName ? `- שם הטיול: ${tripName}` : ""}
         const resultString = await executeTool(
           call.name,
           (call.args || {}) as Record<string, unknown>,
-          tripId
+          tripId,
+          chatId,
+          userName
         );
         functionResponses.push({
           functionResponse: {

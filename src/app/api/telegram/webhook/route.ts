@@ -149,7 +149,9 @@ export async function POST(req: NextRequest) {
       text,
       session.tripId,
       session.tripName,
-      session.recentMessages
+      session.recentMessages,
+      chatId.toString(),
+      firstName || username
     );
 
     await sendTelegramMessage(chatId, reply);
