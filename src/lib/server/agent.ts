@@ -35,7 +35,7 @@ const SYSTEM_PROMPT = `אתה "עוזר מבצעי תיק טיול" 🎒 - סו�
 const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "get_trip_overview",
-    description: "שליפת פרטי הטיול הכלליים: שם הטיול, בית הספר, תאריכים, לינה, הסעות, כיתות ומספר התלמידים.",
+    description: "שליפת פרטי הטיול הכלליים: שם הטיול, בית הספר, תאריכים, לינה, הסעות, כיתות, סה״כ תלמידים, כמה תלמידים יוצאים (confirmedGoing), כמה לא יוצאים (notGoingCount) ושמות כל התלמידים שלא יוצאים לטיול (notGoingStudents).",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -43,7 +43,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "search_students",
-    description: "חיפוש תלמידים לפי שם מלא, שם פרטי, כיתה, או טלפון. מציג האם התלמיד יוצא, הערות רפואיות ואלרגיות.",
+    description: "חיפוש תלמידים לפי שם מלא, שם פרטי, כיתה, טלפון, או סינון תלמידים שלא יוצאים לטיול. מציג האם התלמיד יוצא (isGoing), הערות רפואיות ואלרגיות.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -54,6 +54,10 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
         classFilter: {
           type: Type.STRING,
           description: "סינון לפי כיתה ספציפית (למשל: ט'1)",
+        },
+        onlyNotGoing: {
+          type: Type.BOOLEAN,
+          description: "האם להציג רק תלמידים שלא יוצאים לטיול",
         },
       },
     },
@@ -148,7 +152,8 @@ async function executeTool(
         const data = await searchStudents(
           tripId,
           typeof args.query === "string" ? args.query : undefined,
-          typeof args.classFilter === "string" ? args.classFilter : undefined
+          typeof args.classFilter === "string" ? args.classFilter : undefined,
+          typeof args.onlyNotGoing === "boolean" ? args.onlyNotGoing : undefined
         );
         return JSON.stringify(data);
       }

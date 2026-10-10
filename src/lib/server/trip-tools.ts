@@ -12,6 +12,8 @@ export interface TripOverviewData {
   classes: Array<{ name: string; studentCount: number }>;
   totalStudents: number;
   confirmedGoing: number;
+  notGoingCount: number;
+  notGoingStudents: Array<{ name: string; class: string; phone?: string }>;
 }
 
 export interface BusManifestItem {
@@ -49,9 +51,20 @@ export async function getTripOverview(
 
   const totalStudents = studentsSnap.size;
   let confirmedGoing = 0;
+  const notGoingStudents: Array<{ name: string; class: string; phone?: string }> = [];
+
   studentsSnap.forEach((doc) => {
     const s = doc.data() as Student;
-    if (s.isGoing) confirmedGoing++;
+    if (s.isGoing) {
+      confirmedGoing++;
+    } else {
+      const fullName = `${s.firstName || ""} ${s.lastName || ""}`.trim();
+      notGoingStudents.push({
+        name: fullName,
+        class: s.class || "",
+        phone: s.phone,
+      });
+    }
   });
 
   return {
@@ -65,13 +78,16 @@ export async function getTripOverview(
     classes: data.classes || [],
     totalStudents,
     confirmedGoing,
+    notGoingCount: notGoingStudents.length,
+    notGoingStudents,
   };
 }
 
 export async function searchStudents(
   tripId: string,
   query?: string,
-  classFilter?: string
+  classFilter?: string,
+  onlyNotGoing?: boolean
 ): Promise<
   Array<{
     name: string;
@@ -109,6 +125,7 @@ export async function searchStudents(
     const s = doc.data() as Student;
     const fullName = `${s.firstName || ""} ${s.lastName || ""}`.trim();
     if (cls && s.class !== cls) return;
+    if (onlyNotGoing && s.isGoing) return;
 
     if (q) {
       const match =
