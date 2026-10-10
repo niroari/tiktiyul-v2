@@ -18,7 +18,7 @@ export function TelegramAssistantCard() {
 
   // Name of the bot in Telegram (configured in NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)
   const botUsername =
-    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "HilikTikTiyulBot";
+    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "hilik_tiktiyul_bot";
 
   async function handleGeneratePin() {
     setLoading(true);
