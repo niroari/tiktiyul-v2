@@ -17,16 +17,31 @@ export function getAdminApp(): App {
   const projectId =
     process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "tik-tiyul";
 
-  if (serviceAccountJson) {
+  if (serviceAccountJson && serviceAccountJson.trim() !== "") {
     try {
+      let raw = serviceAccountJson.trim();
+      // Handle cases where Vercel or user wrapped the JSON in surrounding quotes
+      if (
+        (raw.startsWith('"') && raw.endsWith('"')) ||
+        (raw.startsWith("'") && raw.endsWith("'"))
+      ) {
+        raw = raw.slice(1, -1);
+      }
+
       const parsed = JSON.parse(
-        serviceAccountJson.startsWith("{")
-          ? serviceAccountJson
-          : Buffer.from(serviceAccountJson, "base64").toString("utf-8")
+        raw.startsWith("{")
+          ? raw
+          : Buffer.from(raw, "base64").toString("utf-8")
       );
+
+      // Handle PEM newline escapes in private_key
+      if (parsed.private_key && typeof parsed.private_key === "string") {
+        parsed.private_key = parsed.private_key.replace(/\\n/g, "\n");
+      }
+
       adminApp = initializeApp({
         credential: cert(parsed),
-        projectId,
+        projectId: parsed.project_id || projectId,
       });
       return adminApp;
     } catch (e) {
