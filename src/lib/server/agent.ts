@@ -7,6 +7,9 @@ import {
   getRoomAllocation,
   getStaffAndContacts,
   getItinerary,
+  getTripDocumentsAndSignatures,
+  getWeatherAndClimate,
+  getAccompanyingParents,
 } from "./trip-tools";
 import { searchSafetyRegulations, CircularType } from "./safety-guidelines/search";
 
@@ -18,19 +21,28 @@ function getGeminiClient(): GoogleGenAI | null {
   return new GoogleGenAI({ apiKey });
 }
 
-const SYSTEM_PROMPT = `אתה "עוזר מבצעי תיק טיול" 🎒 - סוכן AI לרכזי טיולים, מנהלים ומורים בשטח.
-המטרה שלך היא לספק מידע מבצעי מהיר, תמציתי ומדויק על הטיול הפעיל ועל נהלי חוזרי מנכ״ל של משרד החינוך.
+const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי של מערכת 'תיק טיול' לרכזי טיולים, מנהלים ומורים בשטח.
+המטרה שלך היא לספק מענה של 360 מעלות על כל נתוני הטיול ועל נהלי חוזרי מנכ״ל של משרד החינוך.
 
 עקרונות פעולה:
-1. תשובות קצרות ומבצעיות: המשתמש נמצא בשטח (על אוטובוס, במסלול הליכה או באכסניה). אל תכתוב פסקאות מבוא או ברכות ארוכות.
+1. תשובות קצרות, מדויקות ומבצעיות: המשתמש נמצא בשטח (על אוטובוס, במסלול או באכסניה). אל תכתוב פסקאות מבוא ארוכות, אלא מידע תכליתי.
 2. אימוג'ים ממוקדים:
-   - 📞 למספרי טלפון (הצג תמיד מספר טלפון נקי כדי שיהיה קל ללחוץ עליו ולחייג).
+   - 📞 למספרי טלפון (הצג מספר טלפון נקי כדי שיהיה קל ללחוץ ולחייג).
    - 🚨 לאלרגיות מסכנות חיים, מזרקי אפיפן או מצבי חירום.
    - 🚌 לאוטובוסים, נהגים ומאבטחים.
    - 🛏️ לחדרים באכסניה.
    - 📋 ללו״ז ומנהלות.
-3. בטיחות ונהלים: כאשר נשאל על מזג אוויר, עומס חום, אבטחה, נשק, מים, אלרגיות או נגישות - השתמש תמיד בכלי 'search_safety_regulations' וצטט את שם החוזר.
-4. נאמנות מוחלטת למידע: אם פרט כלשהו לא הוזן במערכת (למשל חלוקת חדרים לא קיימת או אין נהג רשום), אמור במפורש שהנתון טרם עודכן באתר.`;
+   - ⛅ למזג אוויר ועומס חום.
+   - ✍️ לחתימות דיגיטליות ומסמכים.
+3. שימוש בכלים הייעודיים:
+   - כאשר נשאל על כמויות תלמידים, כמה יוצאים, כמה לא יוצאים, או חלוקת בנים/בנות - השתמש ב-'get_trip_overview' (הוא מכיל סה״כ, יוצאים, לא יוצאים עם שמותיהם, וחלוקת בנים/בנות מדויקת).
+   - כאשר נשאל על מזג אוויר, תחזית לבוקר/צהריים, או עומס חום - השתמש ב-'get_weather_and_climate'. אם נדרשות תקנות נוספות על מסלולים, חפש ב-'search_safety_regulations' (חוזר אקלים).
+   - כאשר נשאל האם המסמכים חתומים, מי חתם, מה חסר או איזה נספחים מולאו - השתמש ב-'get_trip_documents_and_signatures'.
+   - כאשר נשאל על הורים מלווים - השתמש ב-'get_accompanying_parents'.
+   - כאשר נשאל על אוטובוסים, נהגים או חובשים - השתמש ב-'get_bus_manifest'.
+   - כאשר נשאל על שיבוץ חדרים או שותפים לחדר - השתמש ב-'get_room_allocation'.
+   - כאשר נשאל על אלרגיות, צליאק, צמחוני, טבעוני או תרופות - השתמש ב-'get_allergies_and_medical'.
+4. נאמנות מוחלטת למידע: אם פרט כלשהו לא הוזן במערכת, ציין במפורש שהנתון טרם עודכן באתר.`;
 
 const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
@@ -118,6 +130,35 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "get_trip_documents_and_signatures",
+    description: "שליפת סטטוס חתימות דיגיטליות על מסמכי הטיול (האם כל המסמכים חתומים, כתב מינוי מנהל, אישור רכז ומנהל, אישורי הורים) וסטטוס מילוי כל נספחי הטיול (א׳ עד י׳).",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
+  {
+    name: "get_weather_and_climate",
+    description: "שליפת תחזית מזג אוויר חיה ליעד הטיול (טמפרטורת בוקר, שיא חום בצהריים, סיכוי לגשם) וניתוח מדד עומס חום לפי הנחיות חוזר מנכ״ל עומס חום של משרד החינוך.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        location: {
+          type: Type.STRING,
+          description: "שם העיר או האזור לחיזוי (לדוגמה: 'עכו', 'ירושלים', 'מצדה', 'ים המלח'). אם לא צוין, נלקח יעד הטיול.",
+        },
+      },
+    },
+  },
+  {
+    name: "get_accompanying_parents",
+    description: "שליפת רשימת ההורים המלווים בטיול, מספרי הטלפון שלהם, ושמות הילדים והכיתות שלהם.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {},
+    },
+  },
+  {
     name: "search_safety_regulations",
     description: "חיפוש ב-5 חוזרי המנכ״ל הרשמיים בנושאי בטיחות, ביטחון ואבטחה, אקלים ועומס חום, הנגשה פרטנית, ואלרגיות ומזרקי אפיפן.",
     parameters: {
@@ -185,6 +226,19 @@ async function executeTool(
       }
       case "get_itinerary": {
         const data = await getItinerary(tripId);
+        return JSON.stringify(data);
+      }
+      case "get_trip_documents_and_signatures": {
+        const data = await getTripDocumentsAndSignatures(tripId);
+        return JSON.stringify(data);
+      }
+      case "get_weather_and_climate": {
+        const loc = typeof args.location === "string" ? args.location : undefined;
+        const data = await getWeatherAndClimate(tripId, loc);
+        return JSON.stringify(data);
+      }
+      case "get_accompanying_parents": {
+        const data = await getAccompanyingParents(tripId);
         return JSON.stringify(data);
       }
       case "search_safety_regulations": {

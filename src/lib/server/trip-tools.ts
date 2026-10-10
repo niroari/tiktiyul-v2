@@ -14,6 +14,22 @@ export interface TripOverviewData {
   confirmedGoing: number;
   notGoingCount: number;
   notGoingStudents: Array<{ name: string; class: string; phone?: string }>;
+  genderBreakdown: {
+    totalBoys: number;
+    goingBoys: number;
+    notGoingBoys: number;
+    totalGirls: number;
+    goingGirls: number;
+    notGoingGirls: number;
+  };
+  classBreakdown: Array<{
+    class: string;
+    total: number;
+    going: number;
+    notGoing: number;
+    boysGoing: number;
+    girlsGoing: number;
+  }>;
 }
 
 export interface BusManifestItem {
@@ -53,8 +69,51 @@ export async function getTripOverview(
   let confirmedGoing = 0;
   const notGoingStudents: Array<{ name: string; class: string; phone?: string }> = [];
 
+  let totalBoys = 0;
+  let goingBoys = 0;
+  let notGoingBoys = 0;
+  let totalGirls = 0;
+  let goingGirls = 0;
+  let notGoingGirls = 0;
+
+  const classMap = new Map<
+    string,
+    { total: number; going: number; notGoing: number; boysGoing: number; girlsGoing: number }
+  >();
+
   studentsSnap.forEach((doc) => {
     const s = doc.data() as Student;
+    const isFemale = s.gender === "female";
+    const cls = s.class || "לא משובץ";
+
+    if (!classMap.has(cls)) {
+      classMap.set(cls, { total: 0, going: 0, notGoing: 0, boysGoing: 0, girlsGoing: 0 });
+    }
+    const clsStats = classMap.get(cls)!;
+    clsStats.total++;
+
+    if (isFemale) {
+      totalGirls++;
+      if (s.isGoing) {
+        goingGirls++;
+        clsStats.going++;
+        clsStats.girlsGoing++;
+      } else {
+        notGoingGirls++;
+        clsStats.notGoing++;
+      }
+    } else {
+      totalBoys++;
+      if (s.isGoing) {
+        goingBoys++;
+        clsStats.going++;
+        clsStats.boysGoing++;
+      } else {
+        notGoingBoys++;
+        clsStats.notGoing++;
+      }
+    }
+
     if (s.isGoing) {
       confirmedGoing++;
     } else {
@@ -66,6 +125,11 @@ export async function getTripOverview(
       });
     }
   });
+
+  const classBreakdown = Array.from(classMap.entries()).map(([name, stats]) => ({
+    class: name,
+    ...stats,
+  }));
 
   return {
     id: tripDoc.id,
@@ -80,6 +144,15 @@ export async function getTripOverview(
     confirmedGoing,
     notGoingCount: notGoingStudents.length,
     notGoingStudents,
+    genderBreakdown: {
+      totalBoys,
+      goingBoys,
+      notGoingBoys,
+      totalGirls,
+      goingGirls,
+      notGoingGirls,
+    },
+    classBreakdown,
   };
 }
 
@@ -405,3 +478,279 @@ export async function getItinerary(tripId: string): Promise<unknown> {
   const data = daletDoc.data() as { rows?: unknown[] };
   return data?.rows || [];
 }
+
+export interface SignatureStatusItem {
+  role: string;
+  roleName: string;
+  leaderName: string;
+  status: "signed" | "pending";
+  signedAt?: string;
+}
+
+export async function getTripDocumentsAndSignatures(tripId: string): Promise<{
+  isFullySigned: boolean;
+  totalSignatures: number;
+  signedCount: number;
+  pendingCount: number;
+  signatures: SignatureStatusItem[];
+  appendicesStatus: Array<{ id: string; name: string; isFilled: boolean }>;
+}> {
+  const db = getAdminDb();
+
+  // 1. Fetch signatures for this trip
+  const sigSnap = await db
+    .collection("signatures")
+    .where("tripId", "==", tripId)
+    .get();
+
+  const signatures: SignatureStatusItem[] = [];
+  let signedCount = 0;
+  let pendingCount = 0;
+
+  sigSnap.forEach((doc) => {
+    const data = doc.data() as {
+      role: string;
+      roleName?: string;
+      leaderName?: string;
+      status?: "signed" | "pending";
+      signedAt?: { toDate: () => Date };
+    };
+    const isSigned = data.status === "signed";
+    if (isSigned) signedCount++;
+    else pendingCount++;
+
+    signatures.push({
+      role: data.role || "",
+      roleName: data.roleName || data.role || "מסמך",
+      leaderName: data.leaderName || "",
+      status: isSigned ? "signed" : "pending",
+      signedAt: data.signedAt ? data.signedAt.toDate().toLocaleString("he-IL") : undefined,
+    });
+  });
+
+  // 2. Fetch appendices saved status
+  const appSnap = await db
+    .collection("trips")
+    .doc(tripId)
+    .collection("appendices")
+    .get();
+
+  const filledAppIds = new Set<string>();
+  appSnap.forEach((doc) => filledAppIds.add(doc.id));
+
+  const standardAppendices = [
+    { id: "alef", name: "נספח א׳ - בדיקה לפני יציאה" },
+    { id: "bet", name: "נספח ב׳ - אישור מנהל ורכז" },
+    { id: "gimel", name: "נספח ג׳ - כתב מינוי" },
+    { id: "dalet", name: "נספח ד׳ - לוח זמנים (לו״ז)" },
+    { id: "hey", name: "נספח ה׳ - טלפונים חיוניים" },
+    { id: "vav", name: "נספח ו׳ - שיבוץ אוטובוסים" },
+    { id: "zayin", name: "נספח ז׳ - רשימת תלמידים" },
+    { id: "chet", name: "נספח ח׳ - אישורי הורים" },
+    { id: "tet", name: "נספח ט׳ - ציוד חובה" },
+    { id: "yod", name: "נספח י׳ - מגבלות רפואיות" },
+    { id: "rooms", name: "שיבוץ חדרים" },
+    { id: "bus-check", name: "בדיקת תקינות אוטובוס" },
+  ];
+
+  const appendicesStatus = standardAppendices.map((app) => ({
+    id: app.id,
+    name: app.name,
+    isFilled: filledAppIds.has(app.id),
+  }));
+
+  const isFullySigned = signatures.length > 0 && pendingCount === 0;
+
+  return {
+    isFullySigned,
+    totalSignatures: signatures.length,
+    signedCount,
+    pendingCount,
+    signatures,
+    appendicesStatus,
+  };
+}
+
+export async function getAccompanyingParents(tripId: string): Promise<
+  Array<{
+    name: string;
+    phone: string;
+    childName: string;
+    childClass: string;
+    gender?: string;
+  }>
+> {
+  const db = getAdminDb();
+  const snap = await db
+    .collection("trips")
+    .doc(tripId)
+    .collection("parents")
+    .get();
+
+  const parents: Array<{
+    name: string;
+    phone: string;
+    childName: string;
+    childClass: string;
+    gender?: string;
+  }> = [];
+
+  snap.forEach((doc) => {
+    const data = doc.data();
+    parents.push({
+      name: data.name || "",
+      phone: data.phone || "",
+      childName: data.childName || "",
+      childClass: data.childClass || "",
+      gender: data.gender === "female" ? "נקבה" : "זכר",
+    });
+  });
+
+  return parents;
+}
+
+export async function getWeatherAndClimate(
+  tripId: string,
+  customLocation?: string
+): Promise<{
+  destination: string;
+  startDate: string;
+  endDate: string;
+  current?: {
+    temperature: number;
+    apparentTemperature: number;
+    humidity: number;
+    description: string;
+  };
+  forecast?: Array<{
+    date: string;
+    maxTemp: number;
+    minTemp: number;
+    morningTemp?: number;
+    rainProbability: number;
+    heatStressLevel: string;
+  }>;
+  safetyGuidelines: string;
+}> {
+  const db = getAdminDb();
+  const tripDoc = await db.collection("trips").doc(tripId).get();
+  const trip = tripDoc.exists ? (tripDoc.data() as Trip) : null;
+
+  const rawDest =
+    customLocation ||
+    trip?.accommodation ||
+    trip?.schoolName ||
+    "עכו";
+
+  // Coordinates lookup for major Israeli trip locations
+  const knownCoords: Record<string, { lat: number; lon: number; name: string }> = {
+    "עכו": { lat: 32.92, lon: 35.08, name: "עכו" },
+    "אנא": { lat: 32.92, lon: 35.08, name: "אכסניית עכו" },
+    "אנ״א": { lat: 32.92, lon: 35.08, name: "אכסניית עכו" },
+    "חיפה": { lat: 32.79, lon: 34.98, name: "חיפה" },
+    "ירושלים": { lat: 31.77, lon: 35.21, name: "ירושלים" },
+    "תל אביב": { lat: 32.08, lon: 34.78, name: "תל אביב" },
+    "הרצליה": { lat: 32.16, lon: 34.84, name: "הרצליה" },
+    "ים המלח": { lat: 31.46, lon: 35.39, name: "ים המלח" },
+    "עין גדי": { lat: 31.46, lon: 35.39, name: "עין גדי" },
+    "מצדה": { lat: 31.31, lon: 35.35, name: "מצדה" },
+    "אילת": { lat: 29.55, lon: 34.95, name: "אילת" },
+    "טבריה": { lat: 32.79, lon: 35.53, name: "טבריה" },
+    "כנרת": { lat: 32.79, lon: 35.53, name: "הכנרת" },
+    "גליל": { lat: 32.96, lon: 35.49, name: "הגליל" },
+    "צפת": { lat: 32.96, lon: 35.49, name: "צפת" },
+    "גולן": { lat: 32.99, lon: 35.69, name: "רמת הגולן" },
+    "חרמון": { lat: 33.31, lon: 35.78, name: "החרמון" },
+    "נגב": { lat: 30.61, lon: 34.80, name: "הנגב" },
+    "מצפה רמון": { lat: 30.61, lon: 34.80, name: "מצפה רמון" },
+  };
+
+  let lat = 32.92;
+  let lon = 35.08;
+  let resolvedName = "עכו / גליל מערבי";
+
+  for (const [key, val] of Object.entries(knownCoords)) {
+    if (rawDest.includes(key)) {
+      lat = val.lat;
+      lon = val.lon;
+      resolvedName = val.name;
+      break;
+    }
+  }
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,apparent_temperature_max,precipitation_probability_max&hourly=temperature_2m,relative_humidity_2m,apparent_temperature&timezone=Asia%2FJerusalem`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Weather fetch failed");
+
+    const data = await res.json();
+    const current = {
+      temperature: data.current?.temperature_2m || 0,
+      apparentTemperature: data.current?.apparent_temperature || 0,
+      humidity: data.current?.relative_humidity_2m || 0,
+      description: getWeatherDesc(data.current?.weather_code),
+    };
+
+    const forecast = (data.daily?.time || []).slice(0, 5).map((d: string, idx: number) => {
+      const maxT = data.daily?.temperature_2m_max?.[idx] || 0;
+      const minT = data.daily?.temperature_2m_min?.[idx] || 0;
+      const appMax = data.daily?.apparent_temperature_max?.[idx] || maxT;
+      const rain = data.daily?.precipitation_probability_max?.[idx] || 0;
+
+      // Find morning temp (09:00)
+      const morningIndex = (data.hourly?.time || []).findIndex((t: string) => t === `${d}T09:00`);
+      const morningTemp = morningIndex !== -1 ? data.hourly?.temperature_2m?.[morningIndex] : undefined;
+
+      let heatStress = "ללא עומס חום (תנאים נוחים לפעילות שטח)";
+      if (appMax >= 28) {
+        heatStress = "עומס חום כבד ומסוכן (אסורה פעילות מאומצת וחשופה בשעות הצהריים!)";
+      } else if (appMax >= 24) {
+        heatStress = "עומס חום בינוני (מסלולים מוצלים בלבד, חובת הפסקות מרובות בצל)";
+      } else if (appMax >= 22) {
+        heatStress = "עומס חום קל (פעילות מותרת, חובת כובע ושתייה מרובה)";
+      }
+
+      return {
+        date: d,
+        maxTemp: maxT,
+        minTemp: minT,
+        morningTemp,
+        rainProbability: rain,
+        heatStressLevel: heatStress,
+      };
+    });
+
+    return {
+      destination: resolvedName,
+      startDate: trip?.startDate || "",
+      endDate: trip?.endDate || "",
+      current,
+      forecast,
+      safetyGuidelines:
+        "הנחיות חוזר מנכ״ל עומס חום: חובה לפתוח כל בוקר טיול בבדיקת מים (לפחות 3 ליטר מים לתלמיד ליום רגיל, 4.5 ליטר ביום חם), כובע חובה. במידה ונמדד עומס חום כבד, חל איסור כניסה למסלולי הליכה בין השעות 10:00 ל-16:00.",
+    };
+  } catch (err) {
+    console.warn("Live weather fetch failed, returning fallback:", err);
+    return {
+      destination: resolvedName,
+      startDate: trip?.startDate || "",
+      endDate: trip?.endDate || "",
+      safetyGuidelines:
+        "הנחיות חוזר מנכ״ל עומס חום: חובה להצטייד ב-3 ליטר מים לתלמיד וכובע. בעומס חום כבד יש להימנע ממסלולים חשופים בין 10:00 ל-16:00.",
+    };
+  }
+}
+
+function getWeatherDesc(code?: number): string {
+  if (code === undefined || code === null) return "רגיל לעונה";
+  if (code === 0) return "בהיר";
+  if (code === 1 || code === 2) return "בהיר עד מעונן חלקית";
+  if (code === 3) return "מעונן";
+  if (code === 45 || code === 48) return "ערפילי";
+  if (code >= 51 && code <= 67) return "גשם קל עד בינוני";
+  if (code >= 71 && code <= 77) return "שלג";
+  if (code >= 80 && code <= 82) return "ממטרים";
+  if (code >= 95) return "סופת רעמים";
+  return "רגיל לעונה";
+}
+
