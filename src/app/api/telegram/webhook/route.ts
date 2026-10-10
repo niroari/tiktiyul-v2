@@ -133,10 +133,12 @@ export async function POST(req: NextRequest) {
 
     await sendTelegramMessage(chatId, reply);
 
-    // Save turn to session memory (fire & forget to keep webhook response fast)
-    addSessionMessageTurn(chatId, text, reply).catch((err) =>
-      console.warn("Failed to persist session message turn:", err)
-    );
+    // Save turn to session memory before terminating serverless response
+    try {
+      await addSessionMessageTurn(chatId, text, reply);
+    } catch (saveErr) {
+      console.warn("Failed to persist session message turn:", saveErr);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
