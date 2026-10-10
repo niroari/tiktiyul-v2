@@ -83,6 +83,19 @@ export async function POST(req: NextRequest) {
         : NextResponse.json({ status: "already_processed" });
     }
 
+    // ── Loop Guard: Ignore automated bot messages / sandbox auto-replies ──
+    if (
+      text.includes("Standard auto-reply") ||
+      text.includes("customize the reply by configuring") ||
+      text.includes("נעים להכיר, אני חיליק") ||
+      senderPhone === "14155238886" ||
+      senderPhone.endsWith("14155238886")
+    ) {
+      return isTwilio
+        ? createTwilioTwiMLResponse("")
+        : NextResponse.json({ status: "ignored_auto_reply" });
+    }
+
     // ── Helper to dispatch reply ──
     const sendReply = async (replyText: string) => {
       if (isTwilio) {
