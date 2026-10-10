@@ -8,6 +8,8 @@ import {
 import {
   getTelegramSession,
   linkTelegramSessionWithPin,
+  addSessionMessageTurn,
+  clearSessionHistory,
 } from "@/lib/server/session-manager";
 import { askTripAgent } from "@/lib/server/agent";
 
@@ -109,12 +111,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── 4. Process Query with AI Agent (Gemini 2.5 Flash) ──
+    // ── 4. Handle Conversation Reset (/clear or /reset) ──
+    if (text === "/clear" || text === "/reset" || text === "איפוס" || text === "אפס שיחה") {
+      await clearSessionHistory(chatId);
+      await sendTelegramMessage(
+        chatId,
+        "היסטוריית השיחה אופסה בהצלחה! 🔄\nבמה אוכל לסייע לך כעת בנוגע לטיול?"
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── 5. Process Query with AI Agent (Gemini 2.5 Flash + Session History) ──
     await sendTelegramTyping(chatId);
 
-    const reply = await askTripAgent(text, session.tripId, session.tripName);
+    const reply = await askTripAgent(
+      text,
+      session.tripId,
+      session.tripName,
+      session.recentMessages
+    );
 
     await sendTelegramMessage(chatId, reply);
+
+    // Save turn to session memory (fire & forget to keep webhook response fast)
+    addSessionMessageTurn(chatId, text, reply).catch((err) =>
+      console.warn("Failed to persist session message turn:", err)
+    );
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {

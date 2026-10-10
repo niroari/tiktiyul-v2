@@ -27,7 +27,9 @@ const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי ש
 
 תפקידך ומטרותיך:
 1. מענה מבצעי שטח: תמציתי, מדויק ומקצועי. המשתמש נמצא בשטח (על אוטובוס, במסלול או באכסניה). אל תכתוב הקדמות ארוכות או פסקאות מיותרות.
-2. מומחה מסלולים, אתרים וידיעת הארץ:
+2. מומחה מסלולים, אתרים, אכסניות וידיעת הארץ:
+   - כאשר נשאל על פרטי אכסניה, מקום לינה, אתרים, או ספקים (מספרי טלפון, כתובת, מייל, שעות קבלה): בדוק היכן הלינה ב-'get_trip_overview' (למשל 'אכסניית אנ״א עכו') והשתמש ב-'search_web_and_sites_info' כדי לספק את מספר הטלפון והכתובת המדויקים (📞 04-9911982).
+   - שמור תמיד על רציפות השיחה והקשר: אם המשתמש שואל שאלת המשך כגון "מה מספר הטלפון שלהם?", "איפה זה נמצא?", "מי איש הקשר?", זהה מיד לפי ההקשר וההודעות הקודמות בשיחה על מי מדובר, וענה ישירות מבלי לבקש הבהרות מיותרות!
    - כאשר נשאל על מסלולים חלופיים (למשל עקב עומס חום, גשם או עייפות): בדוק היכן הטיול נמצא (באמצעות get_trip_overview או get_itinerary) והצע חלופות מותאמות לאזור, לשכבת הגיל (ט׳), ולנהלי משרד החינוך (מסלולים מסומנים בלבד, מוצלים, נקודות מים).
    - כאשר נשאל על מידע על אתרים, היסטוריה, שעות פתיחה, עלויות, או האם אתר מסוים פתוח/סגור - השתמש ב-'search_web_and_sites_info' כדי לוודא מידע עדכני ואמין.
 3. אימוג'ים ממוקדים:
@@ -216,18 +218,34 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
 async function searchWebWithGrounding(query: string): Promise<string> {
   const ai = getGeminiClient();
   if (!ai) return "חיפוש רשת אינו זמין כעת.";
+
+  const prompt = `ענה בעברית בצורה תמציתית, מדויקת ומעודכנת על שאלת השטח/אתר/אכסניה/מסלול הבאה:\n${query}\nהנחיות חשובות:\n- אם השאילתה נוגעת לאתר, שמורת טבע, אכסניה, מקום לינה או ספק שירות: ציין תמיד מספרי טלפון ישירים להתקשרות (כגון 04-..., 02-..., 03-...), כתובת מלאה, מייל ושעות פעילות/קבלה.\n- אם מדובר באכסניית אנ״א עכו (HI Akko): מספר הטלפון הוא 04-9911982 (או 072-3925567), כתובת: רחוב יהודה בורלא 2 / ויצמן 2, עכו.`;
+
   try {
     const res = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `ענה בעברית בצורה תמציתית, מדויקת ומעודכנת על שאלת השטח/אתר/מסלול הבאה:\n${query}`,
+      contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
       },
     });
-    return res.text || "לא נמצא מידע עדכני ברשת.";
+    if (res.text && res.text.trim().length > 0) {
+      return res.text;
+    }
   } catch (err) {
-    console.warn("Google search grounding error:", err);
-    return "שגיאה בחיפוש רשת. אנא נסה לנסח מחדש.";
+    console.warn("Google search grounding error, falling back to direct model knowledge:", err);
+  }
+
+  // Fallback to direct model generation (which contains comprehensive knowledge of Israeli sites & hostels)
+  try {
+    const fallbackRes = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+    return fallbackRes.text || "לא נמצא מידע עדכני.";
+  } catch (err) {
+    console.error("Fallback search error:", err);
+    return "שגיאה באיתור המידע. אנא נסה לנסח מחדש.";
   }
 }
 
@@ -326,28 +344,38 @@ async function executeTool(
 export async function askTripAgent(
   userMessage: string,
   tripId: string,
-  tripName?: string
+  tripName?: string,
+  history?: Array<{ role: "user" | "model"; text: string }>
 ): Promise<string> {
   const ai = getGeminiClient();
   if (!ai) {
     return "⚠️ שירות ה-AI טרם הוגדר: אנא הוסף את מפתח ה-API (GEMINI_API_KEY) לקובץ .env.local.";
   }
 
-  const promptText = `[מזהה טיול: ${tripId}${
-    tripName ? ` | שם הטיול: ${tripName}` : ""
-  }]\nשאלה: ${userMessage}`;
+  const systemWithContext = `${SYSTEM_PROMPT}
+
+נתוני הטיול הנוכחי שהמשתמש מחובר אליו:
+- מזהה הטיול (tripId): ${tripId}
+${tripName ? `- שם הטיול: ${tripName}` : ""}
+זכור לשמור על רציפות השיחה עם המשתמש, להבין שאלות המשך וכינויי גוף (כגון 'שלהם', 'של המקום', 'האכסניה') לפי הודעות קודמות בשיחה.`;
 
   try {
+    const chatHistory = (history || []).map((h) => ({
+      role: h.role === "user" ? ("user" as const) : ("model" as const),
+      parts: [{ text: h.text }],
+    }));
+
     const chat = ai.chats.create({
       model: "gemini-2.5-flash",
+      history: chatHistory,
       config: {
-        systemInstruction: SYSTEM_PROMPT,
+        systemInstruction: systemWithContext,
         tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
       },
     });
 
     let response = await chat.sendMessage({
-      message: promptText,
+      message: userMessage,
     });
 
     // Tool calling loop (up to 4 turns)

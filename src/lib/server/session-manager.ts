@@ -1,6 +1,12 @@
 import { getAdminDb } from "./firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
+export interface ChatMessage {
+  role: "user" | "model";
+  text: string;
+  createdAt?: string;
+}
+
 export interface TelegramSession {
   chatId: string;
   tripId: string;
@@ -8,6 +14,7 @@ export interface TelegramSession {
   username?: string;
   firstName?: string;
   linkedAt: unknown;
+  recentMessages?: ChatMessage[];
 }
 
 export async function getTelegramSession(
@@ -22,6 +29,49 @@ export async function getTelegramSession(
   }
 
   return null;
+}
+
+export async function addSessionMessageTurn(
+  chatId: string | number,
+  userText: string,
+  modelText: string
+): Promise<void> {
+  const db = getAdminDb();
+  const id = chatId.toString();
+  const sessionRef = db.collection("telegram_sessions").doc(id);
+
+  const doc = await sessionRef.get();
+  if (!doc.exists) return;
+
+  const currentMessages: ChatMessage[] = (doc.data()?.recentMessages || []) as ChatMessage[];
+  const updated: ChatMessage[] = [
+    ...currentMessages,
+    { role: "user", text: userText, createdAt: new Date().toISOString() },
+    { role: "model", text: modelText, createdAt: new Date().toISOString() },
+  ];
+
+  // Keep last 14 messages (7 full turns) for fast, focused context
+  const trimmed = updated.slice(-14);
+
+  await sessionRef.set(
+    {
+      recentMessages: trimmed,
+      lastActiveAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+export async function clearSessionHistory(chatId: string | number): Promise<void> {
+  const db = getAdminDb();
+  const id = chatId.toString();
+  await db.collection("telegram_sessions").doc(id).set(
+    {
+      recentMessages: [],
+      lastActiveAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true }
+  );
 }
 
 export async function linkTelegramSessionWithPin(
