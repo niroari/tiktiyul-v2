@@ -21,28 +21,34 @@ function getGeminiClient(): GoogleGenAI | null {
   return new GoogleGenAI({ apiKey });
 }
 
-const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי של מערכת 'תיק טיול' לרכזי טיולים, מנהלים ומורים בשטח.
-המטרה שלך היא לספק מענה של 360 מעלות על כל נתוני הטיול ועל נהלי חוזרי מנכ״ל של משרד החינוך.
+const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי של מערכת 'תיק טיול' ומומחה שטח וידיעת הארץ לרכזי טיולים, מנהלים ומורים.
+יש לך ידע מקיף של 360 מעלות על כל נתוני הטיול מתיק הטיול, על נהלי חוזרי מנכ״ל של משרד החינוך, ועל מסלולים, אתרים וטבע בישראל.
 
-עקרונות פעולה:
-1. תשובות קצרות, מדויקות ומבצעיות: המשתמש נמצא בשטח (על אוטובוס, במסלול או באכסניה). אל תכתוב פסקאות מבוא ארוכות, אלא מידע תכליתי.
-2. אימוג'ים ממוקדים:
+תפקידך ומטרותיך:
+1. מענה מבצעי שטח: תמציתי, מדויק ומקצועי. המשתמש נמצא בשטח (על אוטובוס, במסלול או באכסניה). אל תכתוב הקדמות ארוכות או פסקאות מיותרות.
+2. מומחה מסלולים, אתרים וידיעת הארץ:
+   - כאשר נשאל על מסלולים חלופיים (למשל עקב עומס חום, גשם או עייפות): בדוק היכן הטיול נמצא (באמצעות get_trip_overview או get_itinerary) והצע חלופות מותאמות לאזור, לשכבת הגיל (ט׳), ולנהלי משרד החינוך (מסלולים מסומנים בלבד, מוצלים, נקודות מים).
+   - כאשר נשאל על מידע על אתרים, היסטוריה, שעות פתיחה, עלויות, או האם אתר מסוים פתוח/סגור - השתמש ב-'search_web_and_sites_info' כדי לוודא מידע עדכני ואמין.
+3. אימוג'ים ממוקדים:
    - 📞 למספרי טלפון (הצג מספר טלפון נקי כדי שיהיה קל ללחוץ ולחייג).
    - 🚨 לאלרגיות מסכנות חיים, מזרקי אפיפן או מצבי חירום.
    - 🚌 לאוטובוסים, נהגים ומאבטחים.
    - 🛏️ לחדרים באכסניה.
    - 📋 ללו״ז ומנהלות.
    - ⛅ למזג אוויר ועומס חום.
+   - 🌲 למסלולי טיול, אתרי טבע ונקודות עניין.
    - ✍️ לחתימות דיגיטליות ומסמכים.
-3. שימוש בכלים הייעודיים:
-   - כאשר נשאל על כמויות תלמידים, כמה יוצאים, כמה לא יוצאים, או חלוקת בנים/בנות - השתמש ב-'get_trip_overview' (הוא מכיל סה״כ, יוצאים, לא יוצאים עם שמותיהם, וחלוקת בנים/בנות מדויקת).
-   - כאשר נשאל על מזג אוויר, תחזית לבוקר/צהריים, או עומס חום - השתמש ב-'get_weather_and_climate'. אם נדרשות תקנות נוספות על מסלולים, חפש ב-'search_safety_regulations' (חוזר אקלים).
-   - כאשר נשאל האם המסמכים חתומים, מי חתם, מה חסר או איזה נספחים מולאו - השתמש ב-'get_trip_documents_and_signatures'.
-   - כאשר נשאל על הורים מלווים - השתמש ב-'get_accompanying_parents'.
-   - כאשר נשאל על אוטובוסים, נהגים או חובשים - השתמש ב-'get_bus_manifest'.
-   - כאשר נשאל על שיבוץ חדרים או שותפים לחדר - השתמש ב-'get_room_allocation'.
-   - כאשר נשאל על אלרגיות, צליאק, צמחוני, טבעוני או תרופות - השתמש ב-'get_allergies_and_medical'.
-4. נאמנות מוחלטת למידע: אם פרט כלשהו לא הוזן במערכת, ציין במפורש שהנתון טרם עודכן באתר.`;
+4. שימוש בכלים הייעודיים:
+   - כמויות תלמידים, כמה יוצאים/לא יוצאים, שמות מי שלא יוצא, חלוקת בנים/בנות: 'get_trip_overview'.
+   - תחזית מזג אוויר ועומס חום: 'get_weather_and_climate' ובדיקת תקנות ב-'search_safety_regulations' (חוזר אקלים).
+   - סטטוס חתימות ומוכנות נספחים: 'get_trip_documents_and_signatures'.
+   - מסלולים חלופיים, אתרי טבע, שעות פתיחה, התרעות: 'search_web_and_sites_info'.
+   - הורים מלווים: 'get_accompanying_parents'.
+   - אוטובוסים, נהגים, חובשים: 'get_bus_manifest'.
+   - שיבוץ חדרים: 'get_room_allocation'.
+   - אלרגיות ומגבלות רפואיות: 'get_allergies_and_medical'.
+   - לוח זמנים: 'get_itinerary'.
+5. נאמנות מוחלטת למידע: אם פרט כלשהו לא עודכן בתיק הטיול, ציין זאת במפורש.`;
 
 const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
@@ -176,7 +182,39 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       required: ["query"],
     },
   },
+  {
+    name: "search_web_and_sites_info",
+    description: "חיפוש חי באינטרנט (Google Search) על אתרי טבע, שמורות וגנים לאומיים בישראל, מסלולי טיול חלופיים, שעות פתיחה, מחירי כניסה, התרעות על סגירת מסלולים או שטפונות, ומידע היסטורי/גיאוגרפי על אתרי הטיול.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        query: {
+          type: Type.STRING,
+          description: "שאילתת החיפוש (למשל: 'מסלול חלופי מוצל קרוב לעכו לשכבת ט', 'שעות פתיחה של שמורת עין אפק', 'מצב מסלול נחל כזיב')",
+        },
+      },
+      required: ["query"],
+    },
+  },
 ];
+
+async function searchWebWithGrounding(query: string): Promise<string> {
+  const ai = getGeminiClient();
+  if (!ai) return "חיפוש רשת אינו זמין כעת.";
+  try {
+    const res = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `ענה בעברית בצורה תמציתית, מדויקת ומעודכנת על שאלת השטח/אתר/מסלול הבאה:\n${query}`,
+      config: {
+        tools: [{ googleSearch: {} }],
+      },
+    });
+    return res.text || "לא נמצא מידע עדכני ברשת.";
+  } catch (err) {
+    console.warn("Google search grounding error:", err);
+    return "שגיאה בחיפוש רשת. אנא נסה לנסח מחדש.";
+  }
+}
 
 async function executeTool(
   toolName: string,
@@ -249,6 +287,11 @@ async function executeTool(
             : "all";
         const results = searchSafetyRegulations(q, cType, 3);
         return JSON.stringify(results);
+      }
+      case "search_web_and_sites_info": {
+        const q = typeof args.query === "string" ? args.query : "";
+        const data = await searchWebWithGrounding(q);
+        return data;
       }
       default:
         return JSON.stringify({ error: `כלי לא מוכר: ${toolName}` });
