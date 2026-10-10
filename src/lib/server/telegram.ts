@@ -22,10 +22,8 @@ export interface TelegramUpdate {
 }
 
 export function getTelegramBotToken(): string {
-  const token =
-    process.env.TELEGRAM_BOT_TOKEN ||
-    "8783888018:AAHy8AN3MFJd71_pfAV4cjg4lDIdOGFTg_w";
-  if (!token) {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token || token.trim() === "") {
     throw new Error("TELEGRAM_BOT_TOKEN is not defined in environment variables");
   }
   return token.trim();
