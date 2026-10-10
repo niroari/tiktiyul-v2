@@ -127,20 +127,18 @@ export async function listActiveReminders(
   chatId?: string
 ): Promise<TripReminder[]> {
   const db = getAdminDb();
-  let query = db
+  const snap = await db
     .collection("trip_reminders")
     .where("tripId", "==", tripId)
-    .where("status", "==", "pending");
+    .get();
 
-  if (chatId) {
-    query = query.where("senderChatId", "==", chatId.toString());
-  }
-
-  const snap = await query.get();
   const reminders: TripReminder[] = [];
 
   snap.forEach((doc) => {
     const data = doc.data();
+    if (data.status !== "pending") return;
+    if (chatId && data.senderChatId !== chatId.toString()) return;
+
     reminders.push({
       id: doc.id,
       tripId: data.tripId,
@@ -199,22 +197,30 @@ export async function processDueReminders(): Promise<{
   const db = getAdminDb();
   const nowIso = new Date().toISOString();
 
-  // Fetch pending reminders where scheduledAt <= now
+  // Fetch pending reminders without requiring composite index
   const snap = await db
     .collection("trip_reminders")
     .where("status", "==", "pending")
-    .where("scheduledAt", "<=", nowIso)
-    .limit(50)
+    .limit(100)
     .get();
 
   if (snap.empty) {
     return { processed: 0, sent: 0, failed: 0 };
   }
 
+  const dueDocs = snap.docs.filter((d) => {
+    const data = d.data();
+    return data.scheduledAt && data.scheduledAt <= nowIso;
+  });
+
+  if (dueDocs.length === 0) {
+    return { processed: 0, sent: 0, failed: 0 };
+  }
+
   let sent = 0;
   let failed = 0;
 
-  for (const doc of snap.docs) {
+  for (const doc of dueDocs) {
     const r = doc.data() as TripReminder;
     const reminderId = doc.id;
 
