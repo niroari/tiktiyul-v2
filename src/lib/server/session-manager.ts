@@ -1,45 +1,36 @@
 import { getAdminDb } from "./firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 
-export interface WhatsAppSession {
-  phoneNumber: string;
+export interface TelegramSession {
+  chatId: string;
   tripId: string;
   tripName?: string;
+  username?: string;
+  firstName?: string;
   linkedAt: unknown;
 }
 
-/**
- * Normalizes Israeli and international phone numbers to standard format (e.g. 0501234567 or 972501234567).
- */
-export function normalizePhone(raw: string): string {
-  let clean = raw.replace(/\D/g, "");
-  if (clean.startsWith("972") && clean.length === 12) {
-    clean = "0" + clean.slice(3);
-  }
-  return clean;
-}
-
-export async function getSession(
-  phoneNumber: string
-): Promise<WhatsAppSession | null> {
+export async function getTelegramSession(
+  chatId: string | number
+): Promise<TelegramSession | null> {
   const db = getAdminDb();
-  const clean = normalizePhone(phoneNumber);
+  const id = chatId.toString();
 
-  const doc = await db.collection("whatsapp_sessions").doc(clean).get();
+  const doc = await db.collection("telegram_sessions").doc(id).get();
   if (doc.exists) {
-    const data = doc.data() as WhatsAppSession;
-    return data;
+    return doc.data() as TelegramSession;
   }
 
   return null;
 }
 
-export async function linkSessionWithPin(
-  phoneNumber: string,
-  pin: string
-): Promise<{ success: boolean; message: string; session?: WhatsAppSession }> {
+export async function linkTelegramSessionWithPin(
+  chatId: string | number,
+  pin: string,
+  meta?: { username?: string; firstName?: string }
+): Promise<{ success: boolean; message: string; session?: TelegramSession }> {
   const db = getAdminDb();
-  const cleanPhone = normalizePhone(phoneNumber);
+  const id = chatId.toString();
   const cleanPin = pin.replace(/\D/g, "").trim();
 
   let pinDoc = await db.collection("tripPinCodes").doc(cleanPin).get();
@@ -61,7 +52,7 @@ export async function linkSessionWithPin(
   if (pinData?.expiresAt && pinData.expiresAt.toDate() < new Date()) {
     return {
       success: false,
-      message: "פג תוקפו של הקוד. אנא צור קוד חדש במסך הגדרות הטיול.",
+      message: "פג תוקפו של הקוד. אנא צור קוד חדש במסך הגדרות הטיול באתר.",
     };
   }
 
@@ -70,25 +61,26 @@ export async function linkSessionWithPin(
   const tripData = tripDoc.exists ? (tripDoc.data() as { name?: string }) : undefined;
   const tripName = tripData?.name || "";
 
-  const session: WhatsAppSession = {
-    phoneNumber: cleanPhone,
+  const session: TelegramSession = {
+    chatId: id,
     tripId,
     tripName,
+    username: meta?.username || "",
+    firstName: meta?.firstName || "",
     linkedAt: FieldValue.serverTimestamp(),
   };
 
-  await db.collection("whatsapp_sessions").doc(cleanPhone).set(session);
+  await db.collection("telegram_sessions").doc(id).set(session);
 
   return {
     success: true,
-    message: `הוואטסאפ שלך חובר בהצלחה לטיול "${tripName || tripId}"! 🎉\nכעת תוכל לשאול כל שאלה על תלמידים, אוטובוסים, חדרים, אלרגיות ונהלי בטיחות.`,
+    message: `הטלגרם שלך חובר בהצלחה לטיול "${tripName || tripId}"! 🎉\nכעת תוכל לשאול אותי כל שאלה על תלמידים, אוטובוסים, חדרים, אלרגיות ונהלי בטיחות.`,
     session,
   };
 }
 
 export async function generateTripPin(tripId: string): Promise<string> {
   const db = getAdminDb();
-  // Generate random 6-digit pin
   const pin = Math.floor(100000 + Math.random() * 900000).toString();
 
   // Expires in 48 hours

@@ -7,8 +7,8 @@ import {
   getRoomAllocation,
   getStaffAndContacts,
   getItinerary,
-} from "../trip-tools";
-import { searchSafetyRegulations, CircularType } from "../safety-guidelines/search";
+} from "./trip-tools";
+import { searchSafetyRegulations, CircularType } from "./safety-guidelines/search";
 
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;

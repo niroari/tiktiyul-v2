@@ -1,5 +1,5 @@
 import { TripMetadataForm } from "./trip-metadata-form";
-import { WhatsappAssistantCard } from "./whatsapp-assistant-card";
+import { TelegramAssistantCard } from "./telegram-assistant-card";
 
 export default function SettingsPage() {
   return (
@@ -15,7 +15,7 @@ export default function SettingsPage() {
       </div>
 
       <div className="border-t pt-8">
-        <WhatsappAssistantCard />
+        <TelegramAssistantCard />
       </div>
     </div>
   );

@@ -5,56 +5,31 @@ import { useParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MessageSquare, ExternalLink, Key, Check, Copy } from "lucide-react";
+import { Send, ExternalLink, Key, Check, Copy } from "lucide-react";
 import { createClientTripPin } from "@/lib/firestore/trip-pins";
 
-export function WhatsappAssistantCard() {
+export function TelegramAssistantCard() {
   const { tripId } = useParams<{ tripId: string }>();
   const [pin, setPin] = useState<string | null>(null);
-  const [whatsappLink, setWhatsappLink] = useState<string>("");
+  const [telegramLink, setTelegramLink] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const botPhone = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER || "972556649325";
+  // Name of the bot in Telegram (configured in NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)
+  const botUsername =
+    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "HilikTikTiyulBot";
 
   async function handleGeneratePin() {
     setLoading(true);
     setError(null);
     try {
-      // 1. Try client-side Firestore first (fastest and uses current user auth)
       const generatedPin = await createClientTripPin(tripId);
       setPin(generatedPin);
-
-      const link = `https://wa.me/${botPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
-        `חבר ${generatedPin}`
-      )}`;
-      setWhatsappLink(link);
+      setTelegramLink(`https://t.me/${botUsername}?start=${generatedPin}`);
     } catch (e: unknown) {
-      console.warn("Client PIN creation failed, falling back to API route:", e);
-      // 2. Fallback to server API route
-      try {
-        const res = await fetch("/api/whatsapp/pin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tripId }),
-        });
-        const data = await res.json();
-        if (data.pin) {
-          setPin(data.pin);
-          setWhatsappLink(
-            data.whatsappLink ||
-              `https://wa.me/${botPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
-                `חבר ${data.pin}`
-              )}`
-          );
-        } else {
-          setError(data.error || "שגיאה ביצירת קוד אימות");
-        }
-      } catch (err: unknown) {
-        console.error("Failed to generate PIN:", err);
-        setError("שגיאה ביצירת קוד אימות. נסה שוב.");
-      }
+      console.error("Client PIN creation failed:", e);
+      setError("שגיאה ביצירת קוד אימות. נסה שוב.");
     } finally {
       setLoading(false);
     }
@@ -68,23 +43,23 @@ export function WhatsappAssistantCard() {
   }
 
   return (
-    <Card className="border-primary/20 bg-primary/5">
+    <Card className="border-sky-500/20 bg-sky-500/5">
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-600 text-white">
-              <MessageSquare className="h-5 w-5" />
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-500 text-white shadow-sm">
+              <Send className="h-4 w-4" />
             </div>
             <div>
               <CardTitle className="text-base font-semibold">
-                סוכן וואטסאפ לשטח (AI)
+                סוכן טלגרם לשטח (AI) — חיליק 🎒
               </CardTitle>
               <CardDescription className="text-xs">
-                מענה מבצעי מיידי בוואטסאפ: שיבוצי אוטובוסים, חדרים, אלרגיות וחוזרי מנכ״ל
+                מענה מבצעי מיידי לרכזים ומורים: רשימות, אוטובוסים, חדרים, אלרגיות וחוזרי מנכ״ל
               </CardDescription>
             </div>
           </div>
-          <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
+          <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">
             שטח ובטיחות
           </Badge>
         </div>
@@ -99,17 +74,17 @@ export function WhatsappAssistantCard() {
         {!pin ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground leading-relaxed">
-              חבר את מכשיר הוואטסאפ שלך לסוכן כדי לקבל תשובות מהירות בזמן אמת במהלך הטיול.
-              הסוכן מסונכרן עם נתוני הטיול הנוכחי ו-5 חוזרי מנכ״ל רשמיים.
+              חבר את מכשיר הטלגרם שלך לחיליק כדי לקבל תשובות מיידיות בשטח.
+              הסוכן מסונכרן בזמן אמת עם נתוני הטיול הנוכחי ו-5 חוזרי מנכ״ל רשמיים.
             </p>
             <Button
               type="button"
               onClick={handleGeneratePin}
               disabled={loading}
-              className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+              className="gap-2 bg-sky-600 hover:bg-sky-700 text-white"
             >
               <Key className="h-4 w-4" />
-              {loading ? "מייצר קוד..." : "הפק קוד חיבור לוואטסאפ"}
+              {loading ? "מייצר קוד..." : "הפק קוד חיבור לטלגרם"}
             </Button>
           </div>
         ) : (
@@ -117,7 +92,7 @@ export function WhatsappAssistantCard() {
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-xs text-muted-foreground block">
-                  קוד אימות לחיבור הוואטסאפ (תקף ל-48 שעות):
+                  קוד אימות לחיבור הטלגרם (תקף ל-48 שעות):
                 </span>
                 <span className="text-2xl font-mono font-bold tracking-widest text-primary">
                   {pin}
@@ -150,43 +125,38 @@ export function WhatsappAssistantCard() {
               </span>
               <ol className="text-xs text-muted-foreground list-decimal list-inside space-y-1">
                 <li>
-                  {whatsappLink ? (
+                  {telegramLink ? (
                     <a
-                      href={whatsappLink}
+                      href={telegramLink}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-emerald-600 hover:underline inline-flex items-center gap-1 font-medium"
+                      className="text-sky-600 hover:underline inline-flex items-center gap-1 font-medium"
                     >
-                      לחץ כאן לפתיחת צ׳אט עם הסוכן בוואטסאפ
+                      לחץ כאן לפתיחת השיחה בטלגרם (הקוד יוזן אוטומטית)
                       <ExternalLink className="h-3 w-3" />
                     </a>
                   ) : (
-                    "פתח שיחה בוואטסאפ עם מספר הבוט של המערכת"
+                    "פתח שיחה בטלגרם עם הבוט של המערכת"
                   )}
                 </li>
-                <li>
-                  שלח את הודעת החיבור:{" "}
-                  <span className="font-mono font-semibold text-foreground">
-                    חבר {pin}
-                  </span>
-                </li>
-                <li>הסוכן יחבר אותך מיידית ותוכל לשאול שאלות על הטיול!</li>
+                <li>לחץ על כפתור ״Start״ בטלגרם והחיבור יתבצע מיידית!</li>
+                <li>תוכל לשאול כל שאלה על תלמידים, נהגים, עומס חום ונהלים.</li>
               </ol>
             </div>
 
-            {whatsappLink && (
+            {telegramLink && (
               <a
-                href={whatsappLink}
+                href={telegramLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="block"
               >
                 <Button
                   type="button"
-                  className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                  className="w-full gap-2 bg-sky-600 hover:bg-sky-700 text-white"
                 >
-                  <MessageSquare className="h-4 w-4" />
-                  פתח שיחה ישירה בוואטסאפ
+                  <Send className="h-4 w-4" />
+                  פתח שיחה בטלגרם והתחבר בלחיצה אחת
                 </Button>
               </a>
             )}
