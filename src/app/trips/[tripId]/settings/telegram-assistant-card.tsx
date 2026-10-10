@@ -28,8 +28,24 @@ export function TelegramAssistantCard() {
       setPin(generatedPin);
       setTelegramLink(`https://t.me/${botUsername}?start=${generatedPin}`);
     } catch (e: unknown) {
-      console.error("Client PIN creation failed:", e);
-      setError("שגיאה ביצירת קוד אימות. נסה שוב.");
+      console.warn("Client PIN creation failed, trying server API route:", e);
+      try {
+        const res = await fetch("/api/telegram/pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tripId }),
+        });
+        const data = await res.json();
+        if (data.pin) {
+          setPin(data.pin);
+          setTelegramLink(`https://t.me/${botUsername}?start=${data.pin}`);
+        } else {
+          setError(data.error || "שגיאה ביצירת קוד אימות");
+        }
+      } catch (serverErr: unknown) {
+        console.error("Server PIN fallback failed:", serverErr);
+        setError("שגיאה ביצירת קוד אימות. נסה שוב.");
+      }
     } finally {
       setLoading(false);
     }
