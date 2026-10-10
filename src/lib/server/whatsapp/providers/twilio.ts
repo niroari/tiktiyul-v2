@@ -46,7 +46,7 @@ export function createTwilioTwiMLResponse(replyText: string): Response {
   return new Response(xml, {
     status: 200,
     headers: {
-      "Content-Type": "application/xml; charset=utf-8",
+      "Content-Type": "text/xml; charset=utf-8",
     },
   });
 }
