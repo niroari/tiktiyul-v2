@@ -754,3 +754,94 @@ function getWeatherDesc(code?: number): string {
   return "רגיל לעונה";
 }
 
+export async function getSecurityApprovalDetails(
+  tripId: string,
+  userQuestion?: string
+): Promise<{
+  hasFile: boolean;
+  fileName?: string;
+  analysis?: string;
+  message?: string;
+}> {
+  const db = getAdminDb();
+  let secDoc = await db
+    .collection("trips")
+    .doc(tripId)
+    .collection("appendices")
+    .doc("security")
+    .get();
+
+  // Case-insensitive fallback for tripId if needed
+  if (!secDoc.exists) {
+    const tripSnap = await db.collection("trips").get();
+    for (const d of tripSnap.docs) {
+      if (d.id.toLowerCase() === tripId.toLowerCase()) {
+        secDoc = await db
+          .collection("trips")
+          .doc(d.id)
+          .collection("appendices")
+          .doc("security")
+          .get();
+        if (secDoc.exists) break;
+      }
+    }
+  }
+
+  if (!secDoc.exists) {
+    return {
+      hasFile: false,
+      message: "טרם הועלה אישור ביטחוני בלשונית 'אישור ביטחוני' באתר עבור טיול זה.",
+    };
+  }
+
+  const data = secDoc.data() as { fileUrl?: string; fileName?: string };
+  if (!data?.fileUrl) {
+    return {
+      hasFile: false,
+      message: "האישור הביטחוני עדיין ריק או שלא צורף קישור תקין לקובץ.",
+    };
+  }
+
+  try {
+    const res = await fetch(data.fileUrl);
+    if (!res.ok) throw new Error("Failed to download PDF from storage");
+    const arrayBuffer = await res.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+    const { GoogleGenAI } = await import("@google/genai");
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not defined");
+
+    const ai = new GoogleGenAI({ apiKey });
+    const prompt = userQuestion
+      ? `עיין באישור הביטחוני המצורף של הטיול וענה בעברית במדויק ובתמציתיות לשאלה הבאה:\n${userQuestion}`
+      : `חלץ מתוך האישור הביטחוני של הטיול את הנתונים הבאים:\n1. מספר אישור הטיול\n2. כמות מאבטחים/ליווי בנשק נדרשת ביום ובלינה\n3. הגבלות והנחיות מיוחדות לגבי מסלולים, לינה, חובשים ופיקוד העורף.`;
+
+    const geminiRes = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [
+        {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: base64,
+          },
+        },
+        prompt,
+      ],
+    });
+
+    return {
+      hasFile: true,
+      fileName: data.fileName || "אישור ביטחוני.pdf",
+      analysis: geminiRes.text || "לא התקבל פיענוח מתוך המסמך.",
+    };
+  } catch (err) {
+    console.error("Error analyzing security PDF:", err);
+    return {
+      hasFile: true,
+      fileName: data.fileName,
+      message: "הקובץ קיים במערכת, אך חלה שגיאה בקריאת תוכן ה-PDF.",
+    };
+  }
+}
+

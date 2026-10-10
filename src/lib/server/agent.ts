@@ -10,6 +10,7 @@ import {
   getTripDocumentsAndSignatures,
   getWeatherAndClimate,
   getAccompanyingParents,
+  getSecurityApprovalDetails,
 } from "./trip-tools";
 import { searchSafetyRegulations, CircularType } from "./safety-guidelines/search";
 
@@ -42,6 +43,7 @@ const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי ש
    - כמויות תלמידים, כמה יוצאים/לא יוצאים, שמות מי שלא יוצא, חלוקת בנים/בנות: 'get_trip_overview'.
    - תחזית מזג אוויר ועומס חום: 'get_weather_and_climate' ובדיקת תקנות ב-'search_safety_regulations' (חוזר אקלים).
    - סטטוס חתימות ומוכנות נספחים: 'get_trip_documents_and_signatures'.
+   - דרישות אבטחה, נשק, כמה מאבטחים נדרשים, חובשים, או הנחיות מהאישור הביטחוני: 'get_security_approval_details' (כלי זה קורא ומפענח ישירות את קובץ ה-PDF של האישור הביטחוני שהועלה לטיול).
    - מסלולים חלופיים, אתרי טבע, שעות פתיחה, התרעות: 'search_web_and_sites_info'.
    - הורים מלווים: 'get_accompanying_parents'.
    - אוטובוסים, נהגים, חובשים: 'get_bus_manifest'.
@@ -196,6 +198,19 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
       required: ["query"],
     },
   },
+  {
+    name: "get_security_approval_details",
+    description: "קריאה ופיענוח ישיר של מסמך ה-PDF של האישור הביטחוני הרשמי שהועלה לטיול (בלשונית 'אישור ביטחוני'). מציג במדויק: כמות מאבטחים ואיזה נשק נדרש לטיול ביום ובלינה, מספר אישור הטיול, חובשים, הגבלות ביטחוניות על מסלולים, ודגשים מחדר מצב טיולים.",
+    parameters: {
+      type: Type.OBJECT,
+      properties: {
+        question: {
+          type: Type.STRING,
+          description: "שאלת המשתמש לגבי האישור הביטחוני (למשל: 'כמה מאבטחים אני צריך?', 'מה מספר אישור הטיול?', 'האם נדרש נשק בלינה?')",
+        },
+      },
+    },
+  },
 ];
 
 async function searchWebWithGrounding(query: string): Promise<string> {
@@ -292,6 +307,11 @@ async function executeTool(
         const q = typeof args.query === "string" ? args.query : "";
         const data = await searchWebWithGrounding(q);
         return data;
+      }
+      case "get_security_approval_details": {
+        const q = typeof args.question === "string" ? args.question : undefined;
+        const data = await getSecurityApprovalDetails(tripId, q);
+        return JSON.stringify(data);
       }
       default:
         return JSON.stringify({ error: `כלי לא מוכר: ${toolName}` });
