@@ -83,6 +83,23 @@ export async function POST(req: NextRequest) {
         : NextResponse.json({ status: "already_processed" });
     }
 
+    // ── Log incoming request to Firestore for observability ──
+    try {
+      const { getAdminDb } = await import("@/lib/server/firebase-admin");
+      const { FieldValue } = await import("firebase-admin/firestore");
+      const db = getAdminDb();
+      await db.collection("webhook_debug_logs").add({
+        receivedAt: FieldValue.serverTimestamp(),
+        isTwilio,
+        senderPhone,
+        text,
+        messageId,
+        contentType,
+      });
+    } catch (logErr) {
+      console.warn("Failed to write webhook debug log:", logErr);
+    }
+
     // ── Loop Guard: Ignore automated bot messages / sandbox auto-replies ──
     if (
       text.includes("Standard auto-reply") ||
