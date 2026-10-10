@@ -10,6 +10,7 @@ import {
   linkTelegramSessionWithPin,
   addSessionMessageTurn,
   clearSessionHistory,
+  unlinkTelegramSession,
 } from "@/lib/server/session-manager";
 import { askTripAgent } from "@/lib/server/agent";
 
@@ -111,13 +112,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── 4. Handle Conversation Reset (/clear or /reset) ──
+    // ── 4. Handle Commands (/clear, /disconnect, /help) ──
     if (text === "/clear" || text === "/reset" || text === "איפוס" || text === "אפס שיחה") {
       await clearSessionHistory(chatId);
       await sendTelegramMessage(
         chatId,
         "היסטוריית השיחה אופסה בהצלחה! 🔄\nבמה אוכל לסייע לך כעת בנוגע לטיול?"
       );
+      return NextResponse.json({ ok: true });
+    }
+
+    if (text === "/disconnect" || text === "/logout" || text === "התנתק") {
+      await unlinkTelegramSession(chatId);
+      await sendTelegramMessage(
+        chatId,
+        `הטלגרם שלך נותק בהצלחה מהטיול "${session.tripName || session.tripId}". 👋\nכדי להתחבר לטיול חדש, שלח לכאן את קוד ה-PIN בן 6 הספרות.`
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    if (text === "/help" || text === "עזרה") {
+      const helpMsg = `🎒 *מדריך פקודות חיליק:*
+• שאילת שאלות חופשיות על תלמידים, אוטובוסים, חדרים, אישור ביטחוני, מזג אוויר ונהלים.
+• שלח קוד בן 6 ספרות מכל טיול כדי לעבור מיד בין טיולים שונים.
+• /reset או /clear - איפוס היסטוריית השיחה הנוכחית.
+• /disconnect - ניתוק החיבור מהטיול הנוכחי.
+• מחובר כעת ל: *${session.tripName || session.tripId}*`;
+      await sendTelegramMessage(chatId, helpMsg);
       return NextResponse.json({ ok: true });
     }
 

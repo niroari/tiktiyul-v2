@@ -74,6 +74,12 @@ export async function clearSessionHistory(chatId: string | number): Promise<void
   );
 }
 
+export async function unlinkTelegramSession(chatId: string | number): Promise<void> {
+  const db = getAdminDb();
+  const id = chatId.toString();
+  await db.collection("telegram_sessions").doc(id).delete();
+}
+
 export async function linkTelegramSessionWithPin(
   chatId: string | number,
   pin: string,
