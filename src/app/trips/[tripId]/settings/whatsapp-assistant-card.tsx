@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { MessageSquare, ExternalLink, Key, Check, Copy } from "lucide-react";
+import { createClientTripPin } from "@/lib/firestore/trip-pins";
 
 export function WhatsappAssistantCard() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -13,22 +14,47 @@ export function WhatsappAssistantCard() {
   const [whatsappLink, setWhatsappLink] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const botPhone = process.env.NEXT_PUBLIC_WHATSAPP_BOT_NUMBER || "972556649325";
 
   async function handleGeneratePin() {
     setLoading(true);
+    setError(null);
     try {
-      const res = await fetch("/api/whatsapp/pin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tripId }),
-      });
-      const data = await res.json();
-      if (data.pin) {
-        setPin(data.pin);
-        setWhatsappLink(data.whatsappLink || "");
+      // 1. Try client-side Firestore first (fastest and uses current user auth)
+      const generatedPin = await createClientTripPin(tripId);
+      setPin(generatedPin);
+
+      const link = `https://wa.me/${botPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
+        `חבר ${generatedPin}`
+      )}`;
+      setWhatsappLink(link);
+    } catch (e: unknown) {
+      console.warn("Client PIN creation failed, falling back to API route:", e);
+      // 2. Fallback to server API route
+      try {
+        const res = await fetch("/api/whatsapp/pin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tripId }),
+        });
+        const data = await res.json();
+        if (data.pin) {
+          setPin(data.pin);
+          setWhatsappLink(
+            data.whatsappLink ||
+              `https://wa.me/${botPhone.replace(/\D/g, "")}?text=${encodeURIComponent(
+                `חבר ${data.pin}`
+              )}`
+          );
+        } else {
+          setError(data.error || "שגיאה ביצירת קוד אימות");
+        }
+      } catch (err: unknown) {
+        console.error("Failed to generate PIN:", err);
+        setError("שגיאה ביצירת קוד אימות. נסה שוב.");
       }
-    } catch (e) {
-      console.error("Failed to generate PIN:", e);
     } finally {
       setLoading(false);
     }
@@ -64,6 +90,12 @@ export function WhatsappAssistantCard() {
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {error && (
+          <div className="rounded-md bg-destructive/15 p-3 text-xs text-destructive">
+            {error}
+          </div>
+        )}
+
         {!pin ? (
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground leading-relaxed">
@@ -71,6 +103,7 @@ export function WhatsappAssistantCard() {
               הסוכן מסונכרן עם נתוני הטיול הנוכחי ו-5 חוזרי מנכ״ל רשמיים.
             </p>
             <Button
+              type="button"
               onClick={handleGeneratePin}
               disabled={loading}
               className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
@@ -91,6 +124,7 @@ export function WhatsappAssistantCard() {
                 </span>
               </div>
               <Button
+                type="button"
                 variant="outline"
                 size="sm"
                 onClick={handleCopy}
@@ -130,7 +164,12 @@ export function WhatsappAssistantCard() {
                     "פתח שיחה בוואטסאפ עם מספר הבוט של המערכת"
                   )}
                 </li>
-                <li>שלח את הודעת החיבור: <span className="font-mono font-semibold text-foreground">חבר {pin}</span></li>
+                <li>
+                  שלח את הודעת החיבור:{" "}
+                  <span className="font-mono font-semibold text-foreground">
+                    חבר {pin}
+                  </span>
+                </li>
                 <li>הסוכן יחבר אותך מיידית ותוכל לשאול שאלות על הטיול!</li>
               </ol>
             </div>
@@ -142,7 +181,10 @@ export function WhatsappAssistantCard() {
                 rel="noopener noreferrer"
                 className="block"
               >
-                <Button className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
+                <Button
+                  type="button"
+                  className="w-full gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
                   <MessageSquare className="h-4 w-4" />
                   פתח שיחה ישירה בוואטסאפ
                 </Button>

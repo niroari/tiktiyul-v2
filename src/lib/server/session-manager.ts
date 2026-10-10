@@ -42,7 +42,10 @@ export async function linkSessionWithPin(
   const cleanPhone = normalizePhone(phoneNumber);
   const cleanPin = pin.replace(/\D/g, "").trim();
 
-  const pinDoc = await db.collection("trip_pin_codes").doc(cleanPin).get();
+  let pinDoc = await db.collection("tripPinCodes").doc(cleanPin).get();
+  if (!pinDoc.exists) {
+    pinDoc = await db.collection("trip_pin_codes").doc(cleanPin).get();
+  }
   if (!pinDoc.exists) {
     return {
       success: false,
