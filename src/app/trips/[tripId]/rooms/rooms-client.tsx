@@ -6,6 +6,7 @@ import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
 import { AppendixActions } from "@/components/appendix-actions";
+import { StudentAssignSheet } from "@/components/rooms/student-assign-sheet";
 import { createRoomFillToken, listRoomFillTokensForTrip } from "@/lib/firestore/room-fill-tokens";
 import type { RoomFillToken } from "@/lib/firestore/room-fill-tokens";
 
@@ -337,13 +338,14 @@ type RoomCardProps = {
   onMoveStudent: (studentId: string, fromRoom: string | null, toRoom: string) => void;
   setDragOverRoom: (id: string | null) => void;
   setDraggingId: (id: string | null) => void;
+  onSelectStudent: (student: Student, currentRoomId: string | null) => void;
 };
 
 function RoomCard({
   room, genderRooms, studentById, unassigned,
   dragOverRoom, draggingId,
   onMoveRoom, onDeleteRoom, onSetNumber, onRemoveStudent, onAssignStudent, onMoveStudent,
-  setDragOverRoom, setDraggingId,
+  setDragOverRoom, setDraggingId, onSelectStudent,
 }: RoomCardProps) {
   const studs      = room.studentIds.map((id) => studentById[id]).filter(Boolean);
   const classLabel = studs.length > 0
@@ -428,13 +430,17 @@ function RoomCard({
                 setDraggingId(s.id);
               }}
               onDragEnd={() => { setDraggingId(null); setDragOverRoom(null); }}
-              className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border cursor-grab active:cursor-grabbing transition-opacity ${chipBg} ${chipBorder} ${chipText} ${draggingId === s.id ? "opacity-40" : ""}`}
+              onClick={() => onSelectStudent(s, room.id)}
+              title="לחץ/י להעברה או הסרה, או גרור/י"
+              className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border cursor-pointer hover:shadow-xs active:scale-95 transition-all ${chipBg} ${chipBorder} ${chipText} ${draggingId === s.id ? "opacity-40" : ""}`}
             >
               {s.firstName} {s.lastName}
               <span className="text-muted-foreground text-[10px]">({s.class})</span>
               <button
+                type="button"
                 onClick={(e) => { e.stopPropagation(); onRemoveStudent(room.id, s.id); }}
-                className="text-muted-foreground hover:text-destructive transition-colors mr-0.5"
+                className="text-muted-foreground hover:text-destructive transition-colors mr-0.5 p-0.5 rounded-full hover:bg-black/5"
+                title="הסר מהחדר"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -491,7 +497,13 @@ export function RoomsClient() {
   const [status,       setStatus]       = useState<"idle" | "saving" | "saved">("idle");
   const [classFilter,  setClassFilter]  = useState("all");
   const [genderView,   setGenderView]   = useState<"all" | "male" | "female">("all");
-  const [assigningId,  setAssigningId]  = useState<string | null>(null);
+  const [selectedStudentForSheet, setSelectedStudentForSheet] = useState<{
+    student: Student;
+    currentRoomId: string | null;
+  } | null>(null);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isMultiSheetOpen, setIsMultiSheetOpen] = useState(false);
   const [hostelOpen,   setHostelOpen]   = useState(false);
   const [draggingId,   setDraggingId]   = useState<string | null>(null);
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null);
@@ -793,7 +805,6 @@ export function RoomsClient() {
   }
 
   function assignStudentToRoom(studentId: string, roomId: string) {
-    setAssigningId(null);
     if (!roomId) return;
     updateRooms(rooms.map((r) =>
       r.id === roomId ? { ...r, studentIds: [...r.studentIds, studentId] } : r
@@ -1052,77 +1063,142 @@ export function RoomsClient() {
 
           {/* Unassigned students */}
           {filteredUnassigned.length > 0 && (
-            <div className="bg-amber-50 border border-amber-200 rounded-[var(--radius)] p-4">
-              <div className="text-sm font-semibold text-amber-800 mb-2 leading-snug">
-                <span>תלמידים ללא חדר ({filteredUnassigned.length}
-                {(() => {
-                  const boys  = filteredUnassigned.filter((s) => s.gender === "male").length;
-                  const girls = filteredUnassigned.filter((s) => s.gender === "female").length;
-                  if (boys > 0 && girls > 0) return ` — ${boys} בנים, ${girls} בנות`;
-                  if (boys > 0) return ` — ${boys} בנים`;
-                  if (girls > 0) return ` — ${girls} בנות`;
-                  return "";
-                })()}
-                )</span>
-                <span className="block sm:inline font-normal text-xs mt-0.5 sm:mt-0 sm:mr-1">לחץ/י על תלמיד/ה לשיבוץ</span>
+            <div className="bg-amber-50 border border-amber-200 rounded-[var(--radius)] p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <div className="text-sm font-semibold text-amber-800 leading-snug">
+                  <span>תלמידים ללא חדר ({filteredUnassigned.length}
+                  {(() => {
+                    const boys  = filteredUnassigned.filter((s) => s.gender === "male").length;
+                    const girls = filteredUnassigned.filter((s) => s.gender === "female").length;
+                    if (boys > 0 && girls > 0) return ` — ${boys} בנים, ${girls} בנות`;
+                    if (boys > 0) return ` — ${boys} בנים`;
+                    if (girls > 0) return ` — ${girls} בנות`;
+                    return "";
+                  })()}
+                  )</span>
+                  <span className="block sm:inline font-normal text-xs text-amber-700/80 mt-0.5 sm:mt-0 sm:mr-1.5">
+                    {multiSelectMode
+                      ? "בחר תלמידים מאותו מגדר לשיבוץ יחד"
+                      : "לחץ/י על תלמיד/ה לשיבוץ מהיר או גרור/י"}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {multiSelectMode ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          // Select all visible matching same gender as first selected, or all if none selected
+                          if (selectedStudentIds.length === 0) {
+                            setSelectedStudentIds(filteredUnassigned.map((s) => s.id));
+                          } else {
+                            setSelectedStudentIds([]);
+                          }
+                        }}
+                        className="text-xs px-2.5 py-1 bg-white border border-amber-300 rounded-md text-amber-900 hover:bg-amber-100/60 font-medium transition-colors"
+                      >
+                        {selectedStudentIds.length === 0 ? "בחר הכל" : "נקה בחירה"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMultiSelectMode(false);
+                          setSelectedStudentIds([]);
+                        }}
+                        className="text-xs px-2.5 py-1 bg-white border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        ביטול
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setMultiSelectMode(true)}
+                      className="text-xs px-2.5 py-1 bg-white/90 border border-amber-300 rounded-md text-amber-900 hover:bg-white font-medium transition-all shadow-xs"
+                    >
+                      ☑ בחירה מרובה
+                    </button>
+                  )}
+                </div>
               </div>
+
               <div className="flex flex-wrap gap-2">
                 {filteredUnassigned.map((s) => {
                   const isGirl = s.gender === "female";
-                  const chipBg = isGirl ? "bg-pink-100 border-pink-300 text-pink-900" : "bg-blue-100 border-blue-300 text-blue-900";
+                  const isSelected = selectedStudentIds.includes(s.id);
+                  const chipBg = isGirl
+                    ? isSelected
+                      ? "bg-pink-200 border-pink-500 text-pink-950 font-semibold ring-2 ring-pink-400/50"
+                      : "bg-pink-100 border-pink-300 text-pink-900"
+                    : isSelected
+                    ? "bg-blue-200 border-blue-500 text-blue-950 font-semibold ring-2 ring-blue-400/50"
+                    : "bg-blue-100 border-blue-300 text-blue-900";
                   const targetRooms = rooms.filter((r) => r.gender === s.gender);
+
                   return (
-                    <div key={s.id} className="relative">
-                      {assigningId === s.id ? (
-                        <div className="flex items-center gap-1">
-                          <select
-                            autoFocus
-                            className="text-xs border border-border rounded-full px-2 py-0.5 focus:outline-none focus:border-primary"
-                            onChange={(e) => assignStudentToRoom(s.id, e.target.value)}
-                            onBlur={() => setAssigningId(null)}
-                          >
-                            <option value="">בחר חדר...</option>
-                            {targetRooms.map((r) => (
-                              <option key={r.id} value={r.id}>
-                                {r.number ? `חדר ${r.number}` : `חדר ${rooms.indexOf(r) + 1}`}
-                                {` (${r.studentIds.length}${r.capacity !== undefined ? `/${r.capacity}` : ""})`}
-                              </option>
-                            ))}
-                          </select>
-                          <button onClick={() => setAssigningId(null)} className="text-xs text-muted-foreground">✕</button>
-                        </div>
-                      ) : (
-                        <button
-                          draggable={targetRooms.length > 0}
-                          onDragStart={(e) => {
-                            e.dataTransfer.setData("studentId", s.id);
-                            e.dataTransfer.setData("fromRoom", "");
-                            e.dataTransfer.effectAllowed = "move";
-                            setDraggingId(s.id);
-                          }}
-                          onDragEnd={() => setDraggingId(null)}
-                          onClick={() => {
-                            if (targetRooms.length === 0) return;
-                            if (targetRooms.length === 1) assignStudentToRoom(s.id, targetRooms[0].id);
-                            else setAssigningId(s.id);
-                          }}
-                          title={targetRooms.length === 0 ? `הוסף חדר ${isGirl ? "בנות" : "בנים"} תחילה` : "גרור לחדר או לחץ לשיבוץ"}
-                          className={`text-xs rounded-full px-2.5 py-1 border transition-all ${chipBg} ${
-                            targetRooms.length === 0
-                              ? "opacity-50 cursor-not-allowed"
-                              : draggingId === s.id
-                                ? "opacity-40 scale-95"
-                                : "hover:opacity-80 cursor-grab active:cursor-grabbing"
-                          }`}
-                        >
-                          {s.firstName} {s.lastName}
-                          <span className="mr-1 opacity-60">({s.class})</span>
-                        </button>
+                    <button
+                      key={s.id}
+                      type="button"
+                      draggable={!multiSelectMode && targetRooms.length > 0}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData("studentId", s.id);
+                        e.dataTransfer.setData("fromRoom", "");
+                        e.dataTransfer.effectAllowed = "move";
+                        setDraggingId(s.id);
+                      }}
+                      onDragEnd={() => setDraggingId(null)}
+                      onClick={() => {
+                        if (multiSelectMode) {
+                          setSelectedStudentIds((prev) =>
+                            prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id]
+                          );
+                        } else {
+                          setSelectedStudentForSheet({ student: s, currentRoomId: null });
+                        }
+                      }}
+                      title={
+                        multiSelectMode
+                          ? isSelected ? "בטל בחירה" : "בחר תלמיד/ה"
+                          : targetRooms.length === 0
+                          ? `הוסף חדר ${isGirl ? "בנות" : "בנים"} תחילה`
+                          : "לחץ/י לשיבוץ או גרור/י לחדר"
+                      }
+                      className={`text-xs rounded-full px-2.5 py-1 border transition-all flex items-center gap-1 ${chipBg} ${
+                        targetRooms.length === 0 && !multiSelectMode
+                          ? "opacity-50 cursor-not-allowed"
+                          : draggingId === s.id
+                          ? "opacity-40 scale-95"
+                          : "hover:opacity-90 cursor-pointer active:scale-95"
+                      }`}
+                    >
+                      {multiSelectMode && (
+                        <span className="text-[10px] w-3.5 h-3.5 rounded-full border border-current flex items-center justify-center mr-0.5">
+                          {isSelected ? "✓" : ""}
+                        </span>
                       )}
-                    </div>
+                      <span>{s.firstName} {s.lastName}</span>
+                      <span className="opacity-60 text-[10px]">({s.class})</span>
+                    </button>
                   );
                 })}
               </div>
+
+              {/* Multi-select action bar */}
+              {multiSelectMode && selectedStudentIds.length > 0 && (
+                <div className="pt-2 border-t border-amber-200/80 flex items-center justify-between gap-3">
+                  <span className="text-xs font-medium text-amber-900">
+                    נבחרו {selectedStudentIds.length} תלמידים
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsMultiSheetOpen(true)}
+                    className="text-xs bg-primary text-primary-foreground font-medium px-4 py-1.5 rounded-lg shadow-sm hover:bg-primary/90 transition-all active:scale-95"
+                  >
+                    שבץ {selectedStudentIds.length} תלמידים לחדר...
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
@@ -1153,6 +1229,7 @@ export function RoomsClient() {
                       onMoveRoom={moveRoom} onDeleteRoom={deleteRoom} onSetNumber={setRoomNumber}
                       onRemoveStudent={removeStudentFromRoom} onAssignStudent={assignStudentToRoom}
                       onMoveStudent={moveStudent} setDragOverRoom={setDragOverRoom} setDraggingId={setDraggingId}
+                      onSelectStudent={(student, currentRoomId) => setSelectedStudentForSheet({ student, currentRoomId })}
                     />
                   ))
                 )}
@@ -1184,6 +1261,7 @@ export function RoomsClient() {
                       onMoveRoom={moveRoom} onDeleteRoom={deleteRoom} onSetNumber={setRoomNumber}
                       onRemoveStudent={removeStudentFromRoom} onAssignStudent={assignStudentToRoom}
                       onMoveStudent={moveStudent} setDragOverRoom={setDragOverRoom} setDraggingId={setDraggingId}
+                      onSelectStudent={(student, currentRoomId) => setSelectedStudentForSheet({ student, currentRoomId })}
                     />
                   ))
                 )}
@@ -1222,6 +1300,52 @@ export function RoomsClient() {
           )}
         </>
       )}
+
+      {/* Student Assign Sheet (Mobile & Quick-assign modal) */}
+      <StudentAssignSheet
+        open={!!selectedStudentForSheet || isMultiSheetOpen}
+        onClose={() => {
+          setSelectedStudentForSheet(null);
+          setIsMultiSheetOpen(false);
+        }}
+        students={
+          isMultiSheetOpen
+            ? unassigned.filter((s) => selectedStudentIds.includes(s.id))
+            : selectedStudentForSheet
+            ? [selectedStudentForSheet.student]
+            : []
+        }
+        currentRoomId={selectedStudentForSheet?.currentRoomId ?? null}
+        rooms={rooms.map((r) => {
+          const studs = r.studentIds.map((id) => studentById[id]).filter(Boolean);
+          return {
+            id: r.id,
+            number: r.number,
+            capacity: r.capacity,
+            classLabel: r.classLabel,
+            gender: r.gender,
+            studentNames: studs.map((s) => `${s.firstName} ${s.lastName}`),
+            currentCount: studs.length,
+          };
+        })}
+        onAssignToRoom={(ids, targetRoomId) => {
+          ids.forEach((id) => {
+            const fromRoom = rooms.find((r) => r.studentIds.includes(id));
+            if (fromRoom) {
+              moveStudent(id, fromRoom.id, targetRoomId);
+            } else {
+              assignStudentToRoom(id, targetRoomId);
+            }
+          });
+          setSelectedStudentIds([]);
+          setMultiSelectMode(false);
+        }}
+        onRemoveFromRoom={(ids, fromRoomId) => {
+          ids.forEach((id) => {
+            removeStudentFromRoom(fromRoomId, id);
+          });
+        }}
+      />
 
       <AppendixActions title="חלוקת חדרים" getHTML={getHTML} />
 

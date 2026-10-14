@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useTrip } from "@/hooks/use-trip";
-import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { getAppendix, saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { sigDocId, subscribeToSignature } from "@/lib/firestore/signatures";
 import { AppendixActions, esc, safeSigUrl } from "@/components/appendix-actions";
 import { SignatureCanvas, type SignatureCanvasHandle } from "@/components/signature-canvas";
@@ -12,6 +13,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { ArrowDownToLine, ExternalLink, Check, AlertCircle } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,6 +33,158 @@ type ScheduleRow = {
   activity: string;
   notes: string;
 };
+
+type ItineraryRow = {
+  id: string;
+  day: string;
+  time: string;
+  activity: string;
+  notes: string;
+};
+
+// ─── Schedule Import Helpers ──────────────────────────────────────────────────
+
+function parseDateFromDay(
+  dayStr: string,
+  tripStartDate?: string,
+  lastDate?: string
+): string {
+  const s = String(dayStr ?? "").trim();
+  if (!s) {
+    return lastDate || tripStartDate || "";
+  }
+
+  // 1. Direct ISO match: YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    return s;
+  }
+
+  // Base year from tripStartDate or current year
+  let baseYear = new Date().getFullYear();
+  if (tripStartDate && /^\d{4}-\d{2}-\d{2}$/.test(tripStartDate)) {
+    baseYear = parseInt(tripStartDate.substring(0, 4), 10);
+  }
+
+  // 2. Full date: DD/MM/YYYY or DD.MM.YYYY or DD-MM-YYYY
+  const fullDateMatch = s.match(/(\b\d{1,2})[./-](\d{1,2})[./-](\d{2,4})\b/);
+  if (fullDateMatch) {
+    const day = parseInt(fullDateMatch[1], 10);
+    const month = parseInt(fullDateMatch[2], 10);
+    let year = parseInt(fullDateMatch[3], 10);
+    if (year < 100) year += 2000;
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  // 3. Short date: DD/MM or DD.MM (e.g. "15.5" in "יום א׳ / 15.5")
+  const shortDateMatch = s.match(/(\b\d{1,2})[./](\d{1,2})\b/);
+  if (shortDateMatch) {
+    const day = parseInt(shortDateMatch[1], 10);
+    const month = parseInt(shortDateMatch[2], 10);
+    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+      return `${baseYear}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    }
+  }
+
+  // 4. Day number: "יום 1", "יום 2", "יום 3"
+  const dayNumMatch = s.match(/יום\s*(\d+)/);
+  if (dayNumMatch && tripStartDate) {
+    const dayIndex = parseInt(dayNumMatch[1], 10);
+    if (dayIndex >= 1) {
+      const [y, m, d] = tripStartDate.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      dt.setUTCDate(dt.getUTCDate() + (dayIndex - 1));
+      return dt.toISOString().split("T")[0];
+    }
+  }
+
+  // 5. Hebrew letter: "יום א׳", "יום ב׳", "יום ג׳", "יום ד׳", "יום ה׳", "יום ו׳"
+  const hebrewDayLetterOrder: Record<string, number> = {
+    "א": 0, "א׳": 0, "א'": 0,
+    "ב": 1, "ב׳": 1, "ב'": 1,
+    "ג": 2, "ג׳": 2, "ג'": 2,
+    "ד": 3, "ד׳": 3, "ד'": 3,
+    "ה": 4, "ה׳": 4, "ה'": 4,
+    "ו": 5, "ו׳": 5, "ו'": 5,
+  };
+
+  for (const [letter, dayIdx] of Object.entries(hebrewDayLetterOrder)) {
+    if (s.includes(`יום ${letter}`) || s === letter) {
+      if (tripStartDate) {
+        const [y, m, d] = tripStartDate.split("-").map(Number);
+        const dt = new Date(Date.UTC(y, m - 1, d));
+        dt.setUTCDate(dt.getUTCDate() + dayIdx);
+        return dt.toISOString().split("T")[0];
+      }
+      break;
+    }
+  }
+
+  return lastDate || tripStartDate || "";
+}
+
+function parseTime(timeStr: string): { fromTime: string; toTime: string } {
+  const s = String(timeStr ?? "").trim();
+  const rangeMatch = s.match(/(\d{1,2}:\d{2})\s*[-–—]\s*(\d{1,2}:\d{2})/);
+  if (rangeMatch) {
+    return {
+      fromTime: rangeMatch[1].padStart(5, "0"),
+      toTime: rangeMatch[2].padStart(5, "0"),
+    };
+  }
+  const singleMatch = s.match(/(\d{1,2}:\d{2})/);
+  if (singleMatch) {
+    return {
+      fromTime: singleMatch[1].padStart(5, "0"),
+      toTime: "",
+    };
+  }
+  return { fromTime: "", toTime: "" };
+}
+
+function convertDaletRowsToBet(
+  daletRows: ItineraryRow[],
+  tripStartDate?: string,
+  autoFillEndTime: boolean = false
+): ScheduleRow[] {
+  let lastDate = "";
+  const valid = daletRows.filter(
+    (r) => r.day?.trim() || r.time?.trim() || r.activity?.trim() || r.notes?.trim()
+  );
+
+  const mapped: ScheduleRow[] = valid.map((r) => {
+    const parsedDate = parseDateFromDay(r.day, tripStartDate, lastDate);
+    if (parsedDate) {
+      lastDate = parsedDate;
+    }
+    const { fromTime, toTime } = parseTime(r.time);
+    return {
+      id: crypto.randomUUID(),
+      date: parsedDate,
+      fromTime,
+      toTime,
+      activity: r.activity?.trim() ?? "",
+      notes: r.notes?.trim() ?? "",
+    };
+  });
+
+  if (autoFillEndTime) {
+    for (let i = 0; i < mapped.length - 1; i++) {
+      if (
+        !mapped[i].toTime &&
+        mapped[i].fromTime &&
+        mapped[i + 1].fromTime &&
+        mapped[i].date === mapped[i + 1].date &&
+        mapped[i + 1].fromTime > mapped[i].fromTime
+      ) {
+        mapped[i].toTime = mapped[i + 1].fromTime;
+      }
+    }
+  }
+
+  return mapped;
+}
 
 type FormData = {
   weapons: string;
@@ -149,6 +311,59 @@ export function AppendixBetClient() {
     scheduleAutoSave(updated);
   }
 
+  // ─── Import from Appendix Dalet ─────────────────────────────────────────────
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [importLoading, setImportLoading] = useState(false);
+  const [daletRows, setDaletRows] = useState<ItineraryRow[] | null>(null);
+  const [importMode, setImportMode] = useState<"replace" | "append">("replace");
+  const [autoFillEndTime, setAutoFillEndTime] = useState(true);
+  const [importNotice, setImportNotice] = useState<string | null>(null);
+
+  const hasExistingData = form.schedule.some(
+    (r) => r.date.trim() || r.fromTime.trim() || r.toTime.trim() || r.activity.trim() || r.notes.trim()
+  );
+
+  async function handleOpenImport() {
+    setImportLoading(true);
+    setImportDialogOpen(true);
+    try {
+      const raw = await getAppendix(tripId, "dalet");
+      const rows = (raw?.rows as ItineraryRow[]) ?? [];
+      setDaletRows(rows);
+      setImportMode("replace");
+    } catch {
+      setDaletRows([]);
+    } finally {
+      setImportLoading(false);
+    }
+  }
+
+  const previewRows = useMemo(() => {
+    if (!daletRows) return [];
+    return convertDaletRowsToBet(daletRows, trip?.startDate, autoFillEndTime);
+  }, [daletRows, trip?.startDate, autoFillEndTime]);
+
+  function handleConfirmImport() {
+    if (previewRows.length === 0) return;
+
+    let newSchedule: ScheduleRow[];
+    if (importMode === "append") {
+      const existingClean = form.schedule.filter(
+        (r) => r.date.trim() || r.fromTime.trim() || r.toTime.trim() || r.activity.trim() || r.notes.trim()
+      );
+      newSchedule = existingClean.length > 0 ? [...existingClean, ...previewRows] : previewRows;
+    } else {
+      newSchedule = previewRows;
+    }
+
+    const updated = { ...form, schedule: newSchedule };
+    setForm(updated);
+    scheduleAutoSave(updated);
+    setImportDialogOpen(false);
+    setImportNotice(`יובאו ${previewRows.length} שורות מנספח ד׳ בהצלחה ✓`);
+    setTimeout(() => setImportNotice(null), 4000);
+  }
+
   function getHTML() {
     const classes = trip?.classes?.map((c) => c.name).join(", ") ?? "";
     const schedRows = form.schedule.map((r) => `
@@ -190,7 +405,7 @@ export function AppendixBetClient() {
       <div class="section-title">חתימות</div>
       <table style="margin-top:8px">
         <tr>
-          <th>מורה אחראי/ת</th><th>רכז/ת טיולים</th><th>מנהל/ת ביה&quot;ס</th>
+          <th>מורה אחראי/ת</th><th>רכז/ת טיולים</th><th>מנהל/ת ביה"ס</th>
         </tr>
         <tr>
           <td style="height:70px;text-align:center;vertical-align:middle">
@@ -219,7 +434,7 @@ export function AppendixBetClient() {
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ב׳ — אישור תוכנית הטיול</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            ימולא ע&quot;י האחראי/ת על הטיול ויועבר לאישור מנהל/ת ביה&quot;ס ורכז/ת הטיולים
+            {'ימולא ע"י האחראי/ת על הטיול ויועבר לאישור מנהל/ת ביה"ס ורכז/ת הטיולים'}
           </p>
         </div>
         <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-[var(--success)]" : "text-muted-foreground"}`}>
@@ -283,7 +498,31 @@ export function AppendixBetClient() {
 
       {/* Schedule table */}
       <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
-        <h2 className="text-sm font-semibold text-foreground mb-4">מסלול הטיול — לוח זמנים ופירוט פעילויות</h2>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">מסלול הטיול — לוח זמנים ופירוט פעילויות</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              לוח הזמנים של הפעילויות לאורך ימי הטיול
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleOpenImport}
+            className="text-xs h-8 text-primary border-primary/30 hover:bg-primary/5 hover:border-primary gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <ArrowDownToLine className="w-3.5 h-3.5" />
+            ייבוא מנספח ד׳ (לו״ז)
+          </Button>
+        </div>
+
+        {importNotice && (
+          <div className="flex items-center gap-2 p-2.5 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-[var(--radius-sm)] text-xs mb-3">
+            <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span>{importNotice}</span>
+          </div>
+        )}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted border-b border-border">
@@ -379,7 +618,7 @@ export function AppendixBetClient() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label>הערות מנהל/ת ביה&quot;ס</Label>
+          <Label>{'הערות מנהל/ת ביה"ס'}</Label>
           <textarea
             value={form.principalNotes}
             onChange={(e) => setField("principalNotes", e.target.value)}
@@ -429,8 +668,8 @@ export function AppendixBetClient() {
           <RemoteSignature
             tripId={tripId}
             role="b_principal"
-            roleName='מנהל/ת ביה&quot;ס'
-            label='מנהל/ת ביה&quot;ס'
+            roleName='מנהל/ת ביה"ס'
+            label='מנהל/ת ביה"ס'
             tripName={trip?.name ?? ""}
             schoolName={trip?.schoolName ?? ""}
             leaderName={form.leaderName || trip?.name || ""}
@@ -438,6 +677,160 @@ export function AppendixBetClient() {
           />
         </div>
       </div>
+
+      {/* Import from Appendix Dalet Dialog */}
+      <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col" dir="rtl">
+          <DialogHeader>
+            <DialogTitle>ייבוא לוח זמנים מנספח ד׳</DialogTitle>
+            <DialogDescription>
+              ייבוא הפעילויות ולוח הזמנים שהוגדרו בנספח ד׳ (לוח זמנים) אל טבלת מסלול הטיול.
+            </DialogDescription>
+          </DialogHeader>
+
+          {importLoading ? (
+            <div className="py-12 text-center text-sm text-muted-foreground">
+              טוען נתונים מנספח ד׳...
+            </div>
+          ) : previewRows.length === 0 ? (
+            <div className="py-6 text-center space-y-3">
+              <div className="w-10 h-10 rounded-full bg-amber-50 text-amber-600 mx-auto flex items-center justify-center border border-amber-200">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">לא נמצאו שורות פעילות בנספח ד׳</p>
+                <p className="text-xs text-muted-foreground">
+                  כדי לייבא לוח זמנים, יש למלא תחילה את הפעילויות בנספח ד׳ (לוח זמנים).
+                </p>
+              </div>
+              <div className="pt-2 flex justify-center gap-2">
+                <Link href={`/trips/${tripId}/appendix/dalet`}>
+                  <Button variant="default" size="sm" className="text-xs gap-1.5 cursor-pointer">
+                    <ExternalLink className="w-3.5 h-3.5" />
+                    מעבר לנספח ד׳
+                  </Button>
+                </Link>
+                <Button variant="outline" size="sm" onClick={() => setImportDialogOpen(false)} className="text-xs cursor-pointer">
+                  סגור
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4 overflow-y-auto py-1">
+              {/* Options & Settings */}
+              <div className="bg-muted/40 p-3.5 rounded-[var(--radius-sm)] border border-border space-y-3 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">
+                    נמצאו <strong className="text-foreground font-semibold">{previewRows.length}</strong> פעילויות לייבוא
+                  </span>
+                  <Link
+                    href={`/trips/${tripId}/appendix/dalet`}
+                    target="_blank"
+                    className="text-primary hover:underline flex items-center gap-1 font-medium"
+                  >
+                    <span>פתיחת נספח ד׳ בלשונית חדשה</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                </div>
+
+                {hasExistingData && (
+                  <div className="pt-2.5 border-t border-border">
+                    <span className="font-medium text-foreground block mb-1.5">אופן הייבוא:</span>
+                    <div className="flex flex-wrap items-center gap-4">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="importMode"
+                          value="replace"
+                          checked={importMode === "replace"}
+                          onChange={() => setImportMode("replace")}
+                          className="text-primary focus:ring-primary"
+                        />
+                        <span>החלף את הטבלה הקיימת ({form.schedule.length} שורות)</span>
+                      </label>
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="importMode"
+                          value="append"
+                          checked={importMode === "append"}
+                          onChange={() => setImportMode("append")}
+                          className="text-primary focus:ring-primary"
+                        />
+                        <span>הוסף לשורות הקיימות</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-2.5 border-t border-border">
+                  <label className="flex items-center gap-2 cursor-pointer text-foreground select-none">
+                    <input
+                      type="checkbox"
+                      checked={autoFillEndTime}
+                      onChange={(e) => setAutoFillEndTime(e.target.checked)}
+                      className="rounded border-border text-primary focus:ring-primary h-4 w-4"
+                    />
+                    <span>השלם שעת סיום (&quot;עד שעה&quot;) לפי תחילת הפעילות הבאה באותו יום</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Preview Table */}
+              <div className="border border-border rounded-[var(--radius-sm)] overflow-hidden">
+                <div className="bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground border-b border-border">
+                  תצוגה מקדימה של השורות לייבוא ({previewRows.length} שורות):
+                </div>
+                <div className="max-h-56 overflow-y-auto">
+                  <table className="w-full text-xs">
+                    <thead className="bg-muted/50 border-b border-border text-muted-foreground sticky top-0">
+                      <tr>
+                        <th className="text-right p-2 font-medium w-24">תאריך</th>
+                        <th className="text-right p-2 font-medium w-16">משעה</th>
+                        <th className="text-right p-2 font-medium w-16">עד שעה</th>
+                        <th className="text-right p-2 font-medium">פעילות ומקום</th>
+                        <th className="text-right p-2 font-medium w-28">הערות</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {previewRows.map((row) => (
+                        <tr key={row.id} className="hover:bg-muted/20">
+                          <td className="p-2 font-mono whitespace-nowrap">{row.date || "—"}</td>
+                          <td className="p-2 font-mono whitespace-nowrap">{row.fromTime || "—"}</td>
+                          <td className="p-2 font-mono whitespace-nowrap">{row.toTime || "—"}</td>
+                          <td className="p-2">{row.activity || "—"}</td>
+                          <td className="p-2 text-muted-foreground">{row.notes || "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {previewRows.length > 0 && !importLoading && (
+            <DialogFooter className="gap-2 sm:justify-between flex-row">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setImportDialogOpen(false)}
+                className="cursor-pointer"
+              >
+                ביטול
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmImport}
+                className="gap-1.5 cursor-pointer"
+              >
+                <Check className="w-3.5 h-3.5" />
+                ייבא {previewRows.length} שורות
+              </Button>
+            </DialogFooter>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

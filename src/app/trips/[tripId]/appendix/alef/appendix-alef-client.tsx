@@ -13,7 +13,7 @@ type ChecklistCategory = { n: number; s: string; sub?: string; items: ChecklistI
 
 const CHECKLIST: ChecklistCategory[] = [
   { n: 1, s: "תיק אחראי טיול", sub: "אישורים + רשימות", items: [
-    { d: 'כתב מינוי לאחראי/ת טיול בחתימת מנהל/ת ביה&quot;ס', r: "נספח ב׳" },
+    { d: 'כתב מינוי לאחראי/ת טיול בחתימת מנהל/ת ביה"ס', r: "נספח ב׳" },
     { d: "אישור מנהל/ת ביה\"ס ליציאה לטיול", r: "נספח ג׳" },
     { d: "אישור ביטחוני מהלשכה לתיאום טיולים — תואם לתוכנית הטיול" },
     { d: "אישור מנהל/ת ביה\"ס לפעילות חריגה בטיול + הנוהל הרלוונטי מחוזר מנכ\"ל", r: "נספח ד׳" },
@@ -159,7 +159,7 @@ export function AppendixAlefClient() {
         <span>טיול / סיור כיתות: <strong>${classes}</strong></span>
         <span>חתימה: _______________________</span>
       </div>
-      <div class="footer">עותק של טופס זה יועבר חתום בבוקר הטיול ע&quot;י אחראי/ת הטיול למנהל/ת ביה&quot;ס</div>
+      <div class="footer">עותק של טופס זה יועבר חתום בבוקר הטיול ע"י אחראי/ת הטיול למנהל/ת ביה"ס</div>
     `;
   }
 
@@ -259,7 +259,7 @@ export function AppendixAlefClient() {
       </div>
 
       <p className="text-xs text-muted-foreground mt-3">
-        עותק של טופס זה יועבר חתום בבוקר הטיול ע&quot;י אחראי/ת הטיול למנהל/ת ביה&quot;ס
+        {'עותק של טופס זה יועבר חתום בבוקר הטיול ע"י אחראי/ת הטיול למנהל/ת ביה"ס'}
       </p>
       <AppendixActions title="נספח א׳ — טופס ביקורת לפני יציאה" getHTML={getHTML} />
     </div>

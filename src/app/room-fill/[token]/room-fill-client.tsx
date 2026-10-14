@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { getRoomFillToken } from "@/lib/firestore/room-fill-tokens";
 import { getStudents } from "@/lib/firestore/students";
 import { submitPendingUpdate } from "@/lib/firestore/pending-updates";
+import { StudentAssignSheet } from "@/components/rooms/student-assign-sheet";
 import type { RoomFillToken } from "@/lib/firestore/room-fill-tokens";
 import type { Student } from "@/lib/types";
 
@@ -44,8 +45,13 @@ export function RoomFillClient() {
   const [assignments, setAssignments] = useState<Record<string, string[]>>({});
   const [draggingId, setDraggingId]   = useState<string | null>(null);
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null);
-  // click-to-assign: which student chip was clicked
-  const [assigningId, setAssigningId] = useState<string | null>(null);
+  const [selectedStudentForSheet, setSelectedStudentForSheet] = useState<{
+    student: Student;
+    currentRoomId: string | null;
+  } | null>(null);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
+  const [isMultiSheetOpen, setIsMultiSheetOpen] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -93,7 +99,6 @@ export function RoomFillClient() {
       next[roomId] = [...(next[roomId] ?? []), studentId];
       return next;
     });
-    setAssigningId(null);
   }
 
   function removeStudent(studentId: string, roomId: string) {
@@ -182,65 +187,132 @@ export function RoomFillClient() {
 
       {/* Unassigned students */}
       {unassigned.length > 0 && (
-        <div className="bg-white rounded-xl border border-amber-200 p-4 space-y-2">
-          <p className="text-sm font-semibold text-amber-800">
-            תלמידים ממתינים לשיבוץ ({unassigned.length})
-          </p>
+        <div className="bg-white rounded-xl border border-amber-200 p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div>
+              <p className="text-sm font-semibold text-amber-800">
+                תלמידים ממתינים לשיבוץ ({unassigned.length})
+              </p>
+              <p className="text-xs text-amber-700/80">
+                {multiSelectMode
+                  ? "בחר תלמידים לשיבוץ יחד"
+                  : "לחץ/י על תלמיד/ה לשיבוץ מהיר או גרור/י לחדר"}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {multiSelectMode ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedStudentIds.length === 0) {
+                        setSelectedStudentIds(unassigned.map((s) => s.id));
+                      } else {
+                        setSelectedStudentIds([]);
+                      }
+                    }}
+                    className="text-xs px-2.5 py-1 bg-amber-50 border border-amber-300 rounded-md text-amber-900 font-medium hover:bg-amber-100/60 transition-colors"
+                  >
+                    {selectedStudentIds.length === 0 ? "בחר הכל" : "נקה בחירה"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMultiSelectMode(false);
+                      setSelectedStudentIds([]);
+                    }}
+                    className="text-xs px-2.5 py-1 bg-white border border-border rounded-md text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    ביטול
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setMultiSelectMode(true)}
+                  className="text-xs px-2.5 py-1 bg-amber-50 border border-amber-300 rounded-md text-amber-900 font-medium hover:bg-amber-100/60 transition-all shadow-xs"
+                >
+                  ☑ בחירה מרובה
+                </button>
+              )}
+            </div>
+          </div>
+
           <div className="flex flex-wrap gap-2">
             {unassigned.map((s) => {
-              const isGirl    = s.gender === "female";
-              const chipBg    = isGirl ? "bg-pink-100 border-pink-300 text-pink-900" : "bg-blue-100 border-blue-300 text-blue-900";
-              const eligible  = rooms.filter((r) => !r.gender || r.gender === s.gender);
+              const isGirl = s.gender === "female";
+              const isSelected = selectedStudentIds.includes(s.id);
+              const chipBg = isGirl
+                ? isSelected
+                  ? "bg-pink-200 border-pink-500 text-pink-950 font-semibold ring-2 ring-pink-400/50"
+                  : "bg-pink-100 border-pink-300 text-pink-900"
+                : isSelected
+                ? "bg-blue-200 border-blue-500 text-blue-950 font-semibold ring-2 ring-blue-400/50"
+                : "bg-blue-100 border-blue-300 text-blue-900";
+              const eligible = rooms.filter((r) => !r.gender || r.gender === s.gender);
+
               return (
-                <div key={s.id} className="relative">
-                  {assigningId === s.id ? (
-                    <div className="flex items-center gap-1">
-                      <select
-                        autoFocus
-                        className="text-xs border border-border rounded-full px-2 py-0.5 focus:outline-none focus:border-primary"
-                        onChange={(e) => e.target.value && assignStudent(s.id, e.target.value)}
-                        onBlur={() => setAssigningId(null)}
-                      >
-                        <option value="">בחר חדר...</option>
-                        {eligible.map((r) => (
-                          <option key={r.id} value={r.id}>
-                            {r.number ? `חדר ${r.number}` : `חדר ${rooms.indexOf(r) + 1}`}
-                            {r.capacity ? ` (${(assignments[r.id] ?? []).length}/${r.capacity})` : ""}
-                          </option>
-                        ))}
-                      </select>
-                      <button onClick={() => setAssigningId(null)} className="text-xs text-muted-foreground">✕</button>
-                    </div>
-                  ) : (
-                    <button
-                      draggable={eligible.length > 0}
-                      onDragStart={(e) => {
-                        e.dataTransfer.setData("studentId", s.id);
-                        e.dataTransfer.effectAllowed = "move";
-                        setDraggingId(s.id);
-                      }}
-                      onDragEnd={() => setDraggingId(null)}
-                      onClick={() => {
-                        if (eligible.length === 0) return;
-                        if (eligible.length === 1) assignStudent(s.id, eligible[0].id);
-                        else setAssigningId(s.id);
-                      }}
-                      title={eligible.length === 0 ? "אין חדרים מתאימים" : "לחץ/י לשיבוץ או גרור לחדר"}
-                      className={`text-xs rounded-full px-2.5 py-1 border transition-all ${chipBg} ${
-                        eligible.length === 0
-                          ? "opacity-50 cursor-not-allowed"
-                          : draggingId === s.id
-                            ? "opacity-40 scale-95"
-                            : "hover:opacity-80 cursor-grab active:cursor-grabbing"
-                      }`}
-                    >
-                      {s.firstName} {s.lastName}
-                    </button>
+                <button
+                  key={s.id}
+                  type="button"
+                  draggable={!multiSelectMode && eligible.length > 0}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData("studentId", s.id);
+                    e.dataTransfer.effectAllowed = "move";
+                    setDraggingId(s.id);
+                  }}
+                  onDragEnd={() => setDraggingId(null)}
+                  onClick={() => {
+                    if (multiSelectMode) {
+                      setSelectedStudentIds((prev) =>
+                        prev.includes(s.id) ? prev.filter((id) => id !== s.id) : [...prev, s.id]
+                      );
+                    } else {
+                      setSelectedStudentForSheet({ student: s, currentRoomId: null });
+                    }
+                  }}
+                  title={
+                    multiSelectMode
+                      ? isSelected ? "בטל בחירה" : "בחר תלמיד/ה"
+                      : eligible.length === 0
+                      ? "אין חדרים מתאימים"
+                      : "לחץ/י לשיבוץ או גרור/י לחדר"
+                  }
+                  className={`text-xs rounded-full px-2.5 py-1 border transition-all flex items-center gap-1 ${chipBg} ${
+                    eligible.length === 0 && !multiSelectMode
+                      ? "opacity-50 cursor-not-allowed"
+                      : draggingId === s.id
+                      ? "opacity-40 scale-95"
+                      : "hover:opacity-90 cursor-pointer active:scale-95"
+                  }`}
+                >
+                  {multiSelectMode && (
+                    <span className="text-[10px] w-3.5 h-3.5 rounded-full border border-current flex items-center justify-center mr-0.5">
+                      {isSelected ? "✓" : ""}
+                    </span>
                   )}
-                </div>
+                  <span>{s.firstName} {s.lastName}</span>
+                </button>
               );
             })}
           </div>
+
+          {/* Multi-select action bar */}
+          {multiSelectMode && selectedStudentIds.length > 0 && (
+            <div className="pt-2 border-t border-amber-200/80 flex items-center justify-between gap-3">
+              <span className="text-xs font-medium text-amber-900">
+                נבחרו {selectedStudentIds.length} תלמידים
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsMultiSheetOpen(true)}
+                className="text-xs bg-primary text-primary-foreground font-medium px-4 py-1.5 rounded-lg shadow-sm hover:bg-primary/90 transition-all active:scale-95"
+              >
+                שבץ {selectedStudentIds.length} תלמידים לחדר...
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -304,7 +376,7 @@ export function RoomFillClient() {
                 {isOver && studs.length === 0 && (
                   <span className="text-xs text-primary/50">שחרר כאן</span>
                 )}
-                <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5">
                   {studs.map((s) => (
                     <span
                       key={s.id}
@@ -315,12 +387,19 @@ export function RoomFillClient() {
                         setDraggingId(s.id);
                       }}
                       onDragEnd={() => { setDraggingId(null); setDragOverRoom(null); }}
-                      className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border cursor-grab active:cursor-grabbing ${chipBg} ${draggingId === s.id ? "opacity-40" : ""}`}
+                      onClick={() => setSelectedStudentForSheet({ student: s, currentRoomId: room.id })}
+                      title="לחץ/י להעברה או הסרה, או גרור/י"
+                      className={`inline-flex items-center gap-1 text-xs rounded-full px-2.5 py-0.5 border cursor-pointer hover:shadow-xs active:scale-95 transition-all ${chipBg} ${draggingId === s.id ? "opacity-40" : ""}`}
                     >
                       {s.firstName} {s.lastName}
                       <button
-                        onClick={() => removeStudent(s.id, room.id)}
-                        className="text-muted-foreground hover:text-destructive transition-colors mr-0.5"
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeStudent(s.id, room.id);
+                        }}
+                        className="text-muted-foreground hover:text-destructive transition-colors mr-0.5 p-0.5 rounded-full hover:bg-black/5"
+                        title="הסר מהחדר"
                       >
                         <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -355,6 +434,46 @@ export function RoomFillClient() {
             ? `שלח שיבוץ לאישור (${totalAssigned} תלמידים)`
             : "שלח שיבוץ לאישור"}
       </button>
+
+      {/* Student Assign Sheet */}
+      <StudentAssignSheet
+        open={!!selectedStudentForSheet || isMultiSheetOpen}
+        onClose={() => {
+          setSelectedStudentForSheet(null);
+          setIsMultiSheetOpen(false);
+        }}
+        students={
+          isMultiSheetOpen
+            ? unassigned.filter((s) => selectedStudentIds.includes(s.id))
+            : selectedStudentForSheet
+            ? [selectedStudentForSheet.student]
+            : []
+        }
+        currentRoomId={selectedStudentForSheet?.currentRoomId ?? null}
+        rooms={rooms.map((r, idx) => {
+          const studs = (assignments[r.id] ?? []).map((id) => studentById[id]).filter(Boolean);
+          return {
+            id: r.id,
+            number: r.number || `${idx + 1}`,
+            capacity: r.capacity,
+            gender: r.gender,
+            studentNames: studs.map((s) => `${s.firstName} ${s.lastName}`),
+            currentCount: studs.length,
+          };
+        })}
+        onAssignToRoom={(ids, targetRoomId) => {
+          ids.forEach((id) => {
+            assignStudent(id, targetRoomId);
+          });
+          setSelectedStudentIds([]);
+          setMultiSelectMode(false);
+        }}
+        onRemoveFromRoom={(ids, fromRoomId) => {
+          ids.forEach((id) => {
+            removeStudent(id, fromRoomId);
+          });
+        }}
+      />
     </Shell>
   );
 }

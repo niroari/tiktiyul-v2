@@ -117,7 +117,7 @@ export function AppendixZayinClient() {
         <div class="ministry">${esc(trip?.name)} | ${esc(trip?.schoolName)}</div>
       </div>
       <div class="meta">
-        <span>סה&quot;כ יוצאים: <strong>${going}</strong></span>
+        <span>סה"כ יוצאים: <strong>${going}</strong></span>
         <span>בנים: <strong>${boys}</strong></span>
         <span>בנות: <strong>${girls}</strong></span>
       </div>
@@ -133,7 +133,7 @@ export function AppendixZayinClient() {
         </tr></thead>
         <tbody>${rows}</tbody>
       </table>
-      <div class="footer">רשימה זו מהווה 3 עותקים: אחראי הטיול / אחראי אוטובוס וכיתה / מזכירות ביה&quot;ס</div>
+      <div class="footer">רשימה זו מהווה 3 עותקים: אחראי הטיול / אחראי אוטובוס וכיתה / מזכירות ביה"ס</div>
     `;
   }
 
