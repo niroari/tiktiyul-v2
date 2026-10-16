@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Send, ExternalLink, Key, Check, Copy } from "lucide-react";
+import { Send, ExternalLink, Key, Check, Copy, ShieldCheck } from "lucide-react";
 import { createClientTripPin } from "@/lib/firestore/trip-pins";
 
 export function TelegramAssistantCard() {
@@ -105,6 +105,19 @@ export function TelegramAssistantCard() {
           <div className="flex items-center gap-1.5">
             <span>⛅</span>
             <span><strong className="text-foreground">שטח ומסלולים:</strong> עומס חום, מסלולים חלופיים ואכסניה</span>
+          </div>
+        </div>
+
+        {/* ── Privacy & Security Guarantee ── */}
+        <div className="flex items-start gap-2.5 rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-2.5 text-xs text-muted-foreground">
+          <ShieldCheck className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <span className="font-semibold text-emerald-800 dark:text-emerald-300">
+              פרטיות ואבטחת מידע מובטחת (Zero-PII):
+            </span>{" "}
+            <span>
+              לסוכן ה-AI אין גישה לשמות תלמידים, תעודות זהות או טלפונים של תלמידים. כל הנתונים על כמויות משתתפים, מנות מיוחדות ומגבלות רפואיות מסופקים באופן כמותי ומצרפי בלבד.
+            </span>
           </div>
         </div>
 
