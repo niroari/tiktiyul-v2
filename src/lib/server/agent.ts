@@ -22,6 +22,37 @@ import {
 } from "./reminders";
 import { searchSafetyRegulations, CircularType } from "./safety-guidelines/search";
 
+
+function getResponseText(response: {
+  text?: string;
+  candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
+}): string {
+  if (typeof response.text === "string" && response.text.trim()) {
+    return response.text.trim();
+  }
+  const parts = response.candidates?.[0]?.content?.parts || [];
+  const textParts = parts
+    .map((p) => p.text)
+    .filter((t): t is string => typeof t === "string" && Boolean(t.trim()));
+  if (textParts.length > 0) return textParts.join("\n").trim();
+  return "";
+}
+
+function getFunctionCalls(response: {
+  functionCalls?: Array<{ name?: string; args?: Record<string, unknown>; id?: string }>;
+  candidates?: Array<{ content?: { parts?: Array<{ functionCall?: { name?: string; args?: Record<string, unknown>; id?: string } }> } }>;
+}): Array<{ name?: string; args?: Record<string, unknown>; id?: string }> {
+  if (response.functionCalls && Array.isArray(response.functionCalls) && response.functionCalls.length > 0) {
+    return response.functionCalls;
+  }
+  const parts = response.candidates?.[0]?.content?.parts || [];
+  const calls: Array<{ name?: string; args?: Record<string, unknown>; id?: string }> = [];
+  for (const p of parts) {
+    if (p.functionCall) calls.push(p.functionCall);
+  }
+  return calls;
+}
+
 function getGeminiClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey || apiKey.trim() === "") {
@@ -58,12 +89,24 @@ const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי ש
      * אשר למשתמש בצורה נעימה וברורה את מועד התזכורת המדויק שנקבע (⏰).
    - 📢 שידור מיידי לכל המורים המלווים בטיול: 'broadcast_to_staff'. משמש כאשר המשתמש מבקש לשלוח הודעה דחופה לכל המורים המחוברים לטיול (למשל: "שלח לכל המורים שהיציאה נדחתה", "שדר לצוות להתכנס בלובי").
    - 📋 תזכורות פעילות וביטול: 'list_my_reminders' ו-'cancel_reminder'.
-   - 🚨 מגבלות רפואיות, אלרגיות מסכנות חיים, מזרקי אפיפן, מחלות כרוניות, נכויות, פציעות, תרופות (נספח י'): השתמש אך ורק ב-'get_medical_restrictions'. זהו נספח י' הרשמי!
-     * הדגש מיד באימוג'י 🚨 ובאופן בולט כל תלמיד שנושא מזרק אפיפן (Epipen).
-     * פרט את שם התלמיד, כיתתו, המגבלה הרפואית המדויקת, הנחיות מיוחדות ומספר טלפון לחירום.
+   - 🔒 אבטחת מידע, סודיות ופרטיות תלמידים (Zero-PII Policy):
+     * חוק ברזל: לסוכן אין גישה לשמות תלמידים, תעודות זהות (ת.ז) או מספרי טלפון של תלמידים. מידע מזהה זה חסוי לחלוטין מטעמי אבטחת מידע והגנת פרטיות קטינים.
+     * כל נתוני התלמידים מנוהלים ומוצגים אך ורק בצורה מצרפית וכמותית (ספירות וכמויות אנונימיות ללא שמות):
+       - ספירת משתתפים כללית (כמה יוצאים, כמה לא יוצאים).
+       - פילוח לפי מגדר: בנים ובנות (יוצאים / לא יוצאים) בכלל השכבה ולפי כיתה.
+       - כמויות העדפות מזון ומנות מיוחדות לפי כיתה ושכבה (למשל: "3 צמחונים, 2 טבעונים ו-1 צליאקי"). ללא שמות!
+       - סיכום כמותי של בעיות רפואיות לפי כיתה, וספירת נשאי מזרק אפיפן (🚨) לפי כיתה. ללא שמות!
+       - שיבוץ חדרים: מספרי חדרים, קיבולת, תפוסה נוכחית, מיטות פנויות, מגדר וכיתות המשובצות בחדר (ללא שמות תלמידים).
+       - הורים מלווים: שם ההורה, טלפון ההורה וכיתת הילד/ה (ללא שמות תלמידים).
+     * מענה לשאלות על תלמיד/ה מסוים/ת: אם המשתמש שואל על תלמיד/ה ספציפי/ת (לפי שם או ת.ז, למשל: "האם יונתן כהן יוצא?", "מה ת.ז של דניאל?", "איפה שירה ישנה?", "מי התלמידים שלא יוצאים?"), הסבר באדיבות ובבירור:
+       "מטעמי אבטחת מידע והגנת פרטיות התלמידים, אין לסוכן גישה לשמות, תעודות זהות או פרטים מזהים של תלמידים. באפשרותך לקבל ספירות ונתונים סטטיסטיים (כמויות משתתפים, חלוקת בנים/בנות, כמויות מנות מיוחדות ומגבלות רפואיות לפי כיתה). רשימת השמות המלאה והמאובטחת זמינה לצפייה ישירה באתר 'תיק טיול' בלבד."
+     * איסור מוחלט: לעולם אל תעביר שמות או פרטים מזהים בשאילתות חיפוש ברשת ('search_web_and_sites_info')!
+   - 🚨 מגבלות רפואיות, אלרגיות מסכנות חיים, מזרקי אפיפן (נספח י'): השתמש אך ורק ב-'get_medical_restrictions'.
+     * הכלי מחזיר סיכום כמותי של מגבלות רפואיות ונשאי מזרק אפיפן (🚨) לפי כיתה (ללא שמות תלמידים).
+     * הדגש תמיד באימוג'י 🚨 את כמות נשאי מזרק אפיפן (Epipen) ברמת השכבה והכיתות.
    - 🥗 העדפות מזון, תזונה ומנות מיוחדות (צמחוני, טבעוני, ללא גלוטן/צליאק): השתמש ב-'get_dietary_preferences'.
+     * מציג כמויות מנות מבוקשות לפי כיתה ולכלל השכבה (לדוגמה: "3 צמחונים, 2 טבעונים ו-1 צליאקי"). ללא שמות!
      * לעולם, בשום אופן, אל תציג תלמידים צמחוניים או טבעוניים כבעלי "מגבלה רפואית"! אלו העדפות מזון לצורכי קייטרינג/הסעדה ולא נספח רפואי.
-   - 🔒 אבטחת מידע וסודיות רפואית: המידע הרפואי של התלמידים מנספח י' הוא מידע אישי מוגן ורגיש. הצג אותו אך ורק בתשובה לשאלות מפורשות של הצוות החינוכי המחובר. איסור מוחלט: לעולם אל תעביר שמות תלמידים או פרטים רפואיים אישיים כחלק משאילתות חיפוש ברשת ('search_web_and_sites_info')!
    - 🚌 אוטובוסים, שיבוצים וצוות מתוך 'טבלת השליטה' (נספח ו'): השתמש ב-'get_bus_manifest'.
      * טבלת השליטה מציגה לכל אוטובוס: כיתות משובצות, מורים מלווים (teachers), נהג וטלפון (driver), מאבטח/חובש (medicOrGuard) ומדריך (guide).
      * כאשר נשאל על מורים באוטובוס - ציין אך ורק את המורים מתוך רשימת 'teachers'! אל תכלול את הנהג, המאבטח או המדריך כמורים.
@@ -71,13 +114,13 @@ const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי ש
    - 🚫 איסור מוחלט על ניחוש או המצאת מספרי טלפון (Anti-Hallucination Policy):
      * לעולם, בשום מקרה, אל תמציא או תנחש מספר טלפון! אם מספר טלפון אינו מופיע במפורש בנתוני המערכת, ציין "המספר אינו מופיע כרגע במערכת".
      * אם המשתמש שואל על מספר טלפון או מעיר על אי-דיוק - חובה לקרוא מיד לכלי הנתונים המתאים ('get_bus_manifest', 'get_staff_and_contacts') ולמסור אך ורק את המספר הרשמי שמוחזר מהכלי.
-   - כמויות תלמידים, כמה יוצאים/לא יוצאים, שמות מי שלא יוצא, חלוקת בנים/בנות: 'get_trip_overview'.
+   - כמויות תלמידים, כמה יוצאים/לא יוצאים (כמויות בלבד), חלוקת בנים/בנות לפי שכבה וכיתה: 'get_trip_overview'.
    - תחזית מזג אוויר ועומס חום: 'get_weather_and_climate' ובדיקת תקנות ב-'search_safety_regulations' (חוזר אקלים).
    - סטטוס חתימות ומוכנות נספחים: 'get_trip_documents_and_signatures'.
    - דרישות אבטחה, נשק, כמה מאבטחים נדרשים, חובשים, או הנחיות מהאישור הביטחוני: 'get_security_approval_details'.
    - מסלולים חלופיים, אתרי טבע, שעות פתיחה, התרעות: 'search_web_and_sites_info'.
    - הורים מלווים: 'get_accompanying_parents'.
-   - שיבוץ חדרים: 'get_room_allocation'.
+   - שיבוץ חדרים ותפוסה לפי מספר חדר: 'get_room_allocation'.
    - לוח זמנים: 'get_itinerary'.
    - 📜 תקנות וחוזרי מנכ״ל (בטיחות, ביטחון, אקלים, הנגשה, אלרגיות, וציוד): 'search_safety_regulations'.
      * דיוק ומלאות ברשימות ציוד והנחיות: חוזרי מנכ״ל מפרטים נספחים המשתרעים על פני מספר עמודים (כגון נספח ט' - ציוד חובה לטיול בעמודים 61-62, פרק 4.15.2 - משמעת וכמויות מים בעמוד 88).
@@ -100,7 +143,7 @@ const SYSTEM_PROMPT = `אתה "חיליק" 🎒 - סוכן ה-AI המבצעי ש
 const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   {
     name: "get_trip_overview",
-    description: "שליפת פרטי הטיול הכלליים: שם הטיול, בית הספר, תאריכים, לינה, הסעות, כיתות, סה״כ תלמידים, כמה תלמידים יוצאים (confirmedGoing), כמה לא יוצאים (notGoingCount) ושמות כל התלמידים שלא יוצאים לטיול (notGoingStudents).",
+    description: "שליפת פרטי הטיול הכלליים: שם הטיול, בית הספר, תאריכים, לינה, הסעות, כיתות, סה״כ תלמידים, כמה תלמידים יוצאים (confirmedGoing), כמה לא יוצאים (notGoingCount), פילוח בנים ובנות (genderBreakdown), ופילוח לפי כיתות (classBreakdown). כל הנתונים כמותיים ומצרפיים ללא שמות תלמידים.",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -108,7 +151,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "search_students",
-    description: "חיפוש תלמידים לפי שם מלא, שם פרטי, כיתה, טלפון, או סינון תלמידים שלא יוצאים לטיול. מציג האם התלמיד יוצא (isGoing), הערות רפואיות ואלרגיות.",
+    description: "בדיקת מדיניות פרטיות תלמידים. פרטי זיהוי אישיים של תלמידים (שם, ת.ז, טלפון) חסויים לסוכן ה-AI מטעמי אבטחת מידע וזמינים באתר בלבד.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -129,7 +172,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "get_medical_restrictions",
-    description: "שליפת נספח י׳ הרשמי ('מגבלות רפואיות') של הטיול: רשימת תלמידים עם בעיות בריאותיות, מחלות כרוניות, נכויות, פציעות, והכי חשוב - אלרגיות מסכנות חיים ונשאי מזרק אפיפן (🚨). כלי זה מיועד אך ורק לבטיחות וחירום רפואי.",
+    description: "שליפת סיכום כמותי של נספח י׳ הרשמי ('מגבלות רפואיות'): כמויות תלמידים לפי סוג מגבלה, וכמות נשאי מזרק אפיפן (🚨) ברמת השכבה והכיתה. כל הנתונים מצרפיים ללא שמות תלמידים.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -146,7 +189,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "get_dietary_preferences",
-    description: "שליפת העדפות מזון ותזונה של תלמידים לצורכי הסעדה, קייטרינג, מטבח והזמנת מנות (צמחוני, טבעוני, ללא גלוטן/צליאק). כלי זה נועד אך ורק להסעדה ואינו מחליף את נספח י׳ הרפואי.",
+    description: "שליפת כמויות העדפות מזון ותזונה לצורכי הסעדה, קייטרינג, מטבח והזמנת מנות (כמויות צמחוני, טבעוני, ללא גלוטן/צליאק בסה״כ ולפי כיתה). הנתונים כמותיים ללא שמות תלמידים.",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -163,7 +206,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "get_allergies_and_medical",
-    description: "שליפת כל המידע המשלים על מגבלות רפואיות (נספח י') והעדפות מזון (צמחוני, טבעוני, צליאק).",
+    description: "שליפת סיכום כמותי של מגבלות רפואיות (נספח י') והעדפות מזון (צמחוני, טבעוני, צליאק).",
     parameters: {
       type: Type.OBJECT,
       properties: {
@@ -189,13 +232,13 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "get_room_allocation",
-    description: "שליפת שיבוץ חדרים באכסניה: באיזה חדר נמצא תלמיד מסוים, או מי שוהה בחדר מסוים.",
+    description: "שליפת שיבוץ ותפוסת חדרים באכסניה: מספר חדר, מגדר (בנים/בנות), קיבולת, כמות משובצים, מיטות פנויות, כיתות המשובצות בחדר, וסטטוס תפוסה. חיפוש לפי מספר חדר או סיכום כללי (ללא שמות תלמידים מטעמי פרטיות).",
     parameters: {
       type: Type.OBJECT,
       properties: {
         query: {
           type: Type.STRING,
-          description: "שם התלמיד/ה או מספר החדר לחיפוש",
+          description: "מספר חדר לחיפוש (למשל: '101')",
         },
       },
     },
@@ -239,7 +282,7 @@ const FUNCTION_DECLARATIONS: FunctionDeclaration[] = [
   },
   {
     name: "get_accompanying_parents",
-    description: "שליפת רשימת ההורים המלווים בטיול, מספרי הטלפון שלהם, ושמות הילדים והכיתות שלהם.",
+    description: "שליפת רשימת ההורים המלווים בטיול, מספרי הטלפון שלהם, וכיתת הילד/ה (ללא שמות תלמידים).",
     parameters: {
       type: Type.OBJECT,
       properties: {},
@@ -585,6 +628,7 @@ ${userName ? `- שם המשתמש: ${userName}` : ""}
       config: {
         systemInstruction: systemWithContext,
         tools: [{ functionDeclarations: FUNCTION_DECLARATIONS }],
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 
@@ -594,9 +638,10 @@ ${userName ? `- שם המשתמש: ${userName}` : ""}
 
     // Tool calling loop (up to 4 turns)
     for (let turn = 0; turn < 4; turn++) {
-      const functionCalls = response.functionCalls;
+      const functionCalls = getFunctionCalls(response);
       if (!functionCalls || functionCalls.length === 0) {
-        return response.text || "לא התקבלה תשובה מפורטת.";
+        const reply = getResponseText(response);
+        return reply || "לא התקבלה תשובה מפורטת.";
       }
 
       // Execute functions
@@ -625,7 +670,7 @@ ${userName ? `- שם המשתמש: ${userName}` : ""}
       });
     }
 
-    return response.text || "התקבלה תשובה חלקית בלבד.";
+    const finalReply = getResponseText(response); return finalReply || "התקבלה תשובה חלקית בלבד.";
   } catch (err: unknown) {
     console.error("Gemini agent execution error:", err);
     const msg = err instanceof Error ? err.message : "שגיאה בתקשורת עם ה-AI";

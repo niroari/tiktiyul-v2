@@ -13,7 +13,6 @@ export interface TripOverviewData {
   totalStudents: number;
   confirmedGoing: number;
   notGoingCount: number;
-  notGoingStudents: Array<{ name: string; class: string; phone?: string }>;
   genderBreakdown: {
     totalBoys: number;
     goingBoys: number;
@@ -52,7 +51,10 @@ export interface RoomAllocationItem {
   number: string;
   gender: string;
   capacity: number;
-  students: Array<{ name: string; class: string }>;
+  assignedCount: number;
+  availableBeds: number;
+  occupancyStatus: "מלא" | "פנוי חלקית" | "ריק";
+  classes: string[];
 }
 
 export interface StaffAndContactsResult {
@@ -76,7 +78,6 @@ export async function getTripOverview(
 
   const totalStudents = studentsSnap.size;
   let confirmedGoing = 0;
-  const notGoingStudents: Array<{ name: string; class: string; phone?: string }> = [];
 
   let totalBoys = 0;
   let goingBoys = 0;
@@ -125,13 +126,6 @@ export async function getTripOverview(
 
     if (s.isGoing) {
       confirmedGoing++;
-    } else {
-      const fullName = `${s.firstName || ""} ${s.lastName || ""}`.trim();
-      notGoingStudents.push({
-        name: fullName,
-        class: s.class || "",
-        phone: s.phone,
-      });
     }
   });
 
@@ -151,8 +145,7 @@ export async function getTripOverview(
     classes: data.classes || [],
     totalStudents,
     confirmedGoing,
-    notGoingCount: notGoingStudents.length,
-    notGoingStudents,
+    notGoingCount: totalStudents - confirmedGoing,
     genderBreakdown: {
       totalBoys,
       goingBoys,
@@ -166,92 +159,33 @@ export async function getTripOverview(
 }
 
 export async function searchStudents(
-  tripId: string,
-  query?: string,
-  classFilter?: string,
-  onlyNotGoing?: boolean
-): Promise<
-  Array<{
-    name: string;
-    class: string;
-    gender: string;
-    phone?: string;
-    isGoing: boolean;
-    allergies: string[];
-    medicalNotes?: string;
-    notes?: string;
-  }>
-> {
-  const db = getAdminDb();
-  const studentsSnap = await db
-    .collection("trips")
-    .doc(tripId)
-    .collection("students")
-    .get();
-
-  const results: Array<{
-    name: string;
-    class: string;
-    gender: string;
-    phone?: string;
-    isGoing: boolean;
-    allergies: string[];
-    medicalNotes?: string;
-    notes?: string;
-  }> = [];
-
-  const q = query ? query.toLowerCase().trim() : "";
-  const cls = classFilter ? classFilter.trim() : "";
-
-  studentsSnap.forEach((doc) => {
-    const s = doc.data() as Student;
-    const fullName = `${s.firstName || ""} ${s.lastName || ""}`.trim();
-    if (cls && s.class !== cls) return;
-    if (onlyNotGoing && s.isGoing) return;
-
-    if (q) {
-      const match =
-        fullName.toLowerCase().includes(q) ||
-        (s.class && s.class.toLowerCase().includes(q)) ||
-        (s.phone && s.phone.includes(q));
-      if (!match) return;
-    }
-
-    const allergies: string[] = [];
-    if (s.dietaryFlags?.vegetarian) allergies.push("צמחוני");
-    if (s.dietaryFlags?.vegan) allergies.push("טבעוני");
-    if (s.dietaryFlags?.glutenFree) allergies.push("ללא גלוטן (צליאק)");
-
-    results.push({
-      name: fullName,
-      class: s.class || "",
-      gender: s.gender === "female" ? "נקבה" : "זכר",
-      phone: s.phone,
-      isGoing: s.isGoing,
-      allergies,
-      medicalNotes: s.medicalNotes,
-      notes: s.notes,
-    });
-  });
-
-  return results.slice(0, 20); // Cap for WhatsApp brevity
+  _tripId: string,
+  _query?: string,
+  _classFilter?: string,
+  _onlyNotGoing?: boolean
+): Promise<{
+  privacyProtected: boolean;
+  message: string;
+}> {
+  return {
+    privacyProtected: true,
+    message:
+      "מטעמי אבטחת מידע והגנת פרטיות, חיפוש שמות, תעודות זהות ופרטים אישיים של תלמידים חסוי ואינו זמין לסוכן ה-AI. באפשרותך לקבל ספירת משתתפים (סה״כ ובנים/בנות), וכמויות העדפות מזון ומגבלות רפואיות לפי כיתה. שמות התלמידים נשמרים מאובטחים באתר בלבד.",
+  };
 }
 
-export interface MedicalRestrictionItem {
-  name: string;
-  class: string;
-  issue: string;
-  notes?: string;
-  phone?: string;
-  hasEpipen: boolean;
-  hasCert: boolean;
+export interface MedicalConditionSummaryItem {
+  condition: string;
+  count: number;
+  classes: string[];
+  isLifeThreateningOrEpipen: boolean;
 }
 
 export interface MedicalRestrictionsResult {
   totalRestrictions: number;
   epipenCarriersCount: number;
-  epipenStudents: Array<{ name: string; class: string; phone?: string; details: string }>;
-  otherMedicalStudents: MedicalRestrictionItem[];
+  epipenByClass: Array<{ class: string; count: number }>;
+  conditionsSummary: MedicalConditionSummaryItem[];
 }
 
 export async function getMedicalRestrictions(
@@ -277,10 +211,9 @@ export async function getMedicalRestrictions(
     class?: string;
     issue?: string;
     notes?: string;
-    certUrl?: string;
   }>;
 
-  // 2. Fetch Students for phone numbers & any stray medicalNotes
+  // 2. Fetch Students for class mapping & any stray medicalNotes
   const studentsSnap = await db
     .collection("trips")
     .doc(tripId)
@@ -297,7 +230,14 @@ export async function getMedicalRestrictions(
   });
 
   const processedIds = new Set<string>();
-  const allRestrictions: MedicalRestrictionItem[] = [];
+  const epipenClassMap = new Map<string, number>();
+  const conditionMap = new Map<
+    string,
+    { count: number; classes: Set<string>; isLifeThreateningOrEpipen: boolean }
+  >();
+
+  let totalRestrictions = 0;
+  let epipenCarriersCount = 0;
 
   for (const r of yodRows) {
     const s =
@@ -306,25 +246,34 @@ export async function getMedicalRestrictions(
     if (s?.id) processedIds.add(s.id);
     if (r.studentId) processedIds.add(r.studentId);
 
-    const cls = r.class || s?.class || "";
+    const cls = r.class || s?.class || "לא צוין";
     if (classFilter && cls !== classFilter) continue;
 
     const issueText = (r.issue || "").trim();
     const notesText = (r.notes || "").trim();
-    const fullText = `${issueText} ${notesText}`;
+    const fullText = `${issueText} ${notesText}`.trim() || "מגבלה רפואית";
     const hasEpipen = /אפיפן|epipen/i.test(fullText);
 
     if (onlyEpipen && !hasEpipen) continue;
 
-    allRestrictions.push({
-      name: `${r.firstName || ""} ${r.lastName || ""}`.trim(),
-      class: cls,
-      issue: issueText,
-      notes: notesText || undefined,
-      phone: s?.phone,
-      hasEpipen,
-      hasCert: Boolean(r.certUrl && r.certUrl.trim()),
-    });
+    totalRestrictions++;
+    if (hasEpipen) {
+      epipenCarriersCount++;
+      epipenClassMap.set(cls, (epipenClassMap.get(cls) || 0) + 1);
+    }
+
+    // Categorize condition (anonymized)
+    const categoryKey = hasEpipen ? "אלרגיה מסכנת חיים / מזרק אפיפן" : issueText || "מגבלה כללית";
+    if (!conditionMap.has(categoryKey)) {
+      conditionMap.set(categoryKey, {
+        count: 0,
+        classes: new Set<string>(),
+        isLifeThreateningOrEpipen: hasEpipen,
+      });
+    }
+    const cat = conditionMap.get(categoryKey)!;
+    cat.count++;
+    if (cls) cat.classes.add(cls);
   }
 
   // Also include students who have medicalNotes on their record but were not in Appendix Yod
@@ -332,49 +281,60 @@ export async function getMedicalRestrictions(
     if (processedIds.has(d.id)) return;
     const s = d.data() as Student;
     if (!s.medicalNotes || !s.medicalNotes.trim()) return;
-    if (classFilter && s.class !== classFilter) return;
+    const cls = s.class || "לא צוין";
+    if (classFilter && cls !== classFilter) return;
 
     const fullText = s.medicalNotes.trim();
     const hasEpipen = /אפיפן|epipen/i.test(fullText);
     if (onlyEpipen && !hasEpipen) return;
 
-    allRestrictions.push({
-      name: `${s.firstName || ""} ${s.lastName || ""}`.trim(),
-      class: s.class || "",
-      issue: fullText,
-      phone: s.phone,
-      hasEpipen,
-      hasCert: false,
-    });
+    totalRestrictions++;
+    if (hasEpipen) {
+      epipenCarriersCount++;
+      epipenClassMap.set(cls, (epipenClassMap.get(cls) || 0) + 1);
+    }
+
+    const categoryKey = hasEpipen ? "אלרגיה מסכנת חיים / מזרק אפיפן" : fullText;
+    if (!conditionMap.has(categoryKey)) {
+      conditionMap.set(categoryKey, {
+        count: 0,
+        classes: new Set<string>(),
+        isLifeThreateningOrEpipen: hasEpipen,
+      });
+    }
+    const cat = conditionMap.get(categoryKey)!;
+    cat.count++;
+    if (cls) cat.classes.add(cls);
   });
 
-  const epipenStudents = allRestrictions
-    .filter((m) => m.hasEpipen)
-    .map((m) => ({
-      name: m.name,
-      class: m.class,
-      phone: m.phone,
-      details: [m.issue, m.notes].filter(Boolean).join(" - "),
-    }));
+  const conditionsSummary: MedicalConditionSummaryItem[] = Array.from(
+    conditionMap.entries()
+  ).map(([condition, data]) => ({
+    condition,
+    count: data.count,
+    classes: Array.from(data.classes),
+    isLifeThreateningOrEpipen: data.isLifeThreateningOrEpipen,
+  }));
 
-  const otherMedicalStudents = allRestrictions.filter((m) => !m.hasEpipen);
+  const epipenByClass = Array.from(epipenClassMap.entries()).map(([cls, count]) => ({
+    class: cls,
+    count,
+  }));
 
   return {
-    totalRestrictions: allRestrictions.length,
-    epipenCarriersCount: epipenStudents.length,
-    epipenStudents,
-    otherMedicalStudents,
+    totalRestrictions,
+    epipenCarriersCount,
+    epipenByClass,
+    conditionsSummary,
   };
 }
 
-export interface DietaryPreferenceItem {
-  name: string;
+export interface DietaryClassBreakdown {
   class: string;
-  phone?: string;
-  vegetarian: boolean;
-  vegan: boolean;
-  glutenFree: boolean;
-  preferenceSummary: string;
+  vegetarian: number;
+  vegan: number;
+  glutenFree: number;
+  totalWithDietary: number;
 }
 
 export interface DietaryPreferencesResult {
@@ -382,7 +342,7 @@ export interface DietaryPreferencesResult {
   totalVegetarian: number;
   totalVegan: number;
   totalGlutenFree: number;
-  students: DietaryPreferenceItem[];
+  classBreakdown: DietaryClassBreakdown[];
 }
 
 export async function getDietaryPreferences(
@@ -400,11 +360,16 @@ export async function getDietaryPreferences(
   let totalVegetarian = 0;
   let totalVegan = 0;
   let totalGlutenFree = 0;
-  const students: DietaryPreferenceItem[] = [];
+
+  const classMap = new Map<
+    string,
+    { vegetarian: number; vegan: number; glutenFree: number; total: number }
+  >();
 
   studentsSnap.forEach((d) => {
     const s = d.data() as Student;
-    if (classFilter && s.class !== classFilter) return;
+    const cls = s.class || "לא משובץ";
+    if (classFilter && cls !== classFilter) return;
 
     const isVeg = Boolean(s.dietaryFlags?.vegetarian);
     const isVegan = Boolean(s.dietaryFlags?.vegan);
@@ -420,28 +385,32 @@ export async function getDietaryPreferences(
     if (preferenceType === "vegan" && !isVegan) return;
     if (preferenceType === "glutenFree" && !isGlutenFree) return;
 
-    const labels: string[] = [];
-    if (isVeg) labels.push("צמחוני 🥗");
-    if (isVegan) labels.push("טבעוני 🌱");
-    if (isGlutenFree) labels.push("ללא גלוטן (צליאק) 🌾");
-
-    students.push({
-      name: `${s.firstName || ""} ${s.lastName || ""}`.trim(),
-      class: s.class || "",
-      phone: s.phone,
-      vegetarian: isVeg,
-      vegan: isVegan,
-      glutenFree: isGlutenFree,
-      preferenceSummary: labels.join(", "),
-    });
+    if (!classMap.has(cls)) {
+      classMap.set(cls, { vegetarian: 0, vegan: 0, glutenFree: 0, total: 0 });
+    }
+    const cStats = classMap.get(cls)!;
+    cStats.total++;
+    if (isVeg) cStats.vegetarian++;
+    if (isVegan) cStats.vegan++;
+    if (isGlutenFree) cStats.glutenFree++;
   });
 
+  const classBreakdown: DietaryClassBreakdown[] = Array.from(classMap.entries()).map(
+    ([cls, stats]) => ({
+      class: cls,
+      vegetarian: stats.vegetarian,
+      vegan: stats.vegan,
+      glutenFree: stats.glutenFree,
+      totalWithDietary: stats.total,
+    })
+  );
+
   return {
-    totalWithDietary: students.length,
+    totalWithDietary: totalVegetarian + totalVegan + totalGlutenFree,
     totalVegetarian,
     totalVegan,
     totalGlutenFree,
-    students,
+    classBreakdown,
   };
 }
 
@@ -586,27 +555,40 @@ export async function getRoomAllocation(
     .collection("students")
     .get();
 
-  const studentMap = new Map<string, { name: string; class: string }>();
+  const studentClassMap = new Map<string, string>();
   studentsSnap.forEach((doc) => {
     const s = doc.data() as Student;
-    studentMap.set(doc.id, {
-      name: `${s.firstName || ""} ${s.lastName || ""}`.trim(),
-      class: s.class || "",
-    });
+    if (s.class) {
+      studentClassMap.set(doc.id, s.class);
+    }
   });
 
   const enrichedRooms: RoomAllocationItem[] = rooms.map((r) => {
-    const assignedStudents: Array<{ name: string; class: string }> = [];
+    const assignedCount = (r.studentIds || []).length;
+    const capacity = r.capacity || assignedCount || 0;
+    const availableBeds = Math.max(0, capacity - assignedCount);
+
+    const classesSet = new Set<string>();
     (r.studentIds || []).forEach((id) => {
-      const found = studentMap.get(id);
-      if (found) assignedStudents.push(found);
+      const cls = studentClassMap.get(id);
+      if (cls) classesSet.add(cls);
     });
+
+    let occupancyStatus: "מלא" | "פנוי חלקית" | "ריק" = "ריק";
+    if (assignedCount >= capacity && capacity > 0) {
+      occupancyStatus = "מלא";
+    } else if (assignedCount > 0) {
+      occupancyStatus = "פנוי חלקית";
+    }
 
     return {
       number: r.number || "ללא מספר",
       gender: r.gender === "female" ? "בנות" : "בנים",
-      capacity: r.capacity || r.studentIds?.length || 0,
-      students: assignedStudents,
+      capacity,
+      assignedCount,
+      availableBeds,
+      occupancyStatus,
+      classes: Array.from(classesSet),
     };
   });
 
@@ -615,33 +597,31 @@ export async function getRoomAllocation(
     const byRoom = enrichedRooms.find((r) => r.number.toLowerCase() === q);
     if (byRoom) return byRoom;
 
-    const foundRooms: Array<{
-      matchedStudent: string;
-      class: string;
-      roomNumber: string;
-      gender: string;
-      roommates: string[];
-    }> = [];
-
-    for (const r of enrichedRooms) {
-      const match = r.students.find((s) => s.name.toLowerCase().includes(q));
-      if (match) {
-        foundRooms.push({
-          matchedStudent: match.name,
-          class: match.class,
-          roomNumber: r.number,
-          gender: r.gender,
-          roommates: r.students
-            .filter((s) => s.name !== match.name)
-            .map((s) => s.name),
-        });
-      }
+    const roomNumberMatches = enrichedRooms.filter((r) =>
+      r.number.toLowerCase().includes(q)
+    );
+    if (roomNumberMatches.length > 0) {
+      return roomNumberMatches;
     }
-    if (foundRooms.length > 0) return foundRooms;
-    return { message: `לא נמצא שיבוץ חדר עבור "${query}"` };
+
+    return {
+      privacyProtected: true,
+      message:
+        "מטעמי אבטחת מידע והגנת פרטיות, חיפוש תלמידים ספציפיים בחדרים חסוי. באפשרותך לבדוק תפוסת חדרים לפי מספר חדר (לדוגמה 'חדר 101') או לקבל סיכום של כלל החדרים.",
+    };
   }
 
-  return { totalRooms: enrichedRooms.length, rooms: enrichedRooms.slice(0, 10) };
+  const totalCapacity = enrichedRooms.reduce((acc, r) => acc + r.capacity, 0);
+  const totalAssigned = enrichedRooms.reduce((acc, r) => acc + r.assignedCount, 0);
+  const totalAvailable = enrichedRooms.reduce((acc, r) => acc + r.availableBeds, 0);
+
+  return {
+    totalRooms: enrichedRooms.length,
+    totalCapacity,
+    totalAssigned,
+    totalAvailable,
+    rooms: enrichedRooms,
+  };
 }
 
 export async function getStaffAndContacts(
@@ -797,7 +777,6 @@ export async function getAccompanyingParents(tripId: string): Promise<
   Array<{
     name: string;
     phone: string;
-    childName: string;
     childClass: string;
     gender?: string;
   }>
@@ -812,7 +791,6 @@ export async function getAccompanyingParents(tripId: string): Promise<
   const parents: Array<{
     name: string;
     phone: string;
-    childName: string;
     childClass: string;
     gender?: string;
   }> = [];
@@ -822,7 +800,6 @@ export async function getAccompanyingParents(tripId: string): Promise<
     parents.push({
       name: data.name || "",
       phone: data.phone || "",
-      childName: data.childName || "",
       childClass: data.childClass || "",
       gender: data.gender === "female" ? "נקבה" : "זכר",
     });
