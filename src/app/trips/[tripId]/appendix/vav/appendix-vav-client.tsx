@@ -13,7 +13,7 @@ import { AppendixActions, esc } from "@/components/appendix-actions";
 
 const CREW_ROLES = ["מורה אחראי/ת", "מורה נוסף", "נהג", "מאבטח/חובש", "מדריך"];
 const STAFF_DROPDOWN_LIMIT = 2;
-const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳"];
+const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳", "חלק ד׳"];
 
 function splitKey(cls: string, part: number) { return `${cls}|${part}`; }
 function isSplitSel(sel: string) { return sel.includes("|"); }
@@ -50,7 +50,7 @@ type VavData = {
 function makeBus(): Bus {
   return {
     id: crypto.randomUUID(),
-    classSelections: ["", "", ""],
+    classSelections: ["", "", "", ""],
     crew: CREW_ROLES.map(() => ({ name: "", phone: "" })),
     extraTeachers: [],
   };
@@ -80,7 +80,7 @@ function migrateData(raw: Record<string, unknown>): VavData {
           ...b,
           crew:            b.crew            ?? CREW_ROLES.map(() => ({ name: "", phone: "" })),
           extraTeachers:   b.extraTeachers   ?? [],
-          classSelections: b.classSelections ?? ["", "", ""],
+          classSelections: b.classSelections ?? ["", "", "", ""],
         })),
       })),
       actual,
@@ -94,7 +94,7 @@ function migrateData(raw: Record<string, unknown>): VavData {
         ...b,
         crew:            b.crew            ?? CREW_ROLES.map(() => ({ name: "", phone: "" })),
         extraTeachers:   b.extraTeachers   ?? [],
-        classSelections: b.classSelections ?? ["", "", ""],
+        classSelections: b.classSelections ?? ["", "", "", ""],
       }))
     : [];
 
@@ -295,9 +295,25 @@ export function AppendixVavClient() {
 
   function addSplitPart(cls: string) {
     const parts = [...(data.splits[cls] ?? [])];
-    if (parts.length >= 3) return;
+    if (parts.length >= 4) return;
     parts.push("");
     update({ ...data, splits: { ...data.splits, [cls]: parts } });
+  }
+
+  function removeSplitPart(cls: string) {
+    const parts = [...(data.splits[cls] ?? [])];
+    if (parts.length <= 2) return;
+    const removedPartIdx = parts.length - 1;
+    parts.pop();
+    const removedKey = splitKey(cls, removedPartIdx);
+    const days = data.days.map((d) => ({
+      ...d,
+      buses: d.buses.map((b) => ({
+        ...b,
+        classSelections: b.classSelections.map((sel) => (sel === removedKey ? "" : sel)),
+      })),
+    }));
+    update({ ...data, splits: { ...data.splits, [cls]: parts }, days });
   }
 
   // ── Computed ───────────────────────────────────────────────────────────────
@@ -600,7 +616,7 @@ export function AppendixVavClient() {
                           <p className="text-xs text-muted-foreground">ייבא רשימת תלמידים בנספח ז׳ כדי לבחור כיתות</p>
                         ) : (
                           <div className="flex items-center gap-2 flex-wrap">
-                            {[0, 1, 2].map((si) => (
+                            {[0, 1, 2, 3].map((si) => (
                               <select
                                 key={si}
                                 value={bus.classSelections[si] ?? ""}
@@ -823,15 +839,27 @@ export function AppendixVavClient() {
                         <td colSpan={2} />
                       </tr>
                     ))}
-                    {isSplit && parts.length < 3 && (
-                      <tr key={`${cls}-add`} className="border-b border-border bg-amber-50/20">
+                    {isSplit && (
+                      <tr key={`${cls}-actions`} className="border-b border-border bg-amber-50/20">
                         <td colSpan={4} className="px-8 py-1">
-                          <button
-                            onClick={() => addSplitPart(cls)}
-                            className="text-xs text-primary/70 hover:text-primary transition-colors"
-                          >
-                            + הוסף {PART_LABELS[parts.length]}
-                          </button>
+                          <div className="flex items-center gap-3">
+                            {parts.length < 4 && (
+                              <button
+                                onClick={() => addSplitPart(cls)}
+                                className="text-xs text-primary/70 hover:text-primary transition-colors"
+                              >
+                                + הוסף {PART_LABELS[parts.length]}
+                              </button>
+                            )}
+                            {parts.length > 2 && (
+                              <button
+                                onClick={() => removeSplitPart(cls)}
+                                className="text-xs text-destructive/70 hover:text-destructive transition-colors"
+                              >
+                                - הסר {PART_LABELS[parts.length - 1]}
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     )}

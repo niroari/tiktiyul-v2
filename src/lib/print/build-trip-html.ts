@@ -283,7 +283,7 @@ export function buildHey(rows: HeyRow[]): string {
 
 const CREW_ROLES = ["מורה אחראי/ת", "מורה נוסף", "נהג", "מאבטח/חובש", "מדריך"];
 const DRIVER_IDX = CREW_ROLES.indexOf("נהג");
-const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳"];
+const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳", "חלק ד׳"];
 
 function isSplitSel(sel: string) { return sel.includes("|"); }
 function parseSplit(sel: string): [string, number] {

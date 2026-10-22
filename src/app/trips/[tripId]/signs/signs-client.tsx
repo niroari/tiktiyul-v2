@@ -173,7 +173,7 @@ export function SignsClient() {
   async function importFromVav() {
     const raw = await getAppendix(tripId, "vav");
     if (!raw?.buses) return;
-    const SHORT_PARTS = ["א׳", "ב׳", "ג׳"];
+    const SHORT_PARTS = ["א׳", "ב׳", "ג׳", "ד׳"];
     const vavBuses = raw.buses as { classSelections?: string[] }[];
     const imported: Bus[] = vavBuses.map((b, i) => {
       const selections = (b.classSelections ?? []).filter(Boolean);
