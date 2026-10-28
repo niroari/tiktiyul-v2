@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix, getAppendix } from "@/lib/firestore/appendix";
+import { extractVavBuses, formatVavClassSelections, getVavDriver } from "@/lib/vav";
 import { useTrip } from "@/hooks/use-trip";
 import { SignatureCanvas, SignatureCanvasHandle } from "@/components/signature-canvas";
 import { printHTML, esc, safeSigUrl } from "@/components/appendix-actions";
@@ -189,13 +190,36 @@ export function AppendixBusCheckClient() {
   // ── Import from vav ────────────────────────────────────────────────────────
 
   async function importFromVav() {
-    const raw = await getAppendix(tripId, "vav");
-    if (!raw?.buses) return;
-    const vavBuses = raw.buses as { classSelections?: string[] }[];
-    const imported = vavBuses.map((_, i) => emptyBus(String(i + 1)));
-    const updated = [...buses, ...imported];
-    setBuses(updated);
-    scheduleSave(updated);
+    try {
+      const raw = await getAppendix(tripId, "vav");
+      const vavBuses = extractVavBuses(raw);
+      if (vavBuses.length === 0) {
+        alert("לא נמצאו אוטובוסים בטבלת השליטה (נספח ו׳). יש להגדיר אוטובוסים בטבלת השליטה תחילה.");
+        return;
+      }
+      if (buses.length > 0 && !confirm("פעולה זו תוסיף את האוטובוסים מטבלת השליטה לרשימה הקיימת. להמשיך?")) {
+        return;
+      }
+      const imported: BusEntry[] = vavBuses.map((b, i) => {
+        const busNum = String(buses.length + i + 1);
+        const driver = getVavDriver(b);
+        const gradeClass = formatVavClassSelections(b.classSelections);
+        const newBus = emptyBus(busNum);
+        newBus.gradeClass = gradeClass;
+        if (driver?.name) newBus.driverName = driver.name;
+        if (driver?.phone) newBus.driverPhone = driver.phone;
+        if (trip?.startDate) newBus.date = trip.startDate;
+        if (trip?.name) newBus.area = trip.name;
+        if (trip?.transport) newBus.companyName = trip.transport;
+        return newBus;
+      });
+      const updated = [...buses, ...imported];
+      setBuses(updated);
+      scheduleSave(updated);
+    } catch (err) {
+      console.error("Error importing buses from vav:", err);
+      alert("אירעה שגיאה בייבוא הנתונים מטבלת השליטה.");
+    }
   }
 
   function addBus() {
@@ -452,12 +476,10 @@ export function AppendixBusCheckClient() {
             className="px-4 py-2 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
             + הוסף אוטובוס
           </button>
-          {buses.length === 0 && (
-            <button onClick={importFromVav}
-              className="px-4 py-2 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
-              יבא מטבלת שליטה
-            </button>
-          )}
+          <button onClick={importFromVav}
+            className="px-4 py-2 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
+            יבא מטבלת שליטה
+          </button>
         </div>
       )}
     </div>

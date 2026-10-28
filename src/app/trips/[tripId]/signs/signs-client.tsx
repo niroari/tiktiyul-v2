@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { getAppendix, saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
+import { extractVavBuses, formatVavClassSelections } from "@/lib/vav";
 
 const MAX_LOGO_KB = 200;
 
@@ -171,24 +172,25 @@ export function SignsClient() {
   }
 
   async function importFromVav() {
-    const raw = await getAppendix(tripId, "vav");
-    if (!raw?.buses) return;
-    const SHORT_PARTS = ["א׳", "ב׳", "ג׳", "ד׳"];
-    const vavBuses = raw.buses as { classSelections?: string[] }[];
-    const imported: Bus[] = vavBuses.map((b, i) => {
-      const selections = (b.classSelections ?? []).filter(Boolean);
-      const label = selections
-        .map((sel) => {
-          if (!sel.includes("|")) return sel;
-          const idx = sel.lastIndexOf("|");
-          const cls = sel.slice(0, idx);
-          const part = parseInt(sel.slice(idx + 1));
-          return `${cls} (${SHORT_PARTS[part] ?? ""})`;
-        })
-        .join(", ");
-      return { id: crypto.randomUUID(), num: String(i + 1), classes: label };
-    });
-    updateData({ buses: imported });
+    try {
+      const raw = await getAppendix(tripId, "vav");
+      const vavBuses = extractVavBuses(raw);
+      if (vavBuses.length === 0) {
+        alert("לא נמצאו אוטובוסים בטבלת השליטה (נספח ו׳). יש להגדיר אוטובוסים בטבלת השליטה תחילה.");
+        return;
+      }
+      if (data.buses.length > 0 && !confirm("פעולה זו תחליף את רשימת שלטי האוטובוסים הנוכחית ברשימה מטבלת השליטה. להמשיך?")) {
+        return;
+      }
+      const imported: Bus[] = vavBuses.map((b, i) => {
+        const label = formatVavClassSelections(b.classSelections);
+        return { id: crypto.randomUUID(), num: String(i + 1), classes: label };
+      });
+      updateData({ buses: imported });
+    } catch (err) {
+      console.error("Error importing buses from vav:", err);
+      alert("אירעה שגיאה בייבוא הנתונים מטבלת השליטה.");
+    }
   }
 
   function printOne(bus: Bus) {

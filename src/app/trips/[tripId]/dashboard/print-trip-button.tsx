@@ -10,6 +10,7 @@ import {
   buildVav, buildZayin, buildChet, buildTet, buildYod,
   openTripPrintWindow,
 } from "@/lib/print/build-trip-html";
+import { extractVavBuses } from "@/lib/vav";
 
 export function PrintTripButton({ tripId }: { tripId: string }) {
   const [state, setState] = useState<"idle" | "loading">("idle");
@@ -81,15 +82,12 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
       sections.push(buildHey(heyRows));
 
       // ו
+      const rawBuses = extractVavBuses(vavRaw);
       const vavData = {
-        buses:  ((vavRaw?.buses  ?? []) as {
-          id: string; classSelections: string[];
-          crew: { name: string; phone: string }[];
-          extraTeachers: { role: string; name: string; phone: string }[];
-        }[]).map((b) => ({
-          ...b,
-          crew:            b.crew            ?? [],
-          extraTeachers:   b.extraTeachers   ?? [],
+        buses: rawBuses.map((b) => ({
+          id:              b.id ?? "",
+          crew:            (b.crew ?? []) as { name: string; phone: string }[],
+          extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string }[],
           classSelections: b.classSelections ?? [],
         })),
         actual: (vavRaw?.actual ?? {}) as Record<string, string>,
