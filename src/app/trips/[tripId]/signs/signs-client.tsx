@@ -77,6 +77,9 @@ export function SignsClient() {
   const [busClasses, setBusClasses] = useState("");
   const [logoError, setLogoError] = useState("");
   const [logoUrlInput, setLogoUrlInput] = useState("");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editNum, setEditNum] = useState("");
+  const [editClasses, setEditClasses] = useState("");
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
@@ -167,7 +170,31 @@ export function SignsClient() {
     setTimeout(() => numInputRef.current?.focus(), 50);
   }
 
+  function startEditing(bus: Bus) {
+    setEditingId(bus.id);
+    setEditNum(bus.num);
+    setEditClasses(bus.classes);
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setEditNum("");
+    setEditClasses("");
+  }
+
+  function saveEdit(id: string) {
+    if (!editNum.trim() && !editClasses.trim()) return;
+    const updatedBuses = data.buses.map((b) =>
+      b.id === id ? { ...b, num: editNum.trim(), classes: editClasses.trim() } : b
+    );
+    updateData({ buses: updatedBuses });
+    setEditingId(null);
+    setEditNum("");
+    setEditClasses("");
+  }
+
   function removeBus(id: string) {
+    if (editingId === id) cancelEditing();
     updateData({ buses: data.buses.filter((b) => b.id !== id) });
   }
 
@@ -347,33 +374,103 @@ export function SignsClient() {
         <div className="space-y-4">
           {data.buses.map((bus) => (
             <div key={bus.id} className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-4">
-              <div className="flex items-center justify-between gap-4 mb-4">
-                <span className="text-sm font-medium">
-                  אוטובוס {bus.num} &mdash; <span className="text-muted-foreground">{bus.classes}</span>
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => printOne(bus)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-                    </svg>
-                    הדפס שלט
-                  </button>
-                  <button
-                    onClick={() => removeBus(bus.id)}
-                    className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                  >
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+              {editingId === bus.id ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 mb-4 pb-3 border-b border-border">
+                  <div className="flex items-center gap-2 flex-1 min-w-[260px]">
+                    <div className="w-24">
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">מספר אוטובוס</label>
+                      <input
+                        type="text"
+                        value={editNum}
+                        onChange={(e) => setEditNum(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit(bus.id);
+                          if (e.key === "Escape") cancelEditing();
+                        }}
+                        placeholder="1"
+                        className="w-full text-sm border border-border rounded-[var(--radius-sm)] px-2.5 py-1.5 focus:outline-none focus:border-primary"
+                        autoFocus
+                      />
+                    </div>
+                    <div className="flex-1 min-w-40">
+                      <label className="text-[10px] text-muted-foreground block mb-0.5">כיתות</label>
+                      <input
+                        type="text"
+                        value={editClasses}
+                        onChange={(e) => setEditClasses(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") saveEdit(bus.id);
+                          if (e.key === "Escape") cancelEditing();
+                        }}
+                        placeholder="ט׳1, ט׳2"
+                        className="w-full text-sm border border-border rounded-[var(--radius-sm)] px-2.5 py-1.5 focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end">
+                    <button
+                      onClick={() => saveEdit(bus.id)}
+                      className="px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded-[var(--radius-sm)] hover:bg-primary/90 transition-colors font-medium flex items-center gap-1"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      שמור
+                    </button>
+                    <button
+                      onClick={cancelEditing}
+                      className="px-3 py-1.5 text-xs border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors"
+                    >
+                      ביטול
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between gap-4 mb-4">
+                  <span className="text-sm font-medium">
+                    אוטובוס {bus.num} &mdash; <span className="text-muted-foreground">{bus.classes}</span>
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => startEditing(bus)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors"
+                      title="ערוך שלט"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                      ערוך
+                    </button>
+                    <button
+                      onClick={() => printOne(bus)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                      </svg>
+                      הדפס שלט
+                    </button>
+                    <button
+                      onClick={() => removeBus(bus.id)}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
+                      title="מחק שלט"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
               {/* Live preview (scaled down) */}
               <div className="max-w-xs mx-auto">
-                <SignPreview bus={bus} />
+                <SignPreview
+                  bus={
+                    editingId === bus.id
+                      ? { ...bus, num: editNum, classes: editClasses }
+                      : bus
+                  }
+                />
               </div>
             </div>
           ))}
