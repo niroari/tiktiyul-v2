@@ -848,39 +848,39 @@ export function RoomsClient() {
       const cards = gRooms.map((room) => {
         const studs = room.studentIds.map((id) => studentById[id]).filter(Boolean);
         const chips = studs.map((s) =>
-          `<span style="background:${chipColor};border:1px solid ${chipBorder};border-radius:12px;padding:2px 8px;font-size:10px;display:inline-block;margin:2px">${s.lastName} ${s.firstName} <span style="color:#999;font-size:9px">(${s.class})</span></span>`
+          `<span style="background:${chipColor};border:1px solid ${chipBorder};border-radius:12px;padding:3px 9px;font-size:12px;display:inline-block;margin:2px">${s.lastName} ${s.firstName} <span style="color:#666;font-size:11px">(${s.class})</span></span>`
         ).join("");
         const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ");
         const capLabel = room.capacity !== undefined ? ` · ${room.capacity} מקומות` : "";
         return `
           <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:10px;break-inside:avoid">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:11px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px">
               <strong>חדר ${room.number || "—"}</strong>
-              ${classLabel ? `<span style="background:#e8f5e9;color:#2d6a4f;border-radius:8px;padding:1px 7px;font-size:10px">${classLabel}</span>` : ""}
-              <span style="margin-right:auto;color:#888">${studs.length} תלמידים${capLabel}</span>
+              ${classLabel ? `<span style="background:#e8f5e9;color:#2d6a4f;border-radius:8px;padding:2px 8px;font-size:11.5px">${classLabel}</span>` : ""}
+              <span style="margin-right:auto;color:#666">${studs.length} תלמידים${capLabel}</span>
             </div>
-            <div style="display:flex;flex-wrap:wrap;gap:4px;min-height:24px">${chips || '<span style="color:#bbb;font-size:10px">ריק</span>'}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;min-height:24px">${chips || '<span style="color:#bbb;font-size:12px">ריק</span>'}</div>
           </div>`;
       }).join("");
 
       return `
         <div style="margin-bottom:20px">
-          <div style="font-size:13px;font-weight:bold;padding:6px 10px;background:${bgColor};border-radius:6px;margin-bottom:10px">${label} — ${gRooms.length} חדרים</div>
+          <div style="font-size:14px;font-weight:bold;padding:6px 10px;background:${bgColor};border-radius:6px;margin-bottom:10px">${label} — ${gRooms.length} חדרים</div>
           ${cards}
         </div>`;
     }).join("");
 
     const staffHTML = staffGroups.length > 0
       ? `<div style="margin-top:24px;border-top:2px solid #eee;padding-top:16px">
-          <div style="font-size:14px;font-weight:bold;margin-bottom:12px">אנשי צוות</div>
+          <div style="font-size:15px;font-weight:bold;margin-bottom:12px">אנשי צוות</div>
           ${staffGroups.map((group) => `
             <div style="margin-bottom:16px">
-              <div style="font-size:13px;font-weight:bold;padding:6px 10px;background:#f5f5f5;border-radius:6px;margin-bottom:8px">${group.label} — ${group.rooms.length} חדרים</div>
+              <div style="font-size:13.5px;font-weight:bold;padding:6px 10px;background:#f5f5f5;border-radius:6px;margin-bottom:8px">${group.label} — ${group.rooms.length} חדרים</div>
               <div style="display:flex;flex-wrap:wrap;gap:8px">
                 ${group.rooms.map((room) => `
-                  <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px 12px;font-size:11px;break-inside:avoid">
+                  <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px 12px;font-size:12.5px;break-inside:avoid">
                     <strong>חדר ${room.number || "—"}</strong>
-                    <span style="color:#888;margin-right:6px">${room.capacity} מקומות</span>
+                    <span style="color:#666;margin-right:6px">${room.capacity} מקומות</span>
                   </div>`).join("")}
               </div>
             </div>`).join("")}
@@ -889,12 +889,12 @@ export function RoomsClient() {
 
     const unassignedHTML = unassigned.length > 0
       ? `<div style="margin-top:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;break-inside:avoid">
-          <div style="font-size:11px;font-weight:bold;margin-bottom:6px">לא שובצו (${unassigned.length})</div>
+          <div style="font-size:13px;font-weight:bold;margin-bottom:6px">לא שובצו (${unassigned.length})</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px">
             ${unassigned.map((s) => {
               const bg  = s.gender === "female" ? "#fce4ec" : "#e3f2fd";
               const bdr = s.gender === "female" ? "#f48fb1" : "#90caf9";
-              return `<span style="background:${bg};border:1px solid ${bdr};border-radius:12px;padding:2px 8px;font-size:10px">${s.lastName} ${s.firstName} <span style="color:#888">(${s.class})</span></span>`;
+              return `<span style="background:${bg};border:1px solid ${bdr};border-radius:12px;padding:3px 9px;font-size:12px">${s.lastName} ${s.firstName} <span style="color:#666">(${s.class})</span></span>`;
             }).join("")}
           </div>
         </div>`

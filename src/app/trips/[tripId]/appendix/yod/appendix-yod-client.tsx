@@ -141,11 +141,11 @@ export function AppendixYodClient() {
   function getHTML() {
     const tableRows = rows.map((r, i) => `
       <tr style="${i % 2 === 0 ? "" : "background:#f0f7f4"}">
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${i + 1}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.lastName)} ${esc(r.firstName)}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(r.class)}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.issue)}</td>
-        <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.notes)}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${i + 1}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd">${esc(r.lastName)} ${esc(r.firstName)}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${esc(r.class)}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd">${esc(r.issue)}</td>
+        <td style="padding:6px 8px;border:1px solid #ddd">${esc(r.notes)}</td>
       </tr>`).join("");
 
     return `

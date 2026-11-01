@@ -366,69 +366,69 @@ export function AppendixVavClient() {
           isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel
         ).join(", ");
         const sc = busStudentCount(b);
-        return `<th style="padding:5px 6px;border:1px solid #999;font-size:9px;font-weight:bold;background:#1b4332;color:white;text-align:center;min-width:110px">
-          אוטובוס ${bi + 1}${labels ? `<br><span style="font-weight:normal">${labels}</span>` : ""}${sc ? `<br><span style="font-weight:normal;font-size:8px">${sc} תלמידים</span>` : ""}
+        return `<th style="padding:6px 6px;border:1px solid #999;font-size:11.5px;font-weight:bold;background:#1b4332;color:white;text-align:center;min-width:110px">
+          אוטובוס ${bi + 1}${labels ? `<br><span style="font-weight:normal">${labels}</span>` : ""}${sc ? `<br><span style="font-weight:normal;font-size:10px">${sc} תלמידים</span>` : ""}
         </th>`;
       }).join("");
 
       const crewRows = CREW_ROLES.map((role, ri) => `
         <tr style="background:#d4edda">
-          <td colspan="${n + 1}" style="padding:3px 6px;border:1px solid #bbb;font-size:9px;font-weight:bold;color:#1b4332">${role}</td>
+          <td colspan="${n + 1}" style="padding:4px 6px;border:1px solid #bbb;font-size:11.5px;font-weight:bold;color:#1b4332">${role}</td>
         </tr>
         <tr>
-          <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">שם</td>
-          ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${esc(b.crew[ri]?.name)}</td>`).join("")}
+          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">שם</td>
+          ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${esc(b.crew[ri]?.name)}</td>`).join("")}
         </tr>
         <tr>
-          <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">טלפון</td>
-          ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${esc(b.crew[ri]?.phone)}</td>`).join("")}
+          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">טלפון</td>
+          ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;direction:ltr">${esc(b.crew[ri]?.phone)}</td>`).join("")}
         </tr>`).join("");
 
       const maxExtra = Math.max(0, ...day.buses.map((b) => b.extraTeachers.length));
       const extraRows = Array.from({ length: maxExtra }, (_, ei) => `
         <tr style="background:#d4edda">
-          <td colspan="${n + 1}" style="padding:3px 6px;border:1px solid #bbb;font-size:9px;font-weight:bold;color:#1b4332">מלווה נוסף ${ei + 1}</td>
+          <td colspan="${n + 1}" style="padding:4px 6px;border:1px solid #bbb;font-size:11.5px;font-weight:bold;color:#1b4332">מלווה נוסף ${ei + 1}</td>
         </tr>
         <tr>
-          <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">תפקיד / שם</td>
+          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">תפקיד / שם</td>
           ${day.buses.map((b) => {
             const e = b.extraTeachers[ei];
-            return `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${e ? `${esc(e.role)} — ${esc(e.name)}` : ""}</td>`;
+            return `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${e ? `${esc(e.role)} — ${esc(e.name)}` : ""}</td>`;
           }).join("")}
         </tr>
         <tr>
-          <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">טלפון</td>
-          ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${esc(b.extraTeachers[ei]?.phone)}</td>`).join("")}
+          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">טלפון</td>
+          ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;direction:ltr">${esc(b.extraTeachers[ei]?.phone)}</td>`).join("")}
         </tr>`).join("");
 
       const dt = dayTotals(day);
       return `
         <table>
           <thead><tr>
-            <th style="padding:5px 6px;border:1px solid #999;font-size:9px;background:#1b4332;color:white;min-width:90px"></th>
+            <th style="padding:6px 6px;border:1px solid #999;font-size:11.5px;background:#1b4332;color:white;min-width:90px"></th>
             ${busHeaders}
           </tr></thead>
           <tbody>
             <tr style="background:#e8f5e9">
-              <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;font-weight:bold">כיתות</td>
-              ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${b.classSelections.filter(Boolean).map((sel) => isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ")}</td>`).join("")}
+              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;font-weight:bold">כיתות</td>
+              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${b.classSelections.filter(Boolean).map((sel) => isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ")}</td>`).join("")}
             </tr>
             ${crewRows}${extraRows}
             <tr style="background:#e8f5e9">
-              <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;font-weight:bold">מספר תלמידים</td>
-              ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;font-weight:bold">${busStudentCount(b) || ""}</td>`).join("")}
+              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;font-weight:bold">מספר תלמידים</td>
+              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;font-weight:bold">${busStudentCount(b) || ""}</td>`).join("")}
             </tr>
             <tr>
-              <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;font-weight:bold">מספר מלווים</td>
-              ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${calcEscorts(b) || ""}</td>`).join("")}
+              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;font-weight:bold">מספר מלווים</td>
+              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${calcEscorts(b) || ""}</td>`).join("")}
             </tr>
             <tr style="background:#d4edda;font-weight:bold">
-              <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px">סה"כ באוטובוס</td>
-              ${day.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;font-weight:bold">${(busStudentCount(b) + calcEscorts(b)) || ""}</td>`).join("")}
+              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px">סה"כ באוטובוס</td>
+              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;font-weight:bold">${(busStudentCount(b) + calcEscorts(b)) || ""}</td>`).join("")}
             </tr>
           </tbody>
         </table>
-        <div style="font-size:9px;color:#555;margin-top:4px">
+        <div style="font-size:11.5px;color:#555;margin-top:5px">
           סה"כ ביום: <strong>${dt.students}</strong> תלמידים · <strong>${dt.escorts}</strong> מלווים · <strong>${dt.total}</strong> סה"כ
         </div>`;
     }
@@ -439,26 +439,26 @@ export function AppendixVavClient() {
         const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
         return [
           `<tr style="background:#fff8e1">
-            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;font-weight:bold">${esc(cls)}</td>
-            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
-            <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${esc(data.actual[cls])}</td>
+            <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;font-weight:bold">${esc(cls)}</td>
+            <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
+            <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center">${esc(data.actual[cls])}</td>
           </tr>`,
           ...parts.map((count, pi) => `<tr style="background:#fffde7">
-            <td style="padding:2px 6px 2px 16px;border:1px solid #ddd;font-size:8.5px;color:#666">${PART_LABELS[pi]}</td>
-            <td style="padding:2px 6px;border:1px solid #ddd;font-size:8.5px;text-align:center">${count || "—"}</td>
+            <td style="padding:3px 8px 3px 18px;border:1px solid #ddd;font-size:11px;color:#666">${PART_LABELS[pi]}</td>
+            <td style="padding:3px 8px;border:1px solid #ddd;font-size:11px;text-align:center">${count || "—"}</td>
             <td style="border:1px solid #ddd"></td>
           </tr>`),
           splitSum > 0 && splitSum !== plannedByClass[cls]
-            ? `<tr style="background:#fff3cd"><td colspan="3" style="padding:2px 8px;font-size:8px;color:#856404;border:1px solid #ddd">סה״כ חלקים: ${splitSum} ${splitSum > plannedByClass[cls] ? "⚠ חורג" : ""}</td></tr>`
+            ? `<tr style="background:#fff3cd"><td colspan="3" style="padding:3px 8px;font-size:11px;color:#856404;border:1px solid #ddd">סה״כ חלקים: ${splitSum} ${splitSum > plannedByClass[cls] ? "⚠ חורג" : ""}</td></tr>`
             : "",
         ].filter(Boolean);
       }
       return [`<tr>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px">${esc(cls)}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${esc(data.actual[cls])}</td>
+        <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px">${esc(cls)}</td>
+        <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
+        <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center">${esc(data.actual[cls])}</td>
       </tr>`];
-    }).join("") || `<tr><td colspan="3" style="padding:6px;color:#aaa;text-align:center;font-size:9px">אין נתוני תלמידים</td></tr>`;
+    }).join("") || `<tr><td colspan="3" style="padding:8px;color:#aaa;text-align:center;font-size:12px">אין נתוני תלמידים</td></tr>`;
 
     const totalStudents = data.days.reduce((s, d) => s + dayTotals(d).students, 0);
     const totalEscorts  = data.days.reduce((s, d) => s + dayTotals(d).escorts, 0);
@@ -467,13 +467,13 @@ export function AppendixVavClient() {
       ["מורים ומלווים", totalEscorts || ""],
       ['סה"כ נוכחים', totalStudents + totalEscorts || ""],
     ].map(([label, val], i) => `<tr style="${i === 2 ? "font-weight:bold;background:#d4edda" : ""}">
-      <td style="padding:3px 8px;border:1px solid #ccc;font-size:9px">${label}</td>
-      <td style="padding:3px 8px;border:1px solid #ccc;font-size:9px;text-align:center;width:50px">${val}</td>
+      <td style="padding:4px 10px;border:1px solid #ccc;font-size:12px">${label}</td>
+      <td style="padding:4px 10px;border:1px solid #ccc;font-size:12px;text-align:center;width:60px">${val}</td>
     </tr>`).join("");
 
     const daysHTML = data.days.map((day, di) => `
       <div style="margin-bottom:20px;${di > 0 ? "page-break-before:always;break-before:page;" : ""}">
-        <div style="font-size:11px;font-weight:bold;padding:5px 8px;background:#1b4332;color:white;border-radius:4px 4px 0 0;margin-bottom:6px">
+        <div style="font-size:13px;font-weight:bold;padding:6px 10px;background:#1b4332;color:white;border-radius:4px 4px 0 0;margin-bottom:6px">
           ${esc(day.label)} — ${day.buses.length} אוטובוסים
         </div>
         ${dayTable(day)}

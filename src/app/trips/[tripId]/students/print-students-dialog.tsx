@@ -160,7 +160,7 @@ export function PrintStudentsDialog({
 
         rowsHTML += `
           <tr class="class-group-row">
-            <td colspan="${colCount}" style="background:#1b4332;color:#ffffff;font-size:10px;font-weight:bold;padding:5px 8px;">
+            <td colspan="${colCount}" style="background:#1b4332;color:#ffffff;font-size:13.5px;font-weight:bold;padding:6px 10px;">
               כיתה ${esc(s.class || "ללא כיתה")} — ${inThisClass.length} תלמידים (${classGoing} יוצאים, ${classNotGoing} לא יוצאים)
             </td>
           </tr>
@@ -178,8 +178,8 @@ export function PrintStudentsDialog({
 
       // Status badge
       const statusBadge = isGoing
-        ? `<span style="display:inline-block;padding:2px 7px;border-radius:10px;background:#dcfce7;color:#166534;font-weight:bold;border:1px solid #86efac;font-size:9px;white-space:nowrap;">✓ יוצא${daysLabel ? ` (${daysLabel})` : ""}</span>`
-        : `<span style="display:inline-block;padding:2px 7px;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:bold;border:1px solid #fca5a5;font-size:9px;white-space:nowrap;">✗ לא יוצא</span>`;
+        ? `<span style="display:inline-block;padding:3px 8px;border-radius:10px;background:#dcfce7;color:#166534;font-weight:bold;border:1px solid #86efac;font-size:11.5px;white-space:nowrap;">✓ יוצא${daysLabel ? ` (${daysLabel})` : ""}</span>`
+        : `<span style="display:inline-block;padding:3px 8px;border-radius:10px;background:#fee2e2;color:#991b1b;font-weight:bold;border:1px solid #fca5a5;font-size:11.5px;white-space:nowrap;">✗ לא יוצא</span>`;
 
       // Notes compilation
       let notesParts: string[] = [];
@@ -205,15 +205,15 @@ export function PrintStudentsDialog({
 
       rowsHTML += `
         <tr style="${rowBg}">
-          <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;text-align:center;color:#6b7280;">${rowNum}</td>
-          <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9.5px;font-weight:bold;">${esc(s.lastName)}</td>
-          <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9.5px;">${esc(s.firstName)}</td>
-          <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;text-align:center;">${esc(s.class || "—")}</td>
-          ${includeIdNumber ? `<td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;direction:ltr;text-align:left;">${esc(s.idNumber || "—")}</td>` : ""}
-          <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;text-align:center;">${genderText}</td>
-          ${includePhone ? `<td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;direction:ltr;text-align:left;">${esc(s.phone || "—")}</td>` : ""}
-          <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;text-align:center;">${statusBadge}</td>
-          ${includeNotes ? `<td style="padding:3px 6px;border:1px solid #d1d5db;font-size:8.5px;line-height:1.3;">${notesHTML}</td>` : ""}
+          <td style="padding:5px 8px;border:1px solid #d1d5db;font-size:12px;text-align:center;color:#6b7280;">${rowNum}</td>
+          <td style="padding:5px 8px;border:1px solid #d1d5db;font-size:13px;font-weight:bold;">${esc(s.lastName)}</td>
+          <td style="padding:5px 8px;border:1px solid #d1d5db;font-size:13px;">${esc(s.firstName)}</td>
+          <td style="padding:5px 8px;border:1px solid #d1d5db;font-size:13px;text-align:center;">${esc(s.class || "—")}</td>
+          ${includeIdNumber ? `<td style="padding:5px 8px;border:1px solid #d1d5db;font-size:12.5px;direction:ltr;text-align:left;">${esc(s.idNumber || "—")}</td>` : ""}
+          <td style="padding:5px 8px;border:1px solid #d1d5db;font-size:13px;text-align:center;">${genderText}</td>
+          ${includePhone ? `<td style="padding:5px 8px;border:1px solid #d1d5db;font-size:12.5px;direction:ltr;text-align:left;">${esc(s.phone || "—")}</td>` : ""}
+          <td style="padding:5px 8px;border:1px solid #d1d5db;font-size:12px;text-align:center;">${statusBadge}</td>
+          ${includeNotes ? `<td style="padding:5px 8px;border:1px solid #d1d5db;font-size:12px;line-height:1.4;">${notesHTML}</td>` : ""}
         </tr>
       `;
     }
@@ -222,7 +222,7 @@ export function PrintStudentsDialog({
       <style>
         @page {
           size: A4 portrait;
-          margin: 12mm 10mm 12mm 10mm;
+          margin: 20mm 15mm 20mm 15mm;
         }
         @media print {
           html, body {
@@ -235,7 +235,7 @@ export function PrintStudentsDialog({
         .header {
           border-bottom: 2px solid #1b4332;
           padding-bottom: 8px;
-          margin-bottom: 10px;
+          margin-bottom: 12px;
           text-align: right;
         }
         .header-top {
@@ -245,12 +245,12 @@ export function PrintStudentsDialog({
           gap: 12px;
         }
         .title {
-          font-size: 16px;
+          font-size: 18px;
           font-weight: bold;
           color: #111;
         }
         .subtitle {
-          font-size: 11px;
+          font-size: 12px;
           color: #4b5563;
           margin-top: 3px;
         }
@@ -264,9 +264,9 @@ export function PrintStudentsDialog({
           display: inline-flex;
           align-items: center;
           gap: 4px;
-          padding: 2.5px 8px;
+          padding: 3px 9px;
           border-radius: 4px;
-          font-size: 9.5px;
+          font-size: 12px;
           border: 1px solid #d1d5db;
           background: #f9fafb;
         }
@@ -285,22 +285,22 @@ export function PrintStudentsDialog({
         table {
           width: 100%;
           border-collapse: collapse;
-          margin-top: 6px;
+          margin-top: 8px;
         }
         th {
           background: #1b4332;
           color: #ffffff;
           border: 1px solid #143527;
-          padding: 4px 6px;
+          padding: 6px 8px;
           text-align: right;
-          font-size: 9.5px;
+          font-size: 13px;
           font-weight: bold;
         }
         .footer {
-          margin-top: 10px;
+          margin-top: 12px;
           border-top: 1px solid #e5e7eb;
-          padding-top: 5px;
-          font-size: 8px;
+          padding-top: 6px;
+          font-size: 10px;
           color: #6b7280;
           display: flex;
           justify-content: space-between;

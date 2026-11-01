@@ -28,29 +28,35 @@ function buildDoc(innerHTML: string, title: string) {
   <meta charset="UTF-8"/>
   <title>${title}</title>
   <style>
+    @page {
+      size: A4 portrait;
+      margin: 20mm 15mm 20mm 15mm;
+    }
     @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Frank Ruhl Libre', 'Arial Hebrew', 'Arial', sans-serif; direction: rtl; text-align: right;
-           padding: 20px; font-size: 11px; color: #111; background: #fff;
+           padding: 20mm 15mm; font-size: 13px; line-height: 1.5; color: #111; background: #fff;
            word-spacing: normal; letter-spacing: normal; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-    th, td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 10px;
+    table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+    th, td { border: 1px solid #999; padding: 6px 8px; text-align: right; font-size: 13px;
              word-spacing: normal; letter-spacing: normal; }
     th { background: #1b4332; color: white; font-weight: 600; }
-    .cat-row td { background: #d4edda; font-weight: bold; font-size: 10.5px; }
+    .cat-row td { background: #d4edda; font-weight: bold; font-size: 13.5px; }
     .header { text-align: center; border-bottom: 2px solid #1b4332; padding-bottom: 8px; margin-bottom: 12px; }
-    .header .ministry { font-size: 8px; color: #555; }
-    .header .title { font-size: 15px; font-weight: bold; margin-top: 4px; }
-    .footer { font-size: 8px; color: #888; margin-top: 8px; border-top: 1px solid #ccc; padding-top: 6px; }
-    .meta { display: flex; gap: 16px; font-size: 9.5px; margin-bottom: 8px; flex-wrap: nowrap; }
+    .header .ministry { font-size: 11px; color: #555; }
+    .header .title { font-size: 18px; font-weight: bold; margin-top: 4px; }
+    .footer { font-size: 10px; color: #888; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 6px; }
+    .meta { display: flex; gap: 16px; font-size: 12px; margin-bottom: 10px; flex-wrap: nowrap; }
     .meta span { white-space: nowrap; }
-    .section-title { font-weight: bold; font-size: 12px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
-    .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 16px 20px; line-height: 2.2; font-size: 12px; margin: 10px 0; }
+    .section-title { font-weight: bold; font-size: 14px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+    .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 18px 22px; line-height: 2; font-size: 14px; margin: 10px 0; }
     @media print {
-      body { padding: 10px; }
-      @page { margin: 10mm; }
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
+      html, body {
+        padding: 0 !important;
+        margin: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
     }
   </style>
 </head>

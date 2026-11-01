@@ -86,22 +86,22 @@ export function AppendixZayinClient() {
       if (s.class !== lastClass) {
         const count = printStudents.filter((x) => x.class === s.class).length;
         const colspan = tripDayCount > 1 ? "7" : "6";
-        rows += `<tr class="cat-row"><td colspan="${colspan}" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
+        rows += `<tr class="cat-row"><td colspan="${colspan}" style="background:#1b4332;color:white;font-size:13.5px;font-weight:bold;padding:5px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
         lastClass = s.class;
         rowInClass = 0;
       }
       const gender  = s.gender === "male" ? "זכר" : s.gender === "female" ? "נקבה" : "";
       const days    = dayLabel(s);
       const daysCell = tripDayCount > 1
-        ? `<td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center${days ? ";color:#c2410c;font-weight:600" : ""}">${esc(days) || "—"}</td>`
+        ? `<td style="padding:5px 8px;border:1px solid #ddd;text-align:center${days ? ";color:#c2410c;font-weight:600" : ""}">${esc(days) || "—"}</td>`
         : "";
       rows += `<tr style="${rowInClass % 2 === 0 ? "" : "background:#f0f7f4"}">
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr;text-align:left">${esc(s.idNumber)}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.lastName)}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.firstName)}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(s.class)}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(gender)}</td>
-        <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr">${esc(s.phone)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;direction:ltr;text-align:left">${esc(s.idNumber)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd">${esc(s.lastName)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd">${esc(s.firstName)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${esc(s.class)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;text-align:center">${esc(gender)}</td>
+        <td style="padding:5px 8px;border:1px solid #ddd;direction:ltr">${esc(s.phone)}</td>
         ${daysCell}
       </tr>`;
       rowInClass++;
@@ -213,7 +213,7 @@ export function AppendixZayinClient() {
             continuousClassIndex = 0;
             rowsHTML += `
               <tr class="fs-cat-row">
-                <td colspan="7" style="background:#000000;color:#ffffff;font-size:9px;font-weight:bold;padding:2px 6px;text-shadow:0 0 1px #000,0 0 2px #000">
+                <td colspan="7" style="background:#000000;color:#ffffff;font-size:11.5px;font-weight:bold;padding:4px 6px;text-shadow:0 0 1px #000,0 0 2px #000">
                   כיתה ${esc(s.class)}
                 </td>
               </tr>
@@ -225,21 +225,21 @@ export function AppendixZayinClient() {
 
         const days = dayLabel(s);
         const daysBadge = days
-          ? `<span style="font-size:8px;color:#000000;font-weight:bold;margin-right:3px">(${esc(days)})</span>`
+          ? `<span style="font-size:10px;color:#000000;font-weight:bold;margin-right:3px">(${esc(days)})</span>`
           : "";
         const notGoingBadge = !s.isGoing
-          ? `<span style="font-size:8px;color:#000000;font-weight:bold;margin-right:3px">[לא יוצא]</span>`
+          ? `<span style="font-size:10px;color:#000000;font-weight:bold;margin-right:3px">[לא יוצא]</span>`
           : "";
 
         rowsHTML += `
           <tr>
-            <td style="text-align:center;font-weight:bold;font-size:9px">${currentNumber}</td>
-            <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:9px">${esc(s.idNumber) || "—"}</td>
+            <td style="text-align:center;font-weight:bold;font-size:11.5px">${currentNumber}</td>
+            <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:11.5px">${esc(s.idNumber) || "—"}</td>
             <td style="font-weight:bold;white-space:nowrap;overflow:hidden">${esc(s.lastName)}</td>
             <td style="white-space:nowrap;overflow:hidden">${esc(s.firstName)}${daysBadge}${notGoingBadge}</td>
             <td style="text-align:center"></td>
             <td></td>
-            <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:9px">${esc(s.phone) || "—"}</td>
+            <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:11.5px">${esc(s.phone) || "—"}</td>
           </tr>
         `;
         if (splitByClass) {
@@ -300,7 +300,7 @@ export function AppendixZayinClient() {
       <style>
         @page {
           size: A4 portrait;
-          margin: 15mm 15mm 15mm 15mm;
+          margin: 20mm 15mm 20mm 15mm;
         }
         @media print {
           html, body {
@@ -328,25 +328,25 @@ export function AppendixZayinClient() {
         }
         .fs-header {
           border-bottom: 2px solid #000000;
-          padding-bottom: 4px;
-          margin-bottom: 6px;
+          padding-bottom: 6px;
+          margin-bottom: 8px;
         }
         .fs-header .ministry {
-          font-size: 8px;
+          font-size: 11px;
           color: #222222;
           text-align: center;
           line-height: 1.2;
         }
         .fs-header .title {
-          font-size: 14.5px;
+          font-size: 18px;
           font-weight: bold;
           color: #000000;
           text-align: center;
-          margin: 2px 0;
+          margin: 3px 0;
           line-height: 1.2;
         }
         .fs-header .sub {
-          font-size: 9.5px;
+          font-size: 12px;
           color: #111111;
           text-align: center;
           line-height: 1.2;
@@ -355,13 +355,13 @@ export function AppendixZayinClient() {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          font-size: 9px;
+          font-size: 11.5px;
           font-weight: 500;
           background: #f2f2f2;
           border: 1px solid #000000;
           border-radius: 3px;
-          padding: 3px 8px;
-          margin-top: 5px;
+          padding: 4px 8px;
+          margin-top: 6px;
           color: #000000;
           white-space: nowrap;
           gap: 8px;
@@ -376,21 +376,21 @@ export function AppendixZayinClient() {
           color: #ffffff !important;
           text-shadow: 0 0 1px #000000, 0 0 2px #000000;
           font-weight: bold;
-          font-size: 9.5px;
-          padding: 3.5px 4px;
+          font-size: 11.5px;
+          padding: 4px 5px;
           border: 1px solid #000000;
           text-align: right;
-          line-height: 1.15;
+          line-height: 1.2;
           box-sizing: border-box;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
         .fs-table td {
           border: 1px solid #000000;
-          padding: 2px 4px;
-          font-size: 9px;
-          line-height: 1.15;
-          height: 20px;
+          padding: 3px 5px;
+          font-size: 11.5px;
+          line-height: 1.2;
+          height: 22px;
           vertical-align: middle;
           box-sizing: border-box;
           color: #000000;
@@ -401,11 +401,11 @@ export function AppendixZayinClient() {
         .fs-footer {
           display: flex;
           justify-content: space-between;
-          font-size: 8px;
+          font-size: 10px;
           color: #333333;
-          margin-top: 5px;
+          margin-top: 6px;
           border-top: 1px solid #000000;
-          padding-top: 3px;
+          padding-top: 4px;
         }
       </style>
       ${pagesHTML}

@@ -78,8 +78,8 @@ export function AppendixTetClient() {
       .filter((it) => it.text.trim())
       .map((it, i) => `
         <tr style="${i % 2 === 0 ? "" : "background:#f0f7f4"}">
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:11px;text-align:center;width:36px">${i + 1}</td>
-          <td style="padding:6px 10px;border:1px solid #ddd;font-size:11px">${esc(it.text)}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd;text-align:center;width:36px">${i + 1}</td>
+          <td style="padding:6px 10px;border:1px solid #ddd">${esc(it.text)}</td>
           <td style="padding:6px 10px;border:1px solid #ddd;width:50px;text-align:center"></td>
         </tr>`)
       .join("");

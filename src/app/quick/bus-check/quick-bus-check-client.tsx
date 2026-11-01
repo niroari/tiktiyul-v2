@@ -93,8 +93,8 @@ function CheckToggle({ val, onChange }: { val: CheckVal; onChange: (v: CheckVal)
 function buildBusHTML(bus: BusEntry): string {
   const checkRow = (label: string, val: CheckVal) => `
     <tr>
-      <td style="font-size:10px;padding:5px 8px">${esc(label)}</td>
-      <td style="width:60px;text-align:center;font-size:10px;padding:5px 8px">
+      <td style="padding:6px 8px">${esc(label)}</td>
+      <td style="width:70px;text-align:center;padding:6px 8px">
         ${val === "ok" ? "✓ תקין" : val === "fail" ? "✗ לא תקין" : ""}
       </td>
     </tr>`;
@@ -138,19 +138,19 @@ function buildBusHTML(bus: BusEntry): string {
 
     <table style="width:100%;border:none;border-collapse:collapse;margin-top:20px">
       <tr>
-        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+        <td style="border:none;width:25%;text-align:center;font-size:12px;vertical-align:bottom">
           <div style="padding-bottom:4px;min-height:20px">${esc(bus.inspectorName)}</div>
           <div style="border-top:1px solid #555;padding-top:3px">שם הבודק</div>
         </td>
-        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+        <td style="border:none;width:25%;text-align:center;font-size:12px;vertical-align:bottom">
           <div style="padding-bottom:4px;min-height:20px">${esc(bus.inspectorRole)}</div>
           <div style="border-top:1px solid #555;padding-top:3px">תפקיד</div>
         </td>
-        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+        <td style="border:none;width:25%;text-align:center;font-size:12px;vertical-align:bottom">
           <div style="padding-bottom:4px;min-height:20px;direction:ltr">${esc(bus.inspectorPhone)}</div>
           <div style="border-top:1px solid #555;padding-top:3px">מספר טלפון</div>
         </td>
-        <td style="border:none;width:25%;text-align:center;font-size:9px;vertical-align:bottom">
+        <td style="border:none;width:25%;text-align:center;font-size:12px;vertical-align:bottom">
           <div style="min-height:50px;padding-bottom:4px;display:flex;align-items:flex-end;justify-content:center">
             ${safeSigUrl(bus.signature)
               ? `<img src="${safeSigUrl(bus.signature)}" style="max-height:50px;max-width:120px;object-fit:contain;display:block">`

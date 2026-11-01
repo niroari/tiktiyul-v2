@@ -131,12 +131,12 @@ export function AppendixAlefClient() {
       cat.items.forEach((item, i) => {
         const s = data[itemKey(cat.n, i)] ?? { w: false, m: false, note: "" };
         rows += `<tr>
-          <td style="text-align:center;font-size:9px"></td>
-          <td style="font-size:9.5px;line-height:1.4">${item.d}</td>
-          <td style="text-align:center;font-size:14px">${s.w ? "✓" : ""}</td>
-          <td style="text-align:center;font-size:14px">${s.m ? "✓" : ""}</td>
-          <td style="font-size:9px;color:#555">${item.r ?? ""}</td>
-          <td style="font-size:9px">${s.note}</td>
+          <td style="text-align:center"></td>
+          <td style="line-height:1.4">${item.d}</td>
+          <td style="text-align:center;font-size:15px">${s.w ? "✓" : ""}</td>
+          <td style="text-align:center;font-size:15px">${s.m ? "✓" : ""}</td>
+          <td style="color:#555">${item.r ?? ""}</td>
+          <td>${s.note}</td>
         </tr>`;
       });
     });

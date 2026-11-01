@@ -37,9 +37,10 @@ export function RemoteSignature({ tripId, role, roleName, tripName, schoolName, 
 <head>
 <meta charset="UTF-8"/>
 <style>
+@page { size: A4 portrait; margin: 20mm 15mm 20mm 15mm; }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: 'David', Arial, sans-serif; direction: rtl; background: #fff; }
-@media print { body { -webkit-print-color-adjust: exact; } }
+body { font-family: 'David', Arial, sans-serif; direction: rtl; background: #fff; font-size: 13px; line-height: 1.6; padding: 20mm 15mm; }
+@media print { html, body { margin: 0 !important; padding: 0 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
 </style>
 </head>
 <body>${html}</body>

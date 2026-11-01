@@ -98,12 +98,12 @@ export function buildAlef(data: ChecklistData, trip: Trip | null): string {
     cat.items.forEach((item, i) => {
       const s = data[itemKey(cat.n, i)] ?? { w: false, m: false, note: "" };
       rows += `<tr>
-        <td style="text-align:center;font-size:9px"></td>
-        <td style="font-size:9.5px;line-height:1.4">${esc(item.d)}</td>
-        <td style="text-align:center;font-size:14px">${s.w ? "✓" : ""}</td>
-        <td style="text-align:center;font-size:14px">${s.m ? "✓" : ""}</td>
-        <td style="font-size:9px;color:#555">${esc(item.r ?? "")}</td>
-        <td style="font-size:9px">${esc(s.note)}</td>
+        <td style="text-align:center"></td>
+        <td style="line-height:1.4">${esc(item.d)}</td>
+        <td style="text-align:center;font-size:15px">${s.w ? "✓" : ""}</td>
+        <td style="text-align:center;font-size:15px">${s.m ? "✓" : ""}</td>
+        <td style="color:#555">${esc(item.r ?? "")}</td>
+        <td>${esc(s.note)}</td>
       </tr>`;
     });
   });
@@ -440,17 +440,17 @@ export function buildZayin(students: Student[], trip: Trip | null): string {
   for (const s of going) {
     if (s.class !== lastClass) {
       const count = going.filter((x) => x.class === s.class).length;
-      rows += `<tr class="cat-row"><td colspan="5" style="background:#1b4332;color:white;font-size:10px;font-weight:bold;padding:4px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
+      rows += `<tr class="cat-row"><td colspan="5" style="background:#1b4332;color:white;font-size:13.5px;font-weight:bold;padding:5px 8px">כיתה ${esc(s.class)} — ${count} תלמידים</td></tr>`;
       lastClass = s.class;
       rowInClass = 0;
     }
     const gender = s.gender === "male" ? "זכר" : s.gender === "female" ? "נקבה" : "";
     rows += `<tr style="${rowInClass % 2 === 0 ? "" : "background:#f0f7f4"}">
-      <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.lastName)}</td>
-      <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px">${esc(s.firstName)}</td>
-      <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(s.class)}</td>
-      <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(gender)}</td>
-      <td style="padding:3px 6px;border:1px solid #ddd;font-size:10px;direction:ltr">${esc(s.phone)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(s.lastName)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd">${esc(s.firstName)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:center">${esc(s.class)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;text-align:center">${esc(gender)}</td>
+      <td style="padding:4px 8px;border:1px solid #ddd;direction:ltr">${esc(s.phone)}</td>
     </tr>`;
     rowInClass++;
   }
@@ -498,8 +498,8 @@ type TetItem = { id: string; text: string };
 export function buildTet(items: TetItem[], trip: Trip | null): string {
   const rows = items.filter((it) => it.text.trim()).map((it, i) => `
     <tr style="${i % 2 === 0 ? "" : "background:#f0f7f4"}">
-      <td style="padding:6px 10px;border:1px solid #ddd;font-size:11px;text-align:center;width:36px">${i + 1}</td>
-      <td style="padding:6px 10px;border:1px solid #ddd;font-size:11px">${esc(it.text)}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd;text-align:center;width:36px">${i + 1}</td>
+      <td style="padding:6px 10px;border:1px solid #ddd">${esc(it.text)}</td>
       <td style="padding:6px 10px;border:1px solid #ddd;width:50px;text-align:center"></td>
     </tr>`).join("");
   return `
@@ -524,11 +524,11 @@ type YodRow = { id: string; lastName: string; firstName: string; class: string; 
 export function buildYod(rows: YodRow[], trip: Trip | null): string {
   const tableRows = rows.map((r, i) => `
     <tr style="${i % 2 === 0 ? "" : "background:#f0f7f4"}">
-      <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${i + 1}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.lastName)} ${esc(r.firstName)}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${esc(r.class)}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.issue)}</td>
-      <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${esc(r.notes)}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${i + 1}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${esc(r.lastName)} ${esc(r.firstName)}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${esc(r.class)}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${esc(r.issue)}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd">${esc(r.notes)}</td>
     </tr>`).join("");
   return `
     <div class="header">
@@ -543,7 +543,7 @@ export function buildYod(rows: YodRow[], trip: Trip | null): string {
         <th>הבעיה הרפואית</th>
         <th>דגשים להשגחה</th>
       </tr></thead>
-      <tbody>${tableRows || `<tr><td colspan="5" style="padding:12px;text-align:center;color:#aaa;font-size:10px">אין תלמידים ברשימה</td></tr>`}</tbody>
+      <tbody>${tableRows || `<tr><td colspan="5" style="padding:12px;text-align:center;color:#aaa">אין תלמידים ברשימה</td></tr>`}</tbody>
     </table>
     <div class="footer">מסמך זה הינו סודי — לעיון אחראי הטיול והצוות הרפואי בלבד</div>`;
 }
@@ -551,24 +551,35 @@ export function buildYod(rows: YodRow[], trip: Trip | null): string {
 // ─── Combined print ───────────────────────────────────────────────────────────
 
 const CSS = `
+  @page {
+    size: A4 portrait;
+    margin: 20mm 15mm 20mm 15mm;
+  }
   @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;700&display=swap');
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Frank Ruhl Libre', 'Times New Roman', serif; direction: rtl; text-align: right;
-         padding: 20px; font-size: 11px; color: #111; background: #fff; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
-  th, td { border: 1px solid #999; padding: 4px 6px; text-align: right; font-size: 10px; }
+         padding: 20mm 15mm; font-size: 13px; line-height: 1.5; color: #111; background: #fff; }
+  table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+  th, td { border: 1px solid #999; padding: 6px 8px; text-align: right; font-size: 13px; }
   th { background: #1b4332; color: white; font-weight: 600; }
-  .cat-row td { background: #d4edda; font-weight: bold; font-size: 10.5px; }
+  .cat-row td { background: #d4edda; font-weight: bold; font-size: 13.5px; }
   .header { text-align: center; border-bottom: 2px solid #1b4332; padding-bottom: 8px; margin-bottom: 12px; }
-  .header .ministry { font-size: 8px; color: #555; }
-  .header .title { font-size: 15px; font-weight: bold; margin-top: 4px; }
-  .footer { font-size: 8px; color: #888; margin-top: 8px; border-top: 1px solid #ccc; padding-top: 6px; }
-  .meta { display: flex; gap: 24px; font-size: 9.5px; margin-bottom: 8px; }
-  .section-title { font-weight: bold; font-size: 12px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
-  .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 16px 20px; line-height: 2.2; font-size: 12px; margin: 10px 0; }
+  .header .ministry { font-size: 11px; color: #555; }
+  .header .title { font-size: 18px; font-weight: bold; margin-top: 4px; }
+  .footer { font-size: 10px; color: #888; margin-top: 10px; border-top: 1px solid #ccc; padding-top: 6px; }
+  .meta { display: flex; gap: 24px; font-size: 12px; margin-bottom: 10px; }
+  .section-title { font-weight: bold; font-size: 14px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
+  .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 18px 22px; line-height: 2; font-size: 14px; margin: 10px 0; }
   .appendix-section { page-break-after: always; padding-bottom: 16px; }
   .appendix-section:last-child { page-break-after: auto; }
-  @media print { body { padding: 10px; } @page { margin: 10mm; } }
+  @media print {
+    html, body {
+      padding: 0 !important;
+      margin: 0 !important;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+  }
 `;
 
 export function openTripPrintWindow(sections: string[], title: string) {

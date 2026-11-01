@@ -98,11 +98,11 @@ export function FoodClient() {
 
       return `
         <tr style="${i % 2 === 0 ? "" : "background:#f0f7f4"}">
-          <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${i + 1}</td>
-          <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${s.lastName} ${s.firstName}</td>
-          <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px;text-align:center">${s.class}</td>
-          <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${flags}</td>
-          <td style="padding:5px 8px;border:1px solid #ddd;font-size:10px">${note}</td>
+          <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${i + 1}</td>
+          <td style="padding:6px 8px;border:1px solid #ddd">${s.lastName} ${s.firstName}</td>
+          <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${s.class}</td>
+          <td style="padding:6px 8px;border:1px solid #ddd">${flags}</td>
+          <td style="padding:6px 8px;border:1px solid #ddd">${note}</td>
         </tr>`;
     }).join("");
 
@@ -117,7 +117,7 @@ export function FoodClient() {
         <div class="title">העדפות מזון — תלמידים עם הגבלות תזונתיות</div>
         ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
       </div>
-      <p style="font-size:10px;text-align:center;margin:6px 0 12px;color:#555">${summaryItems}</p>
+      <p style="font-size:12px;text-align:center;margin:6px 0 12px;color:#555">${summaryItems}</p>
       <table>
         <thead><tr>
           <th style="width:28px;text-align:center">מס׳</th>
@@ -126,7 +126,7 @@ export function FoodClient() {
           <th>סוג תזונה</th>
           <th>הערות נוספות</th>
         </tr></thead>
-        <tbody>${tableRows || `<tr><td colspan="5" style="padding:12px;text-align:center;color:#aaa;font-size:10px">אין תלמידים עם הגבלות תזונתיות</td></tr>`}</tbody>
+        <tbody>${tableRows || `<tr><td colspan="5" style="padding:12px;text-align:center;color:#aaa">אין תלמידים עם הגבלות תזונתיות</td></tr>`}</tbody>
       </table>
     `;
   }
