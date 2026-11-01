@@ -17,21 +17,31 @@ function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+function getClassFontSize(classes: string): number {
+  const len = classes.trim().length;
+  if (len <= 4) return 85;       // e.g. "ט׳1"
+  if (len <= 8) return 72;       // e.g. "ח׳2, ח׳6"
+  if (len <= 12) return 60;      // e.g. "ט׳1, ט׳2, ט׳3"
+  if (len <= 18) return 48;      // e.g. "ח׳3, ח׳1 (א׳), ט׳2"
+  if (len <= 26) return 38;      // multi-class split selections
+  return 32;
+}
+
 function buildSignHtml(bus: Bus, logo: string): string {
-  const commaCount = (bus.classes.match(/,/g) ?? []).length;
-  const fontSize = commaCount >= 2 ? 138 : bus.classes.length > 8 ? 173 : 230;
+  const fontSize = getClassFontSize(bus.classes);
   const logoHtml = logo
-    ? `<img src="${esc(logo)}" style="position:absolute;top:10mm;left:10mm;max-height:88mm;max-width:80mm;object-fit:contain" onerror="this.style.display='none'">`
+    ? `<img src="${esc(logo)}" style="position:absolute;top:12mm;left:12mm;max-height:42mm;max-width:55mm;object-fit:contain" onerror="this.style.display='none'">`
     : "";
 
   return `<div class="sign-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;
+    width:297mm;height:210mm;max-width:297mm;max-height:210mm;
     border:8px solid #1b4332;box-sizing:border-box;position:relative;background:white;
-    font-family:Arial,'Noto Sans Hebrew',sans-serif;direction:rtl;padding:10mm 16mm">
+    font-family:Arial,'Noto Sans Hebrew',sans-serif;direction:rtl;padding:12mm 16mm;overflow:hidden">
     ${logoHtml}
-    <div style="font-size:76pt;font-weight:bold;color:#444;margin-bottom:18mm;text-align:center;letter-spacing:1px">
+    <div style="font-size:72pt;font-weight:bold;color:#333;margin-bottom:12mm;text-align:center;line-height:1;letter-spacing:1px">
       ${esc(bus.num)}
     </div>
-    <div style="font-size:${fontSize}pt;font-weight:bold;color:#1b4332;line-height:1;text-align:center">
+    <div style="font-size:${fontSize}pt;font-weight:bold;color:#1b4332;line-height:1.1;text-align:center;white-space:nowrap;max-width:100%;overflow:hidden">
       ${esc(bus.classes)}
     </div>
   </div>`;
@@ -41,14 +51,39 @@ function openSignPrintWindow(bodyHtml: string) {
   const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><style>
     @page { size: A4 landscape; margin: 0; }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; background: white; }
-    .sign-page { width: 100%; height: 100vh; overflow: hidden; }
-    .sign-page + .sign-page { page-break-before: always; }
+    html, body { width: 100%; height: 100%; margin: 0; padding: 0; background: white; }
+    .sign-page {
+      width: 297mm;
+      height: 210mm;
+      max-width: 297mm;
+      max-height: 210mm;
+      overflow: hidden;
+      page-break-after: always;
+      break-after: page;
+    }
+    .sign-page:last-child {
+      page-break-after: auto;
+      break-after: auto;
+    }
+    @media print {
+      html, body {
+        width: 297mm;
+        height: 210mm;
+        margin: 0 !important;
+        padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+      .sign-page {
+        width: 297mm;
+        height: 210mm;
+      }
+    }
   </style></head><body>${bodyHtml}</body></html>`;
 
-  // Use a hidden iframe so mobile browsers don't block a popup window
+  // Use an offscreen iframe with standard landscape dimensions
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden";
+  iframe.style.cssText = "position:fixed;top:0;left:-9999px;width:297mm;height:210mm;border:none;";
   document.body.appendChild(iframe);
 
   const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
@@ -62,8 +97,8 @@ function openSignPrintWindow(bodyHtml: string) {
   setTimeout(() => {
     iframe.contentWindow?.focus();
     iframe.contentWindow?.print();
-    setTimeout(() => document.body.removeChild(iframe), 1000);
-  }, 300);
+    setTimeout(() => document.body.removeChild(iframe), 1500);
+  }, 400);
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -232,20 +267,22 @@ export function SignsClient() {
   // ── Sign preview (live, in-page) ──────────────────────────────────────────
 
   function SignPreview({ bus }: { bus: Bus }) {
-    const commaCount = (bus.classes.match(/,/g) ?? []).length;
-    const fontSize   = commaCount >= 2 ? 46 : bus.classes.length > 8 ? 58 : 76;
+    const fontSize = getClassFontSize(bus.classes);
     return (
       <div
-        className="relative flex flex-col items-center justify-center border-4 border-[#1b4332] bg-white rounded"
+        className="relative flex flex-col items-center justify-center border-4 border-[#1b4332] bg-white rounded overflow-hidden"
         style={{ aspectRatio: "297/210", padding: "6% 8%", fontFamily: "Arial, sans-serif", direction: "rtl" }}
       >
         {data.logo && (
-          <img src={data.logo} alt="לוגו" className="absolute top-2 left-2 max-h-16 max-w-20 object-contain" />
+          <img src={data.logo} alt="לוגו" className="absolute top-2 left-2 max-h-12 max-w-16 object-contain" />
         )}
-        <div className="font-bold text-center text-[#444] mb-4" style={{ fontSize: `${Math.round(fontSize * 0.35)}pt` }}>
+        <div className="font-bold text-center text-[#333] mb-3 leading-none" style={{ fontSize: "25pt" }}>
           {bus.num}
         </div>
-        <div className="font-bold text-center text-[#1b4332] leading-none" style={{ fontSize: `${Math.round(fontSize * 0.35)}pt` }}>
+        <div
+          className="font-bold text-center text-[#1b4332] leading-none whitespace-nowrap max-w-full overflow-hidden"
+          style={{ fontSize: `${Math.round(fontSize * 0.35)}pt` }}
+        >
           {bus.classes}
         </div>
       </div>
