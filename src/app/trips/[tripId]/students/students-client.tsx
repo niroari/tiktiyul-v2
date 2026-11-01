@@ -8,6 +8,7 @@ import { addStudent, updateStudent, deleteStudent, deleteAllStudents } from "@/l
 import { createClassToken, listClassTokensForTrip } from "@/lib/firestore/class-tokens";
 import { ExcelImport } from "@/components/excel-import";
 import { Student, Gender, ClassToken } from "@/lib/types";
+import { PrintStudentsDialog } from "./print-students-dialog";
 
 type DietaryFlags = Student["dietaryFlags"];
 import { Button } from "@/components/ui/button";
@@ -79,6 +80,7 @@ export function StudentsClient() {
   const [noteEdits, setNoteEdits]             = useState<Record<string, string>>({});
   const [showNotesOnly, setShowNotesOnly]     = useState(false);
   const [showPartialOnly, setShowPartialOnly] = useState(false);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
 
   function toggleMedical(id: string) {
     setExpandedMedical((prev) => {
@@ -249,6 +251,14 @@ export function StudentsClient() {
           </p>
         </div>
         <div className="flex gap-2">
+          {students.length > 0 && (
+            <Button variant="outline" onClick={() => setPrintDialogOpen(true)}>
+              <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              הדפסה
+            </Button>
+          )}
           {students.length > 0 && (
             <Button variant="outline" onClick={openShareDialog}>
               <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -701,6 +711,15 @@ export function StudentsClient() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      {/* Print Students Dialog */}
+      <PrintStudentsDialog
+        open={printDialogOpen}
+        onOpenChange={setPrintDialogOpen}
+        students={students}
+        filteredStudents={filtered}
+        trip={trip}
+        tripDayCount={tripDayCount}
+      />
     </div>
   );
 }

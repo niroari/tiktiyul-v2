@@ -46,7 +46,12 @@ function buildDoc(innerHTML: string, title: string) {
     .meta span { white-space: nowrap; }
     .section-title { font-weight: bold; font-size: 12px; margin: 14px 0 6px; border-bottom: 1px solid #ddd; padding-bottom: 3px; }
     .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 16px 20px; line-height: 2.2; font-size: 12px; margin: 10px 0; }
-    @media print { body { padding: 10px; } @page { margin: 10mm; } }
+    @media print {
+      body { padding: 10px; }
+      @page { margin: 10mm; }
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
   </style>
 </head>
 <body>${innerHTML}</body>
