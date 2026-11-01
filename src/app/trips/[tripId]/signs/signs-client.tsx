@@ -32,7 +32,7 @@ function getClassFontSize(classes: string): number {
 function buildSignHtml(bus: Bus, logo: string): string {
   const fontSize = getClassFontSize(bus.classes);
   const logoHtml = logo
-    ? `<img src="${esc(logo)}" style="position:absolute;top:10mm;left:10mm;max-height:36mm;max-width:48mm;object-fit:contain" onerror="this.style.display='none'">`
+    ? `<img src="${esc(logo)}" style="position:absolute;top:10mm;left:10mm;max-height:43.2mm;max-width:57.6mm;object-fit:contain" onerror="this.style.display='none'">`
     : "";
 
   return `<div class="sign-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;
@@ -276,7 +276,7 @@ export function SignsClient() {
         style={{ aspectRatio: "297/210", padding: "6% 8%", fontFamily: "Arial, sans-serif", direction: "rtl" }}
       >
         {data.logo && (
-          <img src={data.logo} alt="לוגו" className="absolute top-2 left-2 max-h-9 max-w-12 object-contain" />
+          <img src={data.logo} alt="לוגו" className="absolute top-2 left-2 max-h-[43px] max-w-[58px] object-contain" />
         )}
         <div className="font-bold text-center text-[#666] mb-1.5 leading-none" style={{ fontSize: "11pt" }}>
           {bus.num}
