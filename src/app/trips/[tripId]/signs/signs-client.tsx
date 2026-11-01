@@ -19,29 +19,31 @@ function esc(s: string) {
 
 function getClassFontSize(classes: string): number {
   const len = classes.trim().length;
-  if (len <= 4) return 85;       // e.g. "ט׳1"
-  if (len <= 8) return 72;       // e.g. "ח׳2, ח׳6"
-  if (len <= 12) return 60;      // e.g. "ט׳1, ט׳2, ט׳3"
-  if (len <= 18) return 48;      // e.g. "ח׳3, ח׳1 (א׳), ט׳2"
-  if (len <= 26) return 38;      // multi-class split selections
-  return 32;
+  if (len <= 4) return 160;      // e.g. "ט׳1"
+  if (len <= 8) return 130;      // e.g. "ח׳2, ח׳6"
+  if (len <= 11) return 105;     // e.g. "ט׳1, ט׳2"
+  if (len <= 15) return 82;      // e.g. "ט׳1, ט׳2, ט׳3"
+  if (len <= 20) return 64;      // e.g. "ח׳3, ח׳1 (א׳), ט׳2"
+  if (len <= 26) return 50;      // e.g. 4 classes
+  if (len <= 34) return 40;
+  return 34;
 }
 
 function buildSignHtml(bus: Bus, logo: string): string {
   const fontSize = getClassFontSize(bus.classes);
   const logoHtml = logo
-    ? `<img src="${esc(logo)}" style="position:absolute;top:12mm;left:12mm;max-height:42mm;max-width:55mm;object-fit:contain" onerror="this.style.display='none'">`
+    ? `<img src="${esc(logo)}" style="position:absolute;top:10mm;left:10mm;max-height:36mm;max-width:48mm;object-fit:contain" onerror="this.style.display='none'">`
     : "";
 
   return `<div class="sign-page" style="display:flex;flex-direction:column;align-items:center;justify-content:center;
     width:297mm;height:210mm;max-width:297mm;max-height:210mm;
     border:8px solid #1b4332;box-sizing:border-box;position:relative;background:white;
-    font-family:Arial,'Noto Sans Hebrew',sans-serif;direction:rtl;padding:12mm 16mm;overflow:hidden">
+    font-family:Arial,'Noto Sans Hebrew',sans-serif;direction:rtl;padding:10mm 14mm;overflow:hidden">
     ${logoHtml}
-    <div style="font-size:72pt;font-weight:bold;color:#333;margin-bottom:12mm;text-align:center;line-height:1;letter-spacing:1px">
+    <div style="font-size:30pt;font-weight:bold;color:#666;margin-bottom:8mm;text-align:center;line-height:1;letter-spacing:1px">
       ${esc(bus.num)}
     </div>
-    <div style="font-size:${fontSize}pt;font-weight:bold;color:#1b4332;line-height:1.1;text-align:center;white-space:nowrap;max-width:100%;overflow:hidden">
+    <div style="font-size:${fontSize}pt;font-weight:bold;color:#1b4332;line-height:1;text-align:center;white-space:nowrap;max-width:100%;overflow:hidden">
       ${esc(bus.classes)}
     </div>
   </div>`;
@@ -274,9 +276,9 @@ export function SignsClient() {
         style={{ aspectRatio: "297/210", padding: "6% 8%", fontFamily: "Arial, sans-serif", direction: "rtl" }}
       >
         {data.logo && (
-          <img src={data.logo} alt="לוגו" className="absolute top-2 left-2 max-h-12 max-w-16 object-contain" />
+          <img src={data.logo} alt="לוגו" className="absolute top-2 left-2 max-h-9 max-w-12 object-contain" />
         )}
-        <div className="font-bold text-center text-[#333] mb-3 leading-none" style={{ fontSize: "25pt" }}>
+        <div className="font-bold text-center text-[#666] mb-1.5 leading-none" style={{ fontSize: "11pt" }}>
           {bus.num}
         </div>
         <div
