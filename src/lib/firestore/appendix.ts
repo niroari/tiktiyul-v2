@@ -9,6 +9,31 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
+function isPlainObject(obj: unknown): obj is Record<string, unknown> {
+  if (typeof obj !== "object" || obj === null) return false;
+  const proto = Object.getPrototypeOf(obj);
+  return proto === Object.prototype || proto === null;
+}
+
+function removeUndefinedDeep<T>(val: T): T {
+  if (val === null || val === undefined) return val;
+  if (Array.isArray(val)) {
+    return val
+      .filter((item) => item !== undefined)
+      .map(removeUndefinedDeep) as unknown as T;
+  }
+  if (isPlainObject(val)) {
+    const res: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(val)) {
+      if (v !== undefined) {
+        res[k] = removeUndefinedDeep(v);
+      }
+    }
+    return res as T;
+  }
+  return val;
+}
+
 function appendixDoc(tripId: string, appendixId: string) {
   return doc(db, "trips", tripId, "appendices", appendixId);
 }
@@ -18,8 +43,9 @@ export async function saveAppendix(
   appendixId: string,
   data: Record<string, unknown>
 ): Promise<void> {
+  const cleanData = removeUndefinedDeep(data);
   await setDoc(appendixDoc(tripId, appendixId), {
-    ...data,
+    ...cleanData,
     savedAt: serverTimestamp(),
   }, { merge: true });
 }

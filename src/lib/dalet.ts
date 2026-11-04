@@ -1,6 +1,7 @@
 import type { ItineraryRow, TripSchedule, DaletData } from "./types";
 export type { ItineraryRow, TripSchedule, DaletData } from "./types";
 
+export const DEFAULT_SCHEDULE_ID = "main";
 export const DEFAULT_SCHEDULE_NAME = "לוח זמנים ראשי";
 
 export const createEmptyItineraryRow = (): ItineraryRow => ({
@@ -14,15 +15,19 @@ export const createEmptyItineraryRow = (): ItineraryRow => ({
 export function createSchedule(
   name: string = DEFAULT_SCHEDULE_NAME,
   rows: ItineraryRow[] = [createEmptyItineraryRow()],
-  description?: string
+  description?: string,
+  customId?: string
 ): TripSchedule {
-  return {
-    id: typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2),
+  const sched: TripSchedule = {
+    id: customId || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)),
     name: name.trim() || DEFAULT_SCHEDULE_NAME,
-    description: description?.trim() || undefined,
     rows: rows.length > 0 ? rows : [createEmptyItineraryRow()],
     createdAt: new Date().toISOString(),
   };
+  if (description?.trim()) {
+    sched.description = description.trim();
+  }
+  return sched;
 }
 
 /**
@@ -31,7 +36,7 @@ export function createSchedule(
  */
 export function parseDaletData(raw: Record<string, unknown> | null | undefined): DaletData {
   if (!raw) {
-    const defaultSchedule = createSchedule();
+    const defaultSchedule = createSchedule(DEFAULT_SCHEDULE_NAME, [createEmptyItineraryRow()], undefined, DEFAULT_SCHEDULE_ID);
     return {
       activeScheduleId: defaultSchedule.id,
       schedules: [defaultSchedule],
@@ -45,10 +50,27 @@ export function parseDaletData(raw: Record<string, unknown> | null | undefined):
       const item = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
       const id = String(item.id || (typeof crypto !== "undefined" ? crypto.randomUUID() : Math.random().toString(36).substring(2)));
       const name = String(item.name || DEFAULT_SCHEDULE_NAME);
-      const description = item.description ? String(item.description) : undefined;
       const rawRows = Array.isArray(item.rows) ? (item.rows as ItineraryRow[]) : [];
-      const rows = rawRows.length > 0 ? rawRows : [createEmptyItineraryRow()];
-      return { id, name, description, rows, createdAt: item.createdAt as string | undefined };
+      const rows = rawRows.length > 0
+        ? rawRows.map((r) => ({
+            id: String(r?.id || (typeof crypto !== "undefined" ? crypto.randomUUID() : Math.random().toString(36).substring(2))),
+            day: String(r?.day || ""),
+            time: String(r?.time || ""),
+            activity: String(r?.activity || ""),
+            notes: String(r?.notes || ""),
+          }))
+        : [createEmptyItineraryRow()];
+
+      const sched: TripSchedule = {
+        id,
+        name,
+        rows,
+        createdAt: item.createdAt ? String(item.createdAt) : new Date().toISOString(),
+      };
+      if (typeof item.description === "string" && item.description.trim()) {
+        sched.description = item.description.trim();
+      }
+      return sched;
     });
 
     let activeScheduleId = String(raw.activeScheduleId || "");
@@ -67,10 +89,16 @@ export function parseDaletData(raw: Record<string, unknown> | null | undefined):
 
   // Legacy format: `{ rows: [...] }`
   const legacyRows = Array.isArray(raw.rows) && raw.rows.length > 0
-    ? (raw.rows as ItineraryRow[])
+    ? (raw.rows as ItineraryRow[]).map((r) => ({
+        id: String(r?.id || (typeof crypto !== "undefined" ? crypto.randomUUID() : Math.random().toString(36).substring(2))),
+        day: String(r?.day || ""),
+        time: String(r?.time || ""),
+        activity: String(r?.activity || ""),
+        notes: String(r?.notes || ""),
+      }))
     : [createEmptyItineraryRow()];
 
-  const defaultSchedule = createSchedule(DEFAULT_SCHEDULE_NAME, legacyRows);
+  const defaultSchedule = createSchedule(DEFAULT_SCHEDULE_NAME, legacyRows, undefined, DEFAULT_SCHEDULE_ID);
 
   return {
     activeScheduleId: defaultSchedule.id,

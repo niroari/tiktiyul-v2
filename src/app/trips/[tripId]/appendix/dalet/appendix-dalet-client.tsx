@@ -19,6 +19,7 @@ import {
   parseDaletData,
   createSchedule,
   createEmptyItineraryRow,
+  DEFAULT_SCHEDULE_ID,
   DEFAULT_SCHEDULE_NAME,
 } from "@/lib/dalet";
 
@@ -33,10 +34,12 @@ export function AppendixDaletClient() {
   const { tripId } = useParams<{ tripId: string }>();
 
   // Dalet schedules state
-  const [schedules, setSchedules] = useState<TripSchedule[]>([createSchedule()]);
-  const [activeScheduleId, setActiveScheduleId] = useState<string>("");
-  const [viewingScheduleId, setViewingScheduleId] = useState<string>("");
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [schedules, setSchedules] = useState<TripSchedule[]>([
+    createSchedule(DEFAULT_SCHEDULE_NAME, [createEmptyItineraryRow()], undefined, DEFAULT_SCHEDULE_ID),
+  ]);
+  const [activeScheduleId, setActiveScheduleId] = useState<string>(DEFAULT_SCHEDULE_ID);
+  const [viewingScheduleId, setViewingScheduleId] = useState<string>(DEFAULT_SCHEDULE_ID);
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // Dialogs state
   const [newDialogOpen, setNewDialogOpen] = useState(false);
@@ -72,23 +75,55 @@ export function AppendixDaletClient() {
     nextActiveId: string = activeScheduleId,
     delay = 1200
   ) {
+    const effectiveActiveId = nextActiveId || nextSchedules[0]?.id || DEFAULT_SCHEDULE_ID;
     isPending.current = true;
     setStatus("saving");
     clearTimeout(saveTimer.current);
 
     saveTimer.current = setTimeout(async () => {
-      const activeSched =
-        nextSchedules.find((s) => s.id === nextActiveId) || nextSchedules[0];
+      try {
+        const activeSched =
+          nextSchedules.find((s) => s.id === effectiveActiveId) || nextSchedules[0];
 
-      await saveAppendix(tripId, "dalet", {
-        activeScheduleId: nextActiveId,
-        schedules: nextSchedules,
-        rows: activeSched.rows,
-      });
+        const sanitizedSchedules = nextSchedules.map((s) => {
+          const item: Record<string, unknown> = {
+            id: s.id || DEFAULT_SCHEDULE_ID,
+            name: s.name || DEFAULT_SCHEDULE_NAME,
+            rows: (s.rows || []).map((r) => ({
+              id: r.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)),
+              day: r.day ?? "",
+              time: r.time ?? "",
+              activity: r.activity ?? "",
+              notes: r.notes ?? "",
+            })),
+            createdAt: s.createdAt || new Date().toISOString(),
+          };
+          if (s.description && s.description.trim()) {
+            item.description = s.description.trim();
+          }
+          return item;
+        });
 
-      isPending.current = false;
-      setStatus("saved");
-      setTimeout(() => setStatus("idle"), 2000);
+        await saveAppendix(tripId, "dalet", {
+          activeScheduleId: effectiveActiveId,
+          schedules: sanitizedSchedules,
+          rows: (activeSched?.rows || []).map((r) => ({
+            id: r.id || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2)),
+            day: r.day ?? "",
+            time: r.time ?? "",
+            activity: r.activity ?? "",
+            notes: r.notes ?? "",
+          })),
+        });
+
+        setStatus("saved");
+        setTimeout(() => setStatus("idle"), 2000);
+      } catch (err) {
+        console.error("Failed to save Appendix Dalet:", err);
+        setStatus("idle");
+      } finally {
+        isPending.current = false;
+      }
     }, delay);
   }
 
@@ -304,10 +339,14 @@ export function AppendixDaletClient() {
         </div>
         <span
           className={`text-xs flex-shrink-0 ${
-            status === "saved" ? "text-green-600 font-medium" : "text-muted-foreground"
+            status === "saved"
+              ? "text-green-600 font-medium"
+              : status === "error"
+              ? "text-destructive font-medium"
+              : "text-muted-foreground"
           }`}
         >
-          {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
+          {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : status === "error" ? "שגיאה בשמירה" : ""}
         </span>
       </div>
 
