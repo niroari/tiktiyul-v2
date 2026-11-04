@@ -50,6 +50,11 @@ export function AppendixDaletClient() {
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renamingName, setRenamingName] = useState("");
 
+  // Drag and drop row reorder state
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [draggableIndex, setDraggableIndex] = useState<number | null>(null);
+
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
 
@@ -169,6 +174,45 @@ export function AppendixDaletClient() {
       return {
         ...sched,
         rows: sched.rows.filter((r: ItineraryRow) => r.id !== rowId),
+      };
+    });
+    setSchedules(updatedSchedules);
+    persist(updatedSchedules, activeScheduleId);
+  }
+
+  function insertRowAt(index: number) {
+    const currentDay = viewingSchedule.rows[index]?.day || "";
+    const newRow: ItineraryRow = {
+      ...createEmptyItineraryRow(),
+      day: currentDay,
+    };
+    const currentRows = [...viewingSchedule.rows];
+    currentRows.splice(index + 1, 0, newRow);
+
+    const updatedSchedules = schedules.map((sched: TripSchedule) => {
+      if (sched.id !== viewingSchedule.id) return sched;
+      return {
+        ...sched,
+        rows: currentRows,
+      };
+    });
+    setSchedules(updatedSchedules);
+    persist(updatedSchedules, activeScheduleId);
+  }
+
+  function reorderRows(fromIndex: number, toIndex: number) {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0) return;
+    const currentRows = [...viewingSchedule.rows];
+    if (fromIndex >= currentRows.length || toIndex >= currentRows.length) return;
+
+    const [moved] = currentRows.splice(fromIndex, 1);
+    currentRows.splice(toIndex, 0, moved);
+
+    const updatedSchedules = schedules.map((sched: TripSchedule) => {
+      if (sched.id !== viewingSchedule.id) return sched;
+      return {
+        ...sched,
+        rows: currentRows,
       };
     });
     setSchedules(updatedSchedules);
@@ -470,65 +514,144 @@ export function AppendixDaletClient() {
           <table className="w-full text-sm">
             <thead className="bg-muted border-b border-border">
               <tr>
+                <th className="w-8"></th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground w-32">יום הטיול</th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground w-24">שעה</th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground">הפעולה והמקום</th>
                 <th className="text-right px-3 py-2 font-medium text-muted-foreground w-40">הערות</th>
-                <th className="w-8"></th>
+                <th className="w-16"></th>
               </tr>
             </thead>
             <tbody>
-              {viewingSchedule.rows.map((row: ItineraryRow) => (
-                <tr key={row.id} className="border-b border-border last:border-0 hover:bg-muted/20">
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      value={row.day}
-                      onChange={(e) => setRow(row.id, "day", e.target.value)}
-                      placeholder="יום א׳ / 15.5"
-                      className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="time"
-                      value={row.time}
-                      onChange={(e) => setRow(row.id, "time", e.target.value)}
-                      className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      value={row.activity}
-                      onChange={(e) => setRow(row.id, "activity", e.target.value)}
-                      placeholder="תיאור הפעילות והמקום..."
-                      className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50"
-                    />
-                  </td>
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      value={row.notes}
-                      onChange={(e) => setRow(row.id, "notes", e.target.value)}
-                      placeholder="הערה..."
-                      className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50"
-                    />
-                  </td>
-                  <td className="px-1 py-1.5 text-center">
-                    <button
-                      type="button"
-                      onClick={() => removeRow(row.id)}
-                      disabled={viewingSchedule.rows.length <= 1}
-                      className="text-muted-foreground hover:text-destructive disabled:opacity-30 transition-colors cursor-pointer"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {viewingSchedule.rows.map((row: ItineraryRow, index: number) => {
+                const isBeingDragged = draggedIndex === index;
+                const isOver = dragOverIndex === index && draggedIndex !== index;
+
+                return (
+                  <tr
+                    key={row.id}
+                    draggable={draggableIndex === index}
+                    onDragStart={(e) => {
+                      setDraggedIndex(index);
+                      e.dataTransfer.effectAllowed = "move";
+                      e.dataTransfer.setData("text/plain", String(index));
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = "move";
+                      if (dragOverIndex !== index) {
+                        setDragOverIndex(index);
+                      }
+                    }}
+                    onDragLeave={() => {
+                      if (dragOverIndex === index) {
+                        setDragOverIndex(null);
+                      }
+                    }}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      const from = draggedIndex ?? Number(e.dataTransfer.getData("text/plain"));
+                      if (!isNaN(from) && from !== index) {
+                        reorderRows(from, index);
+                      }
+                      setDraggedIndex(null);
+                      setDragOverIndex(null);
+                      setDraggableIndex(null);
+                    }}
+                    onDragEnd={() => {
+                      setDraggedIndex(null);
+                      setDragOverIndex(null);
+                      setDraggableIndex(null);
+                    }}
+                    className={`border-b border-border last:border-0 transition-colors ${
+                      isBeingDragged
+                        ? "opacity-30 bg-muted/50"
+                        : isOver
+                        ? "bg-primary/10 border-t-2 border-t-primary"
+                        : "hover:bg-muted/20"
+                    }`}
+                  >
+                    <td className="px-1 py-1.5 text-center w-8">
+                      <button
+                        type="button"
+                        onMouseDown={() => setDraggableIndex(index)}
+                        onMouseUp={() => setDraggableIndex(null)}
+                        className="p-1 text-muted-foreground/40 hover:text-foreground cursor-grab active:cursor-grabbing transition-colors inline-flex items-center justify-center rounded"
+                        title="גרור כדי לשנות סדר"
+                      >
+                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                          <circle cx="9" cy="5" r="1.5" />
+                          <circle cx="9" cy="12" r="1.5" />
+                          <circle cx="9" cy="19" r="1.5" />
+                          <circle cx="15" cy="5" r="1.5" />
+                          <circle cx="15" cy="12" r="1.5" />
+                          <circle cx="15" cy="19" r="1.5" />
+                        </svg>
+                      </button>
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text"
+                        value={row.day}
+                        onChange={(e) => setRow(row.id, "day", e.target.value)}
+                        placeholder="יום א׳ / 15.5"
+                        className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="time"
+                        value={row.time}
+                        onChange={(e) => setRow(row.id, "time", e.target.value)}
+                        className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text"
+                        value={row.activity}
+                        onChange={(e) => setRow(row.id, "activity", e.target.value)}
+                        placeholder="תיאור הפעילות והמקום..."
+                        className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50"
+                      />
+                    </td>
+                    <td className="px-2 py-1.5">
+                      <input
+                        type="text"
+                        value={row.notes}
+                        onChange={(e) => setRow(row.id, "notes", e.target.value)}
+                        placeholder="הערה..."
+                        className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50"
+                      />
+                    </td>
+                    <td className="px-1 py-1.5 text-center w-16">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => insertRowAt(index)}
+                          className="text-muted-foreground/60 hover:text-primary transition-colors cursor-pointer p-0.5 rounded hover:bg-muted"
+                          title="הוסף שורה מתחת"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeRow(row.id)}
+                          disabled={viewingSchedule.rows.length <= 1}
+                          className="text-muted-foreground/60 hover:text-destructive disabled:opacity-30 transition-colors cursor-pointer p-0.5 rounded hover:bg-muted"
+                          title="מחק שורה"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
