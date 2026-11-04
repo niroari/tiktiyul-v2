@@ -69,6 +69,7 @@ export function StudentsClient() {
   const [form, setForm] = useState<StudentFormData>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+  const [selectedClass, setSelectedClass] = useState("all");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [clearing, setClearing] = useState(false);
   const [shareDialogOpen, setShareDialogOpen] = useState(false);
@@ -145,6 +146,7 @@ export function StudentsClient() {
   const partialCount = students.filter((s) => s.isGoing && isPartial(s)).length;
 
   const filtered = students.filter((s) => {
+    if (selectedClass !== "all" && s.class !== selectedClass) return false;
     if (showNotesOnly && !s.notes?.trim()) return false;
     if (showPartialOnly && !(s.isGoing && isPartial(s))) return false;
     const q = search.toLowerCase();
@@ -248,6 +250,11 @@ export function StudentsClient() {
           <h1 className="text-xl font-semibold text-foreground">רשימת תלמידים</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {students.length} תלמידים · {going} יוצאים · {notGoing} לא יוצאים
+            {selectedClass !== "all" && (
+              <span className="text-primary font-medium mr-1.5">
+                (מוצגת כיתה {selectedClass}: {filtered.length})
+              </span>
+            )}
           </p>
         </div>
         <div className="flex gap-2">
@@ -288,43 +295,48 @@ export function StudentsClient() {
         </div>
       </div>
 
-      {/* Excel format instructions */}
-      <div className="mb-5 rounded-[var(--radius)] border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
-        <p className="font-medium text-foreground mb-1">פורמט קובץ Excel לייבוא</p>
-        <p className="mb-2">הקובץ צריך לכלול שורת כותרות עם העמודות הבאות (סדר העמודות לא משנה):</p>
-        <div className="flex flex-wrap gap-1.5">
-          {[
-            { name: "ת.ז", required: true },
-            { name: "שם משפחה", required: true },
-            { name: "שם פרטי", required: true },
-            { name: "כיתה", required: true },
-            { name: "מקבילה", required: true },
-            { name: "מין", required: false },
-            { name: "טלפון נייד", required: false },
-          ].map(({ name, required }) => (
-            <span
-              key={name}
-              className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-mono border ${
-                required
-                  ? "bg-white border-border text-foreground"
-                  : "bg-white border-dashed border-border text-muted-foreground"
-              }`}
-            >
-              {name}
-              {!required && <span className="mr-1 text-[10px]">(אופציונלי)</span>}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Search + notes filter */}
+      {/* Search + class filter + notes filter */}
       <div className="mb-4 flex items-center gap-3 flex-wrap">
         <Input
           placeholder="חיפוש לפי שם או כיתה..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
+          className="max-w-xs"
         />
+
+        {classes.length > 0 && (
+          <div className="flex items-center gap-1.5">
+            <Select
+              value={selectedClass}
+              onValueChange={(val) => setSelectedClass(val || "all")}
+            >
+              <SelectTrigger className="w-[145px] text-xs h-9">
+                <SelectValue placeholder="כל הכיתות" />
+              </SelectTrigger>
+              <SelectContent dir="rtl">
+                <SelectItem value="all">כל הכיתות ({students.length})</SelectItem>
+                {classes.map((cls) => {
+                  const count = students.filter((s) => s.class === cls).length;
+                  return (
+                    <SelectItem key={cls} value={cls}>
+                      {cls} ({count})
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            {selectedClass !== "all" && (
+              <button
+                type="button"
+                onClick={() => setSelectedClass("all")}
+                className="text-xs text-muted-foreground hover:text-foreground px-1.5 py-1 rounded hover:bg-muted transition-colors"
+                title="הצג את כל הכיתות"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        )}
         {withNotes.length > 0 && (
           <button
             onClick={() => setShowNotesOnly((v) => !v)}
@@ -358,11 +370,15 @@ export function StudentsClient() {
         ) : filtered.length === 0 ? (
           <div className="p-12 text-center">
             <p className="text-muted-foreground text-sm mb-3">
-              {search ? "לא נמצאו תלמידים" : "אין תלמידים עדיין"}
+              {search || selectedClass !== "all" ? "לא נמצאו תלמידים" : "אין תלמידים עדיין"}
             </p>
-            {!search && (
+            {selectedClass !== "all" ? (
+              <Button variant="outline" size="sm" onClick={() => setSelectedClass("all")}>
+                הצג את כל הכיתות
+              </Button>
+            ) : !search ? (
               <Button variant="outline" onClick={openAdd}>הוסף תלמיד ראשון</Button>
-            )}
+            ) : null}
           </div>
         ) : (
           <Table>
