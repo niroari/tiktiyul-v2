@@ -10,17 +10,19 @@ export type ParticipantCounts = {
   maleStudents: number;
   femaleTeachers: number;
   maleTeachers: number;
-  guides: number;
-  medics: number;
-  guards: number;
+  femaleGuides: number;
+  maleGuides: number;
+  femaleGuards: number;
+  maleGuards: number;
 };
 
 export function classifyStaff(staff: StaffMember[]) {
   let femaleTeachers = 0;
   let maleTeachers = 0;
-  let guides = 0;
-  let medics = 0;
-  let guards = 0;
+  let femaleGuides = 0;
+  let maleGuides = 0;
+  let femaleGuards = 0;
+  let maleGuards = 0;
 
   for (const m of staff) {
     const role = (m.role || "").trim().toLowerCase();
@@ -28,19 +30,11 @@ export function classifyStaff(staff: StaffMember[]) {
 
     // Check Guide
     if (role.includes("מדריך") || role.includes("מדריכה")) {
-      guides++;
-    }
-    // Check Medic
-    else if (
-      role.includes("חובש") ||
-      role.includes("חובשת") ||
-      role.includes("אחות") ||
-      role.includes("פרמדיק") ||
-      role.includes("פרמדיקית") ||
-      role.includes("רופא") ||
-      role.includes("רופאה")
-    ) {
-      medics++;
+      if (gender === "female" || role.includes("מדריכה")) {
+        femaleGuides++;
+      } else {
+        maleGuides++;
+      }
     }
     // Check Guard
     else if (
@@ -49,16 +43,23 @@ export function classifyStaff(staff: StaffMember[]) {
       role.includes("שומר") ||
       role.includes("שומרת")
     ) {
-      guards++;
+      if (gender === "female" || role.includes("מאבטחת") || role.includes("שומרת")) {
+        femaleGuards++;
+      } else {
+        maleGuards++;
+      }
     }
-    // Check Teacher / School Staff / Escort
+    // Check Teacher / School Staff / Other escorts
     else {
       if (
         gender === "female" ||
         role.includes("מחנכת") ||
         role.includes("מורת") ||
         role.includes("מנהלת") ||
-        role.includes("רכזת")
+        role.includes("רכזת") ||
+        role.includes("אחות") ||
+        role.includes("חובשת") ||
+        role.includes("פרמדיקית")
       ) {
         femaleTeachers++;
       } else {
@@ -67,7 +68,7 @@ export function classifyStaff(staff: StaffMember[]) {
     }
   }
 
-  return { femaleTeachers, maleTeachers, guides, medics, guards };
+  return { femaleTeachers, maleTeachers, femaleGuides, maleGuides, femaleGuards, maleGuards };
 }
 
 function formatDate(iso?: string): string {
@@ -154,9 +155,10 @@ export function HostelMessageDialog({
   const totalStaff =
     counts.femaleTeachers +
     counts.maleTeachers +
-    counts.guides +
-    counts.medics +
-    counts.guards;
+    counts.maleGuides +
+    counts.femaleGuides +
+    counts.maleGuards +
+    counts.femaleGuards;
   const grandTotal = totalStudents + totalStaff;
 
   const schoolName = trip?.schoolName || "בית הספר";
@@ -186,9 +188,10 @@ export function HostelMessageDialog({
 🧑‍🏫 *צוות ומלווים (סה״כ ${totalStaff}):*
 • מורות: ${counts.femaleTeachers}
 • מורים: ${counts.maleTeachers}
-• מדריכים: ${counts.guides}
-• חובשים: ${counts.medics}
-• מאבטחים: ${counts.guards}
+• מדריכים: ${counts.maleGuides}
+• מדריכות: ${counts.femaleGuides}
+• מאבטחים: ${counts.maleGuards}
+• מאבטחות: ${counts.femaleGuards}
 
 📌 *סה״כ משתתפים בטיול: ${grandTotal}*${
     customNotes.trim() ? `\n\n📝 *הערות ודגשים:*\n${customNotes.trim()}` : ""
@@ -214,9 +217,10 @@ export function HostelMessageDialog({
 צוות ומלווים (סה״כ ${totalStaff}):
 • מורות: ${counts.femaleTeachers}
 • מורים: ${counts.maleTeachers}
-• מדריכים: ${counts.guides}
-• חובשים: ${counts.medics}
-• מאבטחים: ${counts.guards}
+• מדריכים: ${counts.maleGuides}
+• מדריכות: ${counts.femaleGuides}
+• מאבטחים: ${counts.maleGuards}
+• מאבטחות: ${counts.femaleGuards}
 
 סה״כ כלל המשתתפים בטיול: ${grandTotal}
 ${customNotes.trim() ? `\nהערות ודגשים מיוחדים:\n${customNotes.trim()}\n` : ""}
@@ -281,25 +285,32 @@ ${customNotes.trim() ? `\nהערות ודגשים מיוחדים:\n${customNotes
       chipClass: "border-indigo-200 bg-indigo-50 text-indigo-900",
     },
     {
-      key: "guides",
+      key: "maleGuides",
       label: "מדריכים",
       group: "staff",
       icon: "🧭",
       chipClass: "border-amber-200 bg-amber-50 text-amber-900",
     },
     {
-      key: "medics",
-      label: "חובשים",
+      key: "femaleGuides",
+      label: "מדריכות",
       group: "staff",
-      icon: "🩺",
-      chipClass: "border-red-200 bg-red-50 text-red-900",
+      icon: "🧭",
+      chipClass: "border-orange-200 bg-orange-50 text-orange-900",
     },
     {
-      key: "guards",
+      key: "maleGuards",
       label: "מאבטחים",
       group: "staff",
       icon: "🛡️",
       chipClass: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    },
+    {
+      key: "femaleGuards",
+      label: "מאבטחות",
+      group: "staff",
+      icon: "🛡️",
+      chipClass: "border-teal-200 bg-teal-50 text-teal-900",
     },
   ];
 
