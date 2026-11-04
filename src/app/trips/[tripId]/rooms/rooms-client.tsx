@@ -927,10 +927,19 @@ export function RoomsClient() {
           <h1 className="text-xl font-semibold text-foreground">חלוקת חדרים</h1>
           <p className="text-sm text-muted-foreground mt-0.5">חלוקת תלמידים לחדרים באכסנייה — הפרדה בין בנים לבנות</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
           <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-green-600" : "text-muted-foreground"}`}>
             {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
           </span>
+          <button
+            onClick={() => setHostelMessageOpen(true)}
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border bg-white text-foreground rounded-[var(--radius-sm)] hover:bg-muted transition-colors shadow-xs"
+          >
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+            <span>הודעה לאכסנייה</span>
+          </button>
           {allClasses.length > 0 && (
             <button
               onClick={openShareDialog}
@@ -955,17 +964,6 @@ export function RoomsClient() {
         <>
           {/* Toolbar */}
           <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] px-4 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
-
-            {/* Hostel message button */}
-            <button
-              onClick={() => setHostelMessageOpen(true)}
-              className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border rounded-[var(--radius-sm)] hover:bg-muted text-foreground transition-colors"
-            >
-              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-              </svg>
-              <span>הודעה לאכסנייה</span>
-            </button>
 
             {/* Hostel capacity button */}
             <button
