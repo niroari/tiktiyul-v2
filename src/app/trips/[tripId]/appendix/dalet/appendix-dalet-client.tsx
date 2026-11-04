@@ -350,64 +350,42 @@ export function AppendixDaletClient() {
         </button>
       </div>
 
-      {/* Active State & Schedule Controls Banner */}
-      <div
-        className={`rounded-[var(--radius)] border p-4 flex flex-wrap items-center justify-between gap-3 ${
-          isViewingActive
-            ? "bg-emerald-50/70 border-emerald-200 text-emerald-950"
-            : "bg-amber-50/70 border-amber-200 text-amber-950"
-        }`}
-      >
+      {/* Schedule Controls */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2.5">
-          <div
-            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${
-              isViewingActive
-                ? "bg-emerald-600 text-white"
-                : "bg-amber-500 text-white"
-            }`}
-          >
-            {isViewingActive ? "✓" : "!"}
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-sm">{viewingSchedule.name}</span>
-              {isViewingActive ? (
-                <span className="bg-emerald-200/80 text-emerald-900 text-[11px] font-medium px-2 py-0.5 rounded-full">
-                  מוגדר כפעיל
-                </span>
-              ) : (
-                <span className="bg-amber-200/80 text-amber-900 text-[11px] font-medium px-2 py-0.5 rounded-full">
-                  תוכנית חלופית (לא פעיל)
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              {isViewingActive
-                ? "לוח זמנים זה מוגדר כפעיל — אישור מנהל (נספח ב׳), הדפסת תיק טיול וסוכן הבינה המלאכותית נסמכים עליו."
-                : "זהו לוח זמנים חלופי. שאר המערכת נסמכת כרגע על הלוח הפעיל."}
-            </p>
-          </div>
+          {isViewingActive ? (
+            <span
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200"
+              title="לוח זמנים זה מוגדר כפעיל"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span>פעיל</span>
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleSetActive(viewingSchedule.id)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-muted/60 text-muted-foreground hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border border-border transition-colors cursor-pointer"
+              title="לחץ להגדרת לוח זמנים זה כפעיל"
+            >
+              <span className="w-2 h-2 rounded-full bg-muted-foreground/40" />
+              <span>לא פעיל</span>
+            </button>
+          )}
+
+          <span className="font-semibold text-sm text-foreground">
+            {viewingSchedule.name}
+          </span>
         </div>
 
         {/* Schedule Action Buttons */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {!isViewingActive && (
-            <Button
-              type="button"
-              size="sm"
-              onClick={() => handleSetActive(viewingSchedule.id)}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs gap-1 cursor-pointer font-medium shadow-xs"
-            >
-              <span>⚡ הגדר כלוח זמנים פעיל</span>
-            </Button>
-          )}
-
+        <div className="flex items-center gap-1.5">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => handleDuplicateSchedule(viewingSchedule)}
-            className="text-xs gap-1 bg-white cursor-pointer"
+            className="text-xs gap-1 bg-white cursor-pointer h-8"
             title="שכפל לוח זמנים זה לתוכנית חלופית חדשה"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -421,7 +399,7 @@ export function AppendixDaletClient() {
             variant="outline"
             size="sm"
             onClick={() => openRenameDialog(viewingSchedule)}
-            className="text-xs gap-1 bg-white cursor-pointer"
+            className="text-xs gap-1 bg-white cursor-pointer h-8"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -435,7 +413,7 @@ export function AppendixDaletClient() {
               variant="outline"
               size="sm"
               onClick={() => handleDeleteSchedule(viewingSchedule)}
-              className="text-xs gap-1 bg-white text-destructive hover:text-destructive cursor-pointer"
+              className="text-xs gap-1 bg-white text-destructive hover:text-destructive cursor-pointer h-8"
               title="מחק לוח זמנים זה"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
