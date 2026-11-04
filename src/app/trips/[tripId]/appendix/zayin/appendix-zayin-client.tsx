@@ -227,8 +227,8 @@ export function AppendixZayinClient() {
         const daysBadge = days
           ? `<span style="font-size:10px;color:#000000;font-weight:bold;margin-right:3px">(${esc(days)})</span>`
           : "";
-        const notGoingBadge = !s.isGoing
-          ? `<span style="font-size:10px;color:#000000;font-weight:bold;margin-right:3px">[לא יוצא]</span>`
+        const attendanceCell = !s.isGoing
+          ? `<span style="font-size:10.5px;font-weight:bold;white-space:nowrap">לא יוצא</span>`
           : "";
 
         rowsHTML += `
@@ -236,8 +236,8 @@ export function AppendixZayinClient() {
             <td style="text-align:center;font-weight:bold;font-size:11.5px">${currentNumber}</td>
             <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:11.5px">${esc(s.idNumber) || "—"}</td>
             <td style="font-weight:bold;white-space:nowrap;overflow:hidden">${esc(s.lastName)}</td>
-            <td style="white-space:nowrap;overflow:hidden">${esc(s.firstName)}${daysBadge}${notGoingBadge}</td>
-            <td style="text-align:center"></td>
+            <td style="white-space:nowrap;overflow:hidden">${esc(s.firstName)}${daysBadge}</td>
+            <td style="text-align:center">${attendanceCell}</td>
             <td></td>
             <td style="text-align:center;direction:ltr;font-family:monospace,sans-serif;font-size:11.5px">${esc(s.phone) || "—"}</td>
           </tr>
@@ -267,7 +267,7 @@ export function AppendixZayinClient() {
               <col style="width:72px" />
               <col style="width:95px" />
               <col style="width:95px" />
-              <col style="width:52px" />
+              <col style="width:58px" />
               <col style="width:auto" />
               <col style="width:84px" />
             </colgroup>

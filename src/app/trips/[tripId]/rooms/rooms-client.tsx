@@ -5,8 +5,10 @@ import { useParams } from "next/navigation";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
+import { useStaff } from "@/hooks/use-staff";
 import { AppendixActions } from "@/components/appendix-actions";
 import { StudentAssignSheet } from "@/components/rooms/student-assign-sheet";
+import { HostelMessageDialog } from "@/components/rooms/hostel-message-dialog";
 import { createRoomFillToken, listRoomFillTokensForTrip } from "@/lib/firestore/room-fill-tokens";
 import type { RoomFillToken } from "@/lib/firestore/room-fill-tokens";
 
@@ -488,6 +490,7 @@ export function RoomsClient() {
   const { tripId } = useParams<{ tripId: string }>();
   const { students } = useStudents(tripId);
   const { trip }     = useTrip(tripId);
+  const { staff }    = useStaff(tripId);
 
   const [rooms,        setRooms]        = useState<Room[]>([]);
   const [boySpecs,     setBoySpecs]     = useState<RoomSpec[]>([]);
@@ -505,6 +508,7 @@ export function RoomsClient() {
   const [selectedStudentIds, setSelectedStudentIds] = useState<string[]>([]);
   const [isMultiSheetOpen, setIsMultiSheetOpen] = useState(false);
   const [hostelOpen,   setHostelOpen]   = useState(false);
+  const [hostelMessageOpen, setHostelMessageOpen] = useState(false);
   const [draggingId,   setDraggingId]   = useState<string | null>(null);
   const [dragOverRoom, setDragOverRoom] = useState<string | null>(null);
   const [addMenuOpen,    setAddMenuOpen]    = useState<"male" | "female" | null>(null);
@@ -952,6 +956,17 @@ export function RoomsClient() {
           {/* Toolbar */}
           <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] px-4 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
 
+            {/* Hostel message button */}
+            <button
+              onClick={() => setHostelMessageOpen(true)}
+              className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border rounded-[var(--radius-sm)] hover:bg-muted text-foreground transition-colors"
+            >
+              <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+              </svg>
+              <span>הודעה לאכסנייה</span>
+            </button>
+
             {/* Hostel capacity button */}
             <button
               onClick={() => setHostelOpen(true)}
@@ -1358,6 +1373,14 @@ export function RoomsClient() {
         initialGirlSpecs={girlSpecs}
         initialStaffGroups={staffGroupsToDlg(staffGroups)}
         onSave={saveHostelConfig}
+      />
+
+      <HostelMessageDialog
+        open={hostelMessageOpen}
+        onClose={() => setHostelMessageOpen(false)}
+        trip={trip}
+        students={students}
+        staff={staff}
       />
 
       {/* Share room-fill links dialog */}
