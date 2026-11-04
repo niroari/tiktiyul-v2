@@ -1,13 +1,24 @@
 import type { Metadata } from "next";
-import { Rubik } from "next/font/google";
+import localFont from "next/font/local";
 import { AuthProvider } from "@/components/auth-provider";
 import { SwRegister } from "@/components/sw-register";
 import "./globals.css";
 
-const rubik = Rubik({
+const alef = localFont({
+  src: [
+    {
+      path: "./fonts/Alef-Regular.ttf",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "./fonts/Alef-Bold.ttf",
+      weight: "700",
+      style: "normal",
+    },
+  ],
   variable: "--font-sans",
-  subsets: ["latin", "hebrew"],
-  weight: ["300", "400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -43,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl" className={`${rubik.variable} h-full antialiased`}>
+    <html lang="he" dir="rtl" className={`${alef.variable} h-full antialiased`}>
       <head>
         <link rel="apple-touch-icon" href="/icon-180.png" />
         <meta name="theme-color" content="#1b4332" />
