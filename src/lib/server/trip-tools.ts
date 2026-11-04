@@ -1,5 +1,6 @@
 import { getAdminDb } from "./firebase-admin";
 import type { Student, StaffMember, Trip } from "@/lib/types";
+import { getActiveSchedule } from "@/lib/dalet";
 
 export interface TripOverviewData {
   id: string;
@@ -677,8 +678,24 @@ export async function getItinerary(tripId: string): Promise<unknown> {
     .get();
 
   if (!daletDoc.exists) return { message: "לא הוזן עדיין לוח זמנים (נספח ד׳)" };
-  const data = daletDoc.data() as { rows?: unknown[] };
-  return data?.rows || [];
+  const raw = daletDoc.data();
+  const { activeSchedule, schedules, rows } = getActiveSchedule(raw);
+
+  const alternativeSchedules = schedules
+    .filter((s) => s.id !== activeSchedule.id)
+    .map((s) => ({
+      name: s.name,
+      description: s.description,
+      rows: s.rows,
+    }));
+
+  return {
+    activeScheduleName: activeSchedule.name,
+    activeRows: rows,
+    alternativeSchedules,
+    // Root rows array maintained for backward compatibility
+    rows,
+  };
 }
 
 export interface SignatureStatusItem {

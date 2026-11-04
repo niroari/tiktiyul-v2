@@ -226,28 +226,73 @@ export function buildGimel(data: GimelData, trip: Trip | null, principalSig: str
 
 type DaletRow = { id: string; day: string; time: string; activity: string; notes: string };
 
-export function buildDalet(rows: DaletRow[]): string {
-  const tableRows = rows.map((r) => `
-    <tr>
-      <td>${esc(r.day)}</td>
-      <td style="text-align:center">${esc(r.time)}</td>
-      <td>${esc(r.activity)}</td>
-      <td>${esc(r.notes)}</td>
-    </tr>`).join("");
-  return `
-    <div class="header">
-      <div class="title">נספח ד׳ — תוכנית הטיול — לוח זמנים</div>
-      <div class="ministry">פירוט ימי ושעות הפעילות</div>
-    </div>
-    <table>
-      <thead><tr>
-        <th style="width:100px">יום הטיול</th>
-        <th style="width:70px">שעה</th>
-        <th>הפעולה והמקום</th>
-        <th style="width:130px">הערות</th>
-      </tr></thead>
-      <tbody>${tableRows}</tbody>
-    </table>`;
+export function buildDalet(
+  rows: DaletRow[],
+  scheduleName?: string,
+  alternativeSchedules?: Array<{ name: string; rows: DaletRow[] }>
+): string {
+  function renderTable(tableTitle: string, tableSubtitle: string, rws: DaletRow[], isActive: boolean = false) {
+    const tableRows = rws
+      .map(
+        (r) => `
+      <tr>
+        <td>${esc(r.day)}</td>
+        <td style="text-align:center">${esc(r.time)}</td>
+        <td>${esc(r.activity)}</td>
+        <td>${esc(r.notes)}</td>
+      </tr>`
+      )
+      .join("");
+
+    return `
+      <div style="margin-bottom: 24px; break-inside: avoid;">
+        <div class="header">
+          <div class="title">${esc(tableTitle)} ${
+      isActive
+        ? `<span style="font-size:11px; background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; padding:1px 7px; border-radius:10px; margin-right:6px;">לוח זמנים פעיל</span>`
+        : ""
+    }</div>
+          <div class="ministry">${esc(tableSubtitle)}</div>
+        </div>
+        <table>
+          <thead><tr>
+            <th style="width:100px">יום הטיול</th>
+            <th style="width:70px">שעה</th>
+            <th>הפעולה והמקום</th>
+            <th style="width:130px">הערות</th>
+          </tr></thead>
+          <tbody>${tableRows || `<tr><td colspan="4" style="text-align:center; color:#888;">אין פעילויות מוגדרות</td></tr>`}</tbody>
+        </table>
+      </div>`;
+  }
+
+  const mainTitle = scheduleName
+    ? `נספח ד׳ — תוכנית הטיול — ${scheduleName}`
+    : `נספח ד׳ — תוכנית הטיול — לוח זמנים`;
+
+  const mainHTML = renderTable(mainTitle, "פירוט ימי ושעות הפעילות — לוח זמנים פעיל", rows, true);
+
+  const altHTML =
+    alternativeSchedules && alternativeSchedules.length > 0
+      ? `
+      <div style="margin-top: 32px; border-top: 2px dashed #cbd5e1; padding-top: 20px; break-before: page;">
+        <div style="font-size: 15px; font-weight: bold; margin-bottom: 14px; color: #1e293b;">
+          תוכניות חלופיות למזג אוויר ואירועים חריגים (${alternativeSchedules.length})
+        </div>
+        ${alternativeSchedules
+          .map((alt) =>
+            renderTable(
+              `תוכנית חלופית: ${alt.name}`,
+              "תוכנית מגירה לשינוי תנאי שטח או מזג אוויר",
+              alt.rows,
+              false
+            )
+          )
+          .join("")}
+      </div>`
+      : "";
+
+  return `${mainHTML}${altHTML}`;
 }
 
 // ─── Appendix ה ──────────────────────────────────────────────────────────────

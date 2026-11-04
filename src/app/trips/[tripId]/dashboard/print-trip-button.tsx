@@ -11,6 +11,7 @@ import {
   openTripPrintWindow,
 } from "@/lib/print/build-trip-html";
 import { extractVavBuses } from "@/lib/vav";
+import { parseDaletData } from "@/lib/dalet";
 
 export function PrintTripButton({ tripId }: { tripId: string }) {
   const [state, setState] = useState<"idle" | "loading">("idle");
@@ -74,8 +75,12 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
       sections.push(buildGimel(gimelData, trip, sigPrincipalC?.status === "signed" ? (sigPrincipalC.signature ?? null) : null));
 
       // ד
-      const daletRows = (daletRaw?.rows ?? []) as { id: string; day: string; time: string; activity: string; notes: string }[];
-      sections.push(buildDalet(daletRows));
+      const parsedDalet = parseDaletData(daletRaw);
+      const activeSched =
+        parsedDalet.schedules.find((s) => s.id === parsedDalet.activeScheduleId) ||
+        parsedDalet.schedules[0];
+      const altSchedules = parsedDalet.schedules.filter((s) => s.id !== activeSched.id);
+      sections.push(buildDalet(activeSched.rows, activeSched.name, altSchedules));
 
       // ה
       const heyRows = (heyRaw?.rows ?? []) as { id: string; role: string; name: string; phone: string; notes: string }[];

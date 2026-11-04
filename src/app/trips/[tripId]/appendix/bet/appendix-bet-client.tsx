@@ -22,6 +22,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { ArrowDownToLine, ExternalLink, Check, AlertCircle } from "lucide-react";
+import { getActiveSchedule } from "@/lib/dalet";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -315,6 +316,7 @@ export function AppendixBetClient() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importLoading, setImportLoading] = useState(false);
   const [daletRows, setDaletRows] = useState<ItineraryRow[] | null>(null);
+  const [activeScheduleName, setActiveScheduleName] = useState<string>("");
   const [importMode, setImportMode] = useState<"replace" | "append">("replace");
   const [autoFillEndTime, setAutoFillEndTime] = useState(true);
   const [importNotice, setImportNotice] = useState<string | null>(null);
@@ -328,11 +330,13 @@ export function AppendixBetClient() {
     setImportDialogOpen(true);
     try {
       const raw = await getAppendix(tripId, "dalet");
-      const rows = (raw?.rows as ItineraryRow[]) ?? [];
+      const { activeSchedule, rows } = getActiveSchedule(raw);
       setDaletRows(rows);
+      setActiveScheduleName(activeSchedule.name);
       setImportMode("replace");
     } catch {
       setDaletRows([]);
+      setActiveScheduleName("");
     } finally {
       setImportLoading(false);
     }
@@ -720,9 +724,16 @@ export function AppendixBetClient() {
               {/* Options & Settings */}
               <div className="bg-muted/40 p-3.5 rounded-[var(--radius-sm)] border border-border space-y-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">
-                    נמצאו <strong className="text-foreground font-semibold">{previewRows.length}</strong> פעילויות לייבוא
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-muted-foreground">
+                      נמצאו <strong className="text-foreground font-semibold">{previewRows.length}</strong> פעילויות
+                    </span>
+                    {activeScheduleName && (
+                      <span className="bg-emerald-100 text-emerald-800 text-[11px] font-medium px-2 py-0.5 rounded-full border border-emerald-200">
+                        מתוך לוח פעיל: {activeScheduleName}
+                      </span>
+                    )}
+                  </div>
                   <Link
                     href={`/trips/${tripId}/appendix/dalet`}
                     target="_blank"

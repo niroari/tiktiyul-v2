@@ -108,3 +108,27 @@ export type AppendixStatus = "empty" | "in_progress" | "done";
 export type TripProgress = {
   [key: string]: AppendixStatus;
 };
+
+// ─── Appendix Dalet (Itinerary / Schedules) ─────────────────────────────────
+
+export type ItineraryRow = {
+  id: string;
+  day: string;
+  time: string;
+  activity: string;
+  notes: string;
+};
+
+export type TripSchedule = {
+  id: string;
+  name: string;
+  description?: string;
+  rows: ItineraryRow[];
+  createdAt?: string;
+};
+
+export type DaletData = {
+  activeScheduleId: string;
+  schedules: TripSchedule[];
+  rows: ItineraryRow[]; // Synchronized with active schedule for backward compatibility
+};
