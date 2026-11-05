@@ -20,7 +20,7 @@ import {
   FolderPlus,
   ChevronDown,
   ChevronUp,
-  FolderOpen,
+  ClipboardPaste,
 } from "lucide-react";
 import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { uploadFile, deleteFileByUrl } from "@/lib/firebase-storage";
@@ -99,6 +99,24 @@ function stripExtension(fileName: string): string {
   return fileName.replace(/\.[^/.]+$/, "");
 }
 
+function normalizePastedFile(file: File | Blob, index = 0): File {
+  const mime = file.type || "image/png";
+  const extFromMime = mime.split("/")[1]?.replace("jpeg", "jpg") || "png";
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString("he-IL", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const suffix = index > 0 ? ` (${index + 1})` : "";
+
+  if (file instanceof File && file.name && !/^(image|blob|clipboard)\.[a-z0-9]+$/i.test(file.name)) {
+    return file;
+  }
+
+  const generatedName = `תמונה מהלוח ${timeStr}${suffix}.${extFromMime}`;
+  return new File([file], generatedName, { type: mime });
+}
+
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes <= 0) return "";
   if (bytes < 1024 * 1024) {
@@ -129,7 +147,7 @@ export function CertificatesClient() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>("all");
   const [uploadTargetGroupId, setUploadTargetGroupId] = useState<string>(DEFAULT_GROUPS[0].id);
-  const [isDragging, setIsDragging] = useState(false);
+  const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
   const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
 
   // Inline editing state for document item
@@ -266,6 +284,69 @@ export function CertificatesClient() {
       isPendingRef.current = false;
     }
   }
+
+  async function handlePasteFromButton(targetGroupId: string) {
+    setFileError("");
+    if (!navigator.clipboard?.read) {
+      setFileError("הדפדפן אינו תומך בהדבקה מכפתור. השתמש/י בקיצור המקלדת Ctrl+V (או ⌘V).");
+      return;
+    }
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      const pastedFiles: File[] = [];
+
+      for (const item of clipboardItems) {
+        const supportedType = item.types.find(
+          (t) => t.startsWith("image/") || t === "application/pdf"
+        );
+        if (supportedType) {
+          const blob = await item.getType(supportedType);
+          pastedFiles.push(normalizePastedFile(blob, pastedFiles.length));
+        }
+      }
+
+      if (pastedFiles.length === 0) {
+        setFileError("לא נמצאה תמונה בלוח העריכה (Clipboard). העתק/י תמונה ונסה/י שוב.");
+        return;
+      }
+
+      await handleFilesUpload(pastedFiles, targetGroupId);
+    } catch (err) {
+      console.error(err);
+      setFileError("לא ניתן לקרוא מהלוח. אשר/י הרשאת הדבקה בדפדפן או לחץ/י Ctrl+V (או ⌘V) בעמוד.");
+    }
+  }
+
+  // Global Ctrl+V / Cmd+V paste listener for images/files
+  const handleFilesUploadRef = useRef(handleFilesUpload);
+  handleFilesUploadRef.current = handleFilesUpload;
+
+  useEffect(() => {
+    function onWindowPaste(e: ClipboardEvent) {
+      if (isPendingRef.current) return;
+      const itemsList = e.clipboardData?.items;
+      if (!itemsList) return;
+
+      const pastedFiles: File[] = [];
+      for (let i = 0; i < itemsList.length; i++) {
+        const item = itemsList[i];
+        if (item.kind === "file") {
+          const rawFile = item.getAsFile();
+          if (rawFile) {
+            pastedFiles.push(normalizePastedFile(rawFile, pastedFiles.length));
+          }
+        }
+      }
+
+      if (pastedFiles.length > 0) {
+        e.preventDefault();
+        handleFilesUploadRef.current(pastedFiles, uploadTargetGroupId);
+      }
+    }
+
+    window.addEventListener("paste", onWindowPaste);
+    return () => window.removeEventListener("paste", onWindowPaste);
+  }, [uploadTargetGroupId]);
 
   function startEditingItem(item: CertificateItem) {
     setEditingItemId(item.id);
@@ -521,13 +602,41 @@ export function CertificatesClient() {
   }, [groups, selectedGroupFilter]);
 
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-4">
+      {/* Hidden file inputs */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        accept={ACCEPTED_EXTENSIONS}
+        onChange={(e) => {
+          if (e.target.files?.length) {
+            handleFilesUpload(e.target.files, uploadTargetGroupId);
+            e.target.value = "";
+          }
+        }}
+        className="hidden"
+      />
+      <input
+        ref={groupFileInputRef}
+        type="file"
+        multiple
+        accept={ACCEPTED_EXTENSIONS}
+        onChange={(e) => {
+          if (e.target.files?.length) {
+            handleFilesUpload(e.target.files, directUploadGroupIdRef.current);
+            e.target.value = "";
+          }
+        }}
+        className="hidden"
+      />
+
+      {/* Page Header + Minimalist Upload & Action Bar */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-foreground">תעודות וואוצ׳רים</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            ניהול מרוכז של וואוצ׳רים לאתרים, תעודות מדריך, רישיונות מאבטחים, היעדר עבירות מין ורישיונות עסק
+          <p className="text-xs text-muted-foreground mt-0.5">
+            ניהול וואוצ׳רים לאתרים, תעודות מדריך, רישיונות מאבטחים, היעדר עבירות מין ורישיונות עסק · ניתן לגרור קבצים או להדביק מהלוח (Ctrl+V)
           </p>
         </div>
 
@@ -552,11 +661,50 @@ export function CertificatesClient() {
             </span>
           )}
 
+          {/* Compact Upload + Paste Group Selector */}
+          <div className="flex items-center gap-1.5 bg-card border border-border rounded-[var(--radius-sm)] p-1 shadow-[var(--shadow-card)]">
+            <select
+              id="target-group-select"
+              value={uploadTargetGroupId}
+              onChange={(e) => setUploadTargetGroupId(e.target.value)}
+              className="h-7 rounded px-2 text-xs font-medium text-foreground bg-muted/50 border-0 focus:outline-none focus:ring-1 focus:ring-ring/40"
+              title="קבוצת יעד להעלאה או הדבקה (Ctrl+V)"
+            >
+              {groups.map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+
+            <Button
+              type="button"
+              size="xs"
+              onClick={() => fileInputRef.current?.click()}
+              className="gap-1"
+            >
+              <Upload className="size-3.5" />
+              <span>העלאת קבצים</span>
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              onClick={() => handlePasteFromButton(uploadTargetGroupId)}
+              className="gap-1 text-primary hover:bg-[var(--brand-light)]"
+              title="הדבק תמונה מהלוח (Ctrl+V / ⌘V)"
+            >
+              <ClipboardPaste className="size-3.5" />
+              <span>הדבק</span>
+            </Button>
+          </div>
+
           <Button
             variant="outline"
             size="sm"
             onClick={() => setNewGroupDialogOpen(true)}
-            className="gap-1.5"
+            className="gap-1.5 h-9"
           >
             <FolderPlus className="size-4" />
             <span>קבוצה חדשה</span>
@@ -567,106 +715,27 @@ export function CertificatesClient() {
               variant="outline"
               size="sm"
               onClick={() => handlePrintAllImages(selectedGroupFilter)}
-              className="gap-1.5"
+              className="gap-1.5 h-9"
             >
               <Printer className="size-4" />
-              <span>הדפס תעודות (תמונות)</span>
+              <span>הדפס תמונות</span>
             </Button>
           )}
         </div>
       </div>
 
-      {/* Upload Dropzone Card */}
-      <div className="bg-card rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Upload className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold text-foreground">העלאת מסמכים ותעודות</h2>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <label htmlFor="target-group-select" className="text-xs text-muted-foreground whitespace-nowrap">
-              שיוך לקבוצה:
-            </label>
-            <select
-              id="target-group-select"
-              value={uploadTargetGroupId}
-              onChange={(e) => setUploadTargetGroupId(e.target.value)}
-              className="h-8 rounded-[var(--radius-sm)] border border-input bg-background px-2.5 text-xs font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-ring/40"
-            >
-              {groups.map((g) => (
-                <option key={g.id} value={g.id}>
-                  {g.name}
-                </option>
-              ))}
-            </select>
-          </div>
+      {fileError && (
+        <div className="text-xs bg-[var(--danger-light)] text-destructive border border-destructive/20 rounded-[var(--radius-sm)] px-3 py-2 flex items-center justify-between gap-2">
+          <span>{fileError}</span>
+          <button
+            type="button"
+            onClick={() => setFileError("")}
+            className="text-destructive/70 hover:text-destructive"
+          >
+            <X className="size-3.5" />
+          </button>
         </div>
-
-        <label
-          onDragOver={(e) => {
-            e.preventDefault();
-            setIsDragging(true);
-          }}
-          onDragLeave={() => setIsDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setIsDragging(false);
-            if (e.dataTransfer.files?.length) {
-              handleFilesUpload(e.dataTransfer.files, uploadTargetGroupId);
-            }
-          }}
-          className={`flex flex-col items-center justify-center border-2 border-dashed rounded-[var(--radius-sm)] p-8 cursor-pointer transition-colors text-center ${
-            isDragging
-              ? "border-primary bg-[var(--brand-light)]"
-              : "border-border hover:border-primary/50 hover:bg-muted/30"
-          }`}
-        >
-          <div className="w-11 h-11 rounded-full bg-[var(--brand-light)] text-primary flex items-center justify-center mb-3">
-            <Upload className="size-5" />
-          </div>
-          <span className="text-sm font-medium text-foreground">
-            לחץ/י לבחירת קבצים או גרור/י לכאן (ניתן להעלות מספר קבצים יחד)
-          </span>
-          <span className="text-xs text-muted-foreground mt-1">
-            תומך בתמונות (JPG, PNG, GIF, WEBP, HEIC) ומסמכים (PDF, Word, Excel) — עד {MAX_MB} MB לקובץ
-          </span>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept={ACCEPTED_EXTENSIONS}
-            onChange={(e) => {
-              if (e.target.files?.length) {
-                handleFilesUpload(e.target.files, uploadTargetGroupId);
-                e.target.value = "";
-              }
-            }}
-            className="hidden"
-          />
-        </label>
-
-        {/* Hidden input for per-group quick upload button */}
-        <input
-          ref={groupFileInputRef}
-          type="file"
-          multiple
-          accept={ACCEPTED_EXTENSIONS}
-          onChange={(e) => {
-            if (e.target.files?.length) {
-              handleFilesUpload(e.target.files, directUploadGroupIdRef.current);
-              e.target.value = "";
-            }
-          }}
-          className="hidden"
-        />
-
-        {fileError && (
-          <div className="text-xs bg-[var(--danger-light)] text-destructive border border-destructive/20 rounded-[var(--radius-sm)] px-3 py-2">
-            {fileError}
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Filter Pills & Search Bar */}
       <div className="bg-card rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-4 space-y-3">
@@ -767,10 +836,30 @@ export function CertificatesClient() {
           return (
             <div
               key={group.id}
-              className="bg-card rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] overflow-hidden"
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (dragOverGroupId !== group.id) setDragOverGroupId(group.id);
+              }}
+              onDragLeave={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setDragOverGroupId(null);
+                }
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOverGroupId(null);
+                if (e.dataTransfer.files?.length) {
+                  handleFilesUpload(e.dataTransfer.files, group.id);
+                }
+              }}
+              className={`bg-card rounded-[var(--radius)] border shadow-[var(--shadow-card)] overflow-hidden transition-colors ${
+                dragOverGroupId === group.id
+                  ? "border-primary ring-2 ring-primary/20 bg-[var(--brand-light)]/20"
+                  : "border-border"
+              }`}
             >
               {/* Group Header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 px-5 py-3.5 bg-muted/30 border-b border-border">
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-muted/30 border-b border-border">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <button
                     type="button"
@@ -842,6 +931,17 @@ export function CertificatesClient() {
                   <Button
                     variant="outline"
                     size="xs"
+                    onClick={() => handlePasteFromButton(group.id)}
+                    className="gap-1 text-primary border-primary/30 hover:bg-[var(--brand-light)]"
+                    title="הדבק תמונה מהלוח לקבוצה זו"
+                  >
+                    <ClipboardPaste className="size-3.5" />
+                    <span>הדבק לכאן</span>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    size="xs"
                     onClick={() => {
                       directUploadGroupIdRef.current = group.id;
                       groupFileInputRef.current?.click();
@@ -879,22 +979,19 @@ export function CertificatesClient() {
 
               {/* Group Content */}
               {!isCollapsed && (
-                <div className="p-4">
+                <div className="p-3.5">
                   {groupItems.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-6 text-center border border-dashed border-border rounded-[var(--radius-sm)] bg-muted/15">
-                      <FolderOpen className="size-6 text-muted-foreground/50 mb-1.5" />
-                      <p className="text-xs text-muted-foreground">
-                        אין עדיין מסמכים בקבוצת &quot;{group.name}&quot;
-                      </p>
+                    <div className="flex items-center justify-between gap-2 py-2 px-3 rounded-[var(--radius-sm)] border border-dashed border-border bg-muted/15 text-xs text-muted-foreground">
+                      <span>אין עדיין מסמכים בקבוצה זו — ניתן לגרור קבצים לכאן</span>
                       <button
                         type="button"
                         onClick={() => {
                           directUploadGroupIdRef.current = group.id;
                           groupFileInputRef.current?.click();
                         }}
-                        className="mt-2 text-xs font-medium text-primary hover:underline"
+                        className="font-medium text-primary hover:underline shrink-0"
                       >
-                        + העלה קובץ לקבוצה זו
+                        + העלה קובץ
                       </button>
                     </div>
                   ) : (
