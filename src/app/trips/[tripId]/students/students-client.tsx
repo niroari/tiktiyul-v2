@@ -399,22 +399,29 @@ export function StudentsClient() {
                 const isMedExpanded   = expandedMedical.has(student.id);
                 const isNotesExpanded = expandedNotes.has(student.id);
                 const hasNotes        = !!student.notes?.trim();
+                const isNotGoing      = !student.isGoing;
+                const rowTextCls      = isNotGoing ? "text-slate-400 dark:text-slate-500" : "";
                 return (
                 <>
-                <TableRow key={student.id} className="hover:bg-muted/50">
-                  <TableCell className="font-medium">{student.lastName}</TableCell>
-                  <TableCell>{student.firstName}</TableCell>
-                  <TableCell>{student.class}</TableCell>
+                <TableRow
+                  key={student.id}
+                  className={`hover:bg-muted/50 ${isNotGoing ? "bg-muted/20 text-slate-400 dark:text-slate-500" : ""}`}
+                >
+                  <TableCell className={`font-medium ${rowTextCls}`}>{student.lastName}</TableCell>
+                  <TableCell className={rowTextCls}>{student.firstName}</TableCell>
+                  <TableCell className={rowTextCls}>{student.class}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
-                      ${student.gender === "female"
-                        ? "bg-pink-50 text-pink-700"
-                        : "bg-blue-50 text-blue-700"
-                      }`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      isNotGoing
+                        ? "bg-muted text-slate-400 dark:text-slate-500"
+                        : student.gender === "female"
+                          ? "bg-pink-50 text-pink-700"
+                          : "bg-blue-50 text-blue-700"
+                    }`}>
                       {student.gender === "female" ? "בת" : "בן"}
                     </span>
                   </TableCell>
-                  <TableCell className="text-muted-foreground">{student.phone || "—"}</TableCell>
+                  <TableCell className={isNotGoing ? rowTextCls : "text-muted-foreground"}>{student.phone || "—"}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-1.5">
                       <button

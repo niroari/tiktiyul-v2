@@ -496,6 +496,8 @@ export function AppendixZayinClient() {
               <tbody>
                 {visible.map((s, i) => {
                   const isClassHeader = i === 0 || visible[i - 1].class !== s.class;
+                  const isNotGoing = !s.isGoing;
+                  const rowTextCls = isNotGoing ? "text-slate-400 dark:text-slate-500" : "";
                   return (
                     <>
                       {isClassHeader && sortField === "class" && (
@@ -507,25 +509,29 @@ export function AppendixZayinClient() {
                       )}
                       <tr
                         key={s.id}
-                        className={`border-b border-border last:border-0 transition-colors ${!s.isGoing ? "opacity-40" : "hover:bg-muted/20"}`}
+                        className={`border-b border-border last:border-0 transition-colors ${
+                          isNotGoing
+                            ? "bg-muted/20 text-slate-400 dark:text-slate-500 hover:bg-muted/40"
+                            : "hover:bg-muted/20"
+                        }`}
                       >
-                        <td className="px-4 py-2 text-xs font-mono text-muted-foreground" dir="ltr">{s.idNumber || "—"}</td>
-                        <td className="px-4 py-2">{s.lastName}</td>
-                        <td className="px-4 py-2">{s.firstName}</td>
-                        <td className="px-3 py-2 text-center text-muted-foreground">{s.class}</td>
+                        <td className={`px-4 py-2 text-xs font-mono ${isNotGoing ? rowTextCls : "text-muted-foreground"}`} dir="ltr">{s.idNumber || "—"}</td>
+                        <td className={`px-4 py-2 ${rowTextCls}`}>{s.lastName}</td>
+                        <td className={`px-4 py-2 ${rowTextCls}`}>{s.firstName}</td>
+                        <td className={`px-3 py-2 text-center ${isNotGoing ? rowTextCls : "text-muted-foreground"}`}>{s.class}</td>
                         <td className="px-3 py-2 text-center">
                           {s.gender === "male" ? (
-                            <span className="text-xs bg-blue-50 text-blue-700 rounded-full px-2 py-0.5">זכר</span>
+                            <span className={`text-xs rounded-full px-2 py-0.5 ${isNotGoing ? "bg-muted text-slate-400 dark:text-slate-500" : "bg-blue-50 text-blue-700"}`}>זכר</span>
                           ) : s.gender === "female" ? (
-                            <span className="text-xs bg-pink-50 text-pink-700 rounded-full px-2 py-0.5">נקבה</span>
+                            <span className={`text-xs rounded-full px-2 py-0.5 ${isNotGoing ? "bg-muted text-slate-400 dark:text-slate-500" : "bg-pink-50 text-pink-700"}`}>נקבה</span>
                           ) : null}
                         </td>
-                        <td className="px-4 py-2 text-xs font-mono text-muted-foreground" dir="ltr">{s.phone}</td>
+                        <td className={`px-4 py-2 text-xs font-mono ${isNotGoing ? rowTextCls : "text-muted-foreground"}`} dir="ltr">{s.phone}</td>
                         {tripDayCount > 1 && (
                           <td className="px-3 py-2 text-center text-xs font-medium">
                             {dayLabel(s)
-                              ? <span className="text-orange-600">{dayLabel(s)}</span>
-                              : <span className="text-muted-foreground/40">—</span>
+                              ? <span className={isNotGoing ? rowTextCls : "text-orange-600"}>{dayLabel(s)}</span>
+                              : <span className={isNotGoing ? rowTextCls : "text-muted-foreground/40"}>—</span>
                             }
                           </td>
                         )}
