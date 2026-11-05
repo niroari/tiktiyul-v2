@@ -148,7 +148,7 @@ export function CertificatesClient() {
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>("all");
   const [uploadTargetGroupId, setUploadTargetGroupId] = useState<string>(DEFAULT_GROUPS[0].id);
   const [dragOverGroupId, setDragOverGroupId] = useState<string | null>(null);
-  const [collapsedGroups, setCollapsedGroups] = useState<Record<string, boolean>>({});
+  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
   // Inline editing state for document item
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
@@ -185,6 +185,7 @@ export function CertificatesClient() {
   useEffect(() => {
     if (selectedGroupFilter !== "all") {
       setUploadTargetGroupId(selectedGroupFilter);
+      setExpandedGroups((prev) => ({ ...prev, [selectedGroupFilter]: true }));
     }
   }, [selectedGroupFilter]);
 
@@ -259,8 +260,8 @@ export function CertificatesClient() {
       const nextItems = [...newlyUploaded, ...items];
       setItems(nextItems);
 
-      // Expand target group if collapsed
-      setCollapsedGroups((prev) => ({ ...prev, [targetGroupId]: false }));
+      // Expand target group when files are uploaded to it
+      setExpandedGroups((prev) => ({ ...prev, [targetGroupId]: true }));
 
       await saveAppendix(tripId, "certificates", {
         groups,
@@ -822,10 +823,14 @@ export function CertificatesClient() {
       </div>
 
       {/* Groups & Document Cards */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         {visibleGroups.map((group) => {
           const groupItems = filteredItems.filter((it) => it.groupId === group.id);
-          const isCollapsed = !!collapsedGroups[group.id];
+          const isExpanded =
+            !!expandedGroups[group.id] ||
+            selectedGroupFilter === group.id ||
+            (!!searchQuery.trim() && groupItems.length > 0);
+          const isCollapsed = !isExpanded;
           const isRenaming = renamingGroupId === group.id;
 
           // If user is searching and this group has no matches, hide empty groups during search
@@ -859,16 +864,29 @@ export function CertificatesClient() {
               }`}
             >
               {/* Group Header */}
-              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-muted/30 border-b border-border">
+              <div
+                onClick={() => {
+                  if (!isRenaming) {
+                    setExpandedGroups((prev) => ({
+                      ...prev,
+                      [group.id]: !isExpanded,
+                    }));
+                  }
+                }}
+                className={`flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors ${
+                  !isCollapsed ? "border-b border-border" : ""
+                }`}
+              >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <button
                     type="button"
-                    onClick={() =>
-                      setCollapsedGroups((prev) => ({
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedGroups((prev) => ({
                         ...prev,
-                        [group.id]: !prev[group.id],
-                      }))
-                    }
+                        [group.id]: !isExpanded,
+                      }));
+                    }}
                     className="p-1 rounded-[var(--radius-sm)] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                     title={isCollapsed ? "הרחב קבוצה" : "כווץ קבוצה"}
                   >
@@ -880,7 +898,10 @@ export function CertificatesClient() {
                   </button>
 
                   {isRenaming ? (
-                    <div className="flex items-center gap-1.5">
+                    <div
+                      className="flex items-center gap-1.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <Input
                         value={renameGroupValue}
                         onChange={(e) => setRenameGroupValue(e.target.value)}
@@ -909,15 +930,7 @@ export function CertificatesClient() {
                     </div>
                   ) : (
                     <>
-                      <h3
-                        onClick={() =>
-                          setCollapsedGroups((prev) => ({
-                            ...prev,
-                            [group.id]: !prev[group.id],
-                          }))
-                        }
-                        className="text-sm font-semibold text-foreground cursor-pointer truncate"
-                      >
+                      <h3 className="text-sm font-semibold text-foreground truncate">
                         {group.name}
                       </h3>
                       <Badge variant={groupItems.length > 0 ? "default" : "secondary"}>
@@ -927,7 +940,10 @@ export function CertificatesClient() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-1.5">
+                <div
+                  className="flex items-center gap-1.5"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <Button
                     variant="outline"
                     size="xs"
