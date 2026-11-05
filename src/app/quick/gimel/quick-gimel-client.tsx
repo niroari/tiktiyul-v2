@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AppendixActions, esc, safeSigUrl } from "@/components/appendix-actions";
 import { RemoteSignature } from "@/components/remote-signature";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type FormData = {
   date: string;
@@ -175,6 +176,7 @@ export function QuickGimelClient({ savedId }: { savedId?: string }) {
                 שמור
               </button>
             )}
+            <ThemeToggle />
           </div>
         </div>
 

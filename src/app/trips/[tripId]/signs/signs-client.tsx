@@ -272,7 +272,7 @@ export function SignsClient() {
     const fontSize = getClassFontSize(bus.classes);
     return (
       <div
-        className="relative flex flex-col items-center justify-center border-4 border-[#1b4332] bg-white rounded overflow-hidden"
+        className="keep-white relative flex flex-col items-center justify-center border-4 border-[#1b4332] bg-white rounded overflow-hidden"
         style={{ aspectRatio: "297/210", padding: "6% 8%", fontFamily: "Arial, sans-serif", direction: "rtl" }}
       >
         {data.logo && (

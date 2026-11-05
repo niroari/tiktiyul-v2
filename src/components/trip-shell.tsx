@@ -10,6 +10,7 @@ import { generateInviteToken } from "@/lib/firestore/trips";
 import { subscribeToPendingUpdates } from "@/lib/firestore/pending-updates";
 import { getTripNav } from "@/lib/nav";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 type Props = {
   tripId: string;
@@ -58,9 +59,9 @@ export function TripShell({ tripId, tripName, schoolName, children }: Props) {
   const userInitial = user?.displayName?.[0] ?? user?.email?.[0]?.toUpperCase() ?? "?";
 
   return (
-    <div className="min-h-screen bg-muted">
+    <div className="min-h-screen bg-muted dark:bg-background">
       {/* Top bar */}
-      <header className="fixed top-0 right-0 left-0 z-30 h-14 bg-white border-b border-border flex items-center justify-between px-4 shadow-[var(--shadow-card)]">
+      <header className="fixed top-0 right-0 left-0 z-30 h-14 bg-card border-b border-border flex items-center justify-between px-4 shadow-[var(--shadow-card)]">
         <div className="flex items-center gap-3">
           {/* Hamburger — mobile only */}
           <button
@@ -119,6 +120,9 @@ export function TripShell({ tripId, tripName, schoolName, children }: Props) {
             )}
           </Button>
 
+          {/* Theme toggle */}
+          <ThemeToggle />
+
           {/* User avatar + dropdown */}
           <UserMenu initial={userInitial} photoURL={user?.photoURL ?? null} onSignOut={handleSignOut} />
         </div>
@@ -127,7 +131,7 @@ export function TripShell({ tripId, tripName, schoolName, children }: Props) {
       {/* Sidebar */}
       <aside
         className={`
-          fixed top-14 right-0 bottom-0 z-20 w-60 bg-white border-l border-border overflow-y-auto
+          fixed top-14 right-0 bottom-0 z-20 w-60 bg-card border-l border-border overflow-y-auto
           shadow-[var(--shadow-sidebar)] transition-transform duration-200
           lg:translate-x-0
           ${sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0"}
@@ -219,7 +223,7 @@ function UserMenu({ initial, photoURL, onSignOut }: { initial: string; photoURL:
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-10 z-20 bg-white border border-border rounded-xl shadow-lg p-3 w-52 space-y-2 text-sm" dir="rtl">
+          <div className="absolute left-0 top-10 z-20 bg-popover border border-border rounded-xl shadow-lg p-3 w-52 space-y-2 text-sm" dir="rtl">
             <p className="text-xs text-muted-foreground truncate px-1">{user?.displayName ?? user?.email}</p>
             <hr className="border-border" />
             <button

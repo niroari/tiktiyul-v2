@@ -49,6 +49,8 @@
 }
 
 :root {
+  color-scheme: light;
+
   /* ── Brand ── */
   --brand: #2563eb;
   --brand-light: #eff6ff;
@@ -125,37 +127,57 @@
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
+  color-scheme: dark;
+
+  /* ── Brand & Status (Dark Mode) ── */
+  --brand: #3b82f6;
+  --brand-light: rgba(59, 130, 246, 0.18);
+  --brand-dark: #60a5fa;
+
+  --success: #4ade80;
+  --success-light: rgba(34, 197, 94, 0.16);
+  --warn: #fbbf24;
+  --warn-light: rgba(245, 158, 11, 0.16);
+  --danger: #f87171;
+  --danger-light: rgba(239, 68, 68, 0.16);
+
+  /* ── Shadows (Dark Mode) ── */
+  --shadow-card: 0 1px 4px 0 rgba(0, 0, 0, 0.35);
+  --shadow-sidebar: 2px 0 12px 0 rgba(0, 0, 0, 0.45);
+  --shadow-dropdown: 0 4px 16px 0 rgba(0, 0, 0, 0.50);
+
+  /* ── Surfaces & Text (Dark Mode) ── */
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #1e293b;
+  --card-foreground: #f1f5f9;
+  --popover: #1e293b;
+  --popover-foreground: #f1f5f9;
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: #334155;
+  --secondary-foreground: #f1f5f9;
+  --muted: #283548;
+  --muted-foreground: #94a3b8;
+  --accent: rgba(59, 130, 246, 0.18);
+  --accent-foreground: #60a5fa;
+  --destructive: #f87171;
+  --border: #334155;
+  --input: #334155;
+  --ring: #3b82f6;
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --sidebar: #1e293b;
+  --sidebar-foreground: #f1f5f9;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(59, 130, 246, 0.18);
+  --sidebar-accent-foreground: #60a5fa;
+  --sidebar-border: #334155;
+  --sidebar-ring: #3b82f6;
 }
 
 @layer base {
@@ -170,4 +192,154 @@
     @apply font-sans;
     overflow-x: hidden;
   }
+}
+
+/* ── Dark Mode Compatibility for Hardcoded Surfaces, Inputs & Badges ── */
+.dark .min-h-screen.bg-muted,
+.dark .bg-\[\#f6faf8\] {
+  background-color: var(--background) !important;
+}
+
+/* Convert bg-white cards/containers to dark card surface while preserving paper previews, signature pads, and toggle knobs */
+.dark .bg-white:not(.keep-white):not(canvas):not(img):not(span.rounded-full),
+.dark .bg-white\/90:not(.keep-white),
+.dark .bg-white\/70:not(.keep-white),
+.dark .bg-white\/60:not(.keep-white) {
+  background-color: var(--card) !important;
+}
+
+/* Recessed inputs, selects, and textareas inside dark cards for clear visibility */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.dark select,
+.dark textarea {
+  background-color: #0f172a !important;
+  color: var(--foreground) !important;
+  border-color: var(--border);
+}
+
+.dark option {
+  background-color: #1e293b;
+  color: #f1f5f9;
+}
+
+/* Forest-green headings outside paper previews */
+.dark .text-\[\#1b4332\]:not(.keep-white *) {
+  color: #6ee7b7 !important;
+}
+
+/* Amber alerts, split rows & badges */
+.dark .bg-amber-50,
+.dark .bg-amber-50\/60,
+.dark .bg-amber-50\/30,
+.dark .bg-amber-50\/20,
+.dark .bg-amber-100 {
+  background-color: rgba(245, 158, 11, 0.14) !important;
+}
+.dark .text-amber-600,
+.dark .text-amber-700,
+.dark .text-amber-700\/80,
+.dark .text-amber-800,
+.dark .text-amber-900 {
+  color: #fcd34d !important;
+}
+.dark .border-amber-200,
+.dark .border-amber-200\/80,
+.dark .border-amber-300 {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+
+/* Blue / Sky chips & badges */
+.dark .bg-blue-50,
+.dark .bg-blue-50\/50,
+.dark .bg-blue-100 {
+  background-color: rgba(59, 130, 246, 0.16) !important;
+}
+.dark .bg-blue-200 {
+  background-color: rgba(59, 130, 246, 0.28) !important;
+}
+.dark .text-blue-600,
+.dark .text-blue-700,
+.dark .text-blue-800,
+.dark .text-blue-900,
+.dark .text-blue-950 {
+  color: #93c5fd !important;
+}
+.dark .border-blue-100,
+.dark .border-blue-200,
+.dark .border-blue-300,
+.dark .border-sky-200 {
+  border-color: rgba(59, 130, 246, 0.35) !important;
+}
+
+/* Pink gender chips & badges */
+.dark .bg-pink-50 {
+  background-color: rgba(236, 72, 153, 0.16) !important;
+}
+.dark .text-pink-600,
+.dark .text-pink-700,
+.dark .text-pink-800 {
+  color: #f9a8d4 !important;
+}
+.dark .border-pink-200 {
+  border-color: rgba(236, 72, 153, 0.35) !important;
+}
+
+/* Green & Emerald badges, alerts & message boxes */
+.dark .bg-green-50,
+.dark .bg-green-100,
+.dark .bg-emerald-50,
+.dark .bg-emerald-100,
+.dark .bg-\[\#eef8f3\] {
+  background-color: rgba(16, 185, 129, 0.15) !important;
+}
+.dark .text-green-600,
+.dark .text-green-700,
+.dark .text-emerald-600,
+.dark .text-emerald-700,
+.dark .text-emerald-800,
+.dark .text-emerald-900,
+.dark .text-emerald-950 {
+  color: #6ee7b7 !important;
+}
+.dark .border-green-200,
+.dark .border-emerald-200,
+.dark .border-emerald-200\/70 {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+
+/* Red alerts & badges */
+.dark .bg-red-50 {
+  background-color: rgba(239, 68, 68, 0.15) !important;
+}
+.dark .text-red-700 {
+  color: #fca5a5 !important;
+}
+.dark .border-red-200 {
+  border-color: rgba(239, 68, 68, 0.35) !important;
+}
+
+/* Purple, Indigo & Slate chips / preview boxes */
+.dark .bg-purple-50 {
+  background-color: rgba(168, 85, 247, 0.16) !important;
+}
+.dark .text-purple-900 {
+  color: #d8b4fe !important;
+}
+.dark .border-purple-200 {
+  border-color: rgba(168, 85, 247, 0.35) !important;
+}
+.dark .bg-indigo-50 {
+  background-color: rgba(99, 102, 241, 0.16) !important;
+}
+.dark .text-indigo-900 {
+  color: #a5b4fc !important;
+}
+.dark .border-indigo-200 {
+  border-color: rgba(99, 102, 241, 0.35) !important;
+}
+.dark .bg-slate-50 {
+  background-color: #0f172a !important;
+}
+.dark .text-slate-800 {
+  color: #e2e8f0 !important;
 }

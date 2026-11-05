@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth-provider";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { listSavedForms, deleteSavedForm, type SavedFormEntry } from "@/lib/firestore/quick-forms";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -61,6 +62,7 @@ export default function QuickLibraryPage() {
             className="px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
             + כתב מינוי
           </Link>
+          <ThemeToggle />
         </div>
       </header>
 

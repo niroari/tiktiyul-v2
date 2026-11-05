@@ -54,10 +54,15 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl" className={`${alef.variable} h-full antialiased`}>
+    <html lang="he" dir="rtl" suppressHydrationWarning className={`${alef.variable} h-full antialiased`}>
       <head>
         <link rel="apple-touch-icon" href="/icon-180.png" />
         <meta name="theme-color" content="#1b4332" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{if(localStorage.getItem("tiktiyul-theme")==="dark"){document.documentElement.classList.add("dark")}}catch(e){}`,
+          }}
+        />
       </head>
       <body className="min-h-full flex flex-col bg-background text-foreground">
         <SwRegister />

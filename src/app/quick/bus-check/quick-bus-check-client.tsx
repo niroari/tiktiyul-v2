@@ -13,6 +13,7 @@ import {
 } from "@/lib/firestore/quick-forms";
 import { SignatureCanvas, SignatureCanvasHandle } from "@/components/signature-canvas";
 import { printHTML, sharePDF, esc, safeSigUrl } from "@/components/appendix-actions";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -306,6 +307,7 @@ export function QuickBusCheckClient({ savedId }: { savedId?: string }) {
                 שמור
               </button>
             )}
+            <ThemeToggle />
           </div>
         </div>
 

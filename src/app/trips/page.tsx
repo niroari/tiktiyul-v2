@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { Trip } from "@/lib/types";
 import { subscribeToUserTrips, createTrip, deleteTrip } from "@/lib/firestore/trips";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 function formatDate(iso: string) {
   if (!iso) return "";
@@ -54,16 +55,17 @@ export default function TripsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-muted">
-      <header className="sticky top-0 z-10 bg-white border-b border-border h-14 flex items-center justify-between px-6 shadow-[var(--shadow-card)]">
+    <div className="min-h-screen bg-muted dark:bg-background">
+      <header className="sticky top-0 z-10 bg-card border-b border-border h-14 flex items-center justify-between px-6 shadow-[var(--shadow-card)]">
         <span className="font-bold text-lg text-primary tracking-tight">תיק טיול</span>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <Button size="sm" onClick={() => setDialogOpen(true)}>
             <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             טיול חדש
           </Button>
+          <ThemeToggle />
           <UserAvatar user={user} onSignOut={handleSignOut} />
         </div>
       </header>
@@ -128,7 +130,7 @@ function UserAvatar({ user, onSignOut }: { user: ReturnType<typeof useAuth>["use
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-10 z-20 bg-white border border-border rounded-xl shadow-lg p-3 w-52 space-y-2 text-sm">
+          <div className="absolute left-0 top-10 z-20 bg-popover border border-border rounded-xl shadow-lg p-3 w-52 space-y-2 text-sm">
             <p className="text-xs text-muted-foreground truncate px-1">{user?.displayName ?? user?.email}</p>
             <hr className="border-border" />
             <button
@@ -250,9 +252,9 @@ function QuickFormsSection() {
     <div className="mt-10 pt-8 border-t border-border">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <Link href="/quick/bus-check"
-          className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
-          <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4.5 h-4.5 text-[#1b4332]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          className="flex items-center gap-3 p-4 bg-card border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
           </div>
@@ -263,9 +265,9 @@ function QuickFormsSection() {
         </Link>
 
         <Link href="/quick/gimel"
-          className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
-          <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4.5 h-4.5 text-[#1b4332]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          className="flex items-center gap-3 p-4 bg-card border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
@@ -276,9 +278,9 @@ function QuickFormsSection() {
         </Link>
 
         <Link href="/quick"
-          className="flex items-center gap-3 p-4 bg-white border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
-          <div className="w-9 h-9 rounded-lg bg-[#1b4332]/10 flex items-center justify-center flex-shrink-0">
-            <svg className="w-4.5 h-4.5 text-[#1b4332]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          className="flex items-center gap-3 p-4 bg-card border border-border rounded-[var(--radius)] shadow-[var(--shadow-card)] hover:shadow-md transition-shadow group">
+          <div className="w-9 h-9 rounded-lg bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+            <svg className="w-4.5 h-4.5 text-emerald-800 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
             </svg>
           </div>
