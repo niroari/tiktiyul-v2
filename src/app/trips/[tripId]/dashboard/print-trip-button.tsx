@@ -97,7 +97,7 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
         })),
         actual: (vavRaw?.actual ?? {}) as Record<string, string>,
         splits: (vavRaw?.splits ?? {}) as Record<string, string[]>,
-        splitStudents: (vavRaw?.splitStudents ?? {}) as Record<string, string[][]>,
+        splitStudents: (vavRaw?.splitStudents ?? {}) as Record<string, Record<string, string[]>>,
       };
       sections.push(buildVav(vavData, students, trip));
 

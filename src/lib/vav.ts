@@ -17,7 +17,7 @@ export type VavBus = {
   extraTeachers?: VavExtraTeacher[];
 };
 
-export type VavSplitStudents = Record<string, string[][]>;
+export type VavSplitStudents = Record<string, Record<string, string[]>>;
 
 export const SHORT_PARTS = ["א׳", "ב׳", "ג׳", "ד׳"];
 

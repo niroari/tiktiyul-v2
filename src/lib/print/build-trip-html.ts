@@ -344,7 +344,7 @@ type VavData = {
   buses: VavBus[];
   actual: Record<string, string>;
   splits: Record<string, string[]>;
-  splitStudents?: Record<string, string[][]>;
+  splitStudents?: Record<string, Record<string, string[]>>;
 };
 
 function calcEscorts(bus: VavBus): number {
@@ -478,19 +478,23 @@ export function buildVav(data: VavData, students: Student[], trip: Trip | null):
     </div>
     ${(() => {
       const goingStudents = students.filter((s) => s.isGoing);
-      const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsArr]) => {
-        if (!partsArr || partsArr.length === 0) return "";
-        const partItems = partsArr.map((studentIds, pi) => {
+      const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsData]) => {
+        if (!partsData || typeof partsData !== "object") return "";
+        const partsEntries = Array.isArray(partsData)
+          ? partsData.map((arr, i) => [i, Array.isArray(arr) ? (arr as string[]) : []] as const)
+          : Object.entries(partsData).map(([k, v]) => [parseInt(k, 10), Array.isArray(v) ? (v as string[]) : []] as const);
+
+        const partItems = partsEntries.map(([pi, studentIds]) => {
           if (!studentIds || studentIds.length === 0) return "";
           const names = studentIds
-            .map((id) => {
+            .map((id: string) => {
               const s = goingStudents.find((st) => st.id === id);
               return s ? `${s.firstName} ${s.lastName}` : "";
             })
             .filter(Boolean);
           if (names.length === 0) return "";
           return `<div style="margin-bottom:3px;font-size:8px;line-height:1.4">
-            <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi]} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
+            <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi] ?? `חלק ${pi + 1}`} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
           </div>`;
         }).filter(Boolean).join("");
 

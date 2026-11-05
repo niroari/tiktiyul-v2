@@ -47,7 +47,7 @@ type VavData = {
   days:   DayData[];
   actual: Record<string, string>;
   splits: Record<string, string[]>;
-  splitStudents?: Record<string, string[][]>;
+  splitStudents?: Record<string, Record<string, string[]>>;
 };
 
 function makeBus(): Bus {
@@ -70,10 +70,40 @@ function calcEscorts(bus: Bus): number {
     + bus.extraTeachers.filter((e) => e.name.trim()).length;
 }
 
+// Normalize splitStudents so that it stores objects with string keys { "0": [...], "1": [...] }
+// avoiding Firestore's error on nested arrays (arrays inside arrays are disallowed by Firestore)
+function normalizeSplitStudents(raw: unknown): Record<string, Record<string, string[]>> {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Record<string, Record<string, string[]>> = {};
+
+  for (const [cls, val] of Object.entries(raw as Record<string, unknown>)) {
+    if (!val) continue;
+    result[cls] = {};
+
+    if (Array.isArray(val)) {
+      // Legacy array-of-arrays format
+      val.forEach((arr, pi) => {
+        if (Array.isArray(arr)) {
+          result[cls][String(pi)] = arr.filter((x): x is string => typeof x === "string");
+        }
+      });
+    } else if (typeof val === "object") {
+      // Map format { "0": [...], "1": [...] }
+      for (const [partIdxStr, arr] of Object.entries(val as Record<string, unknown>)) {
+        if (Array.isArray(arr)) {
+          result[cls][partIdxStr] = arr.filter((x): x is string => typeof x === "string");
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
 // Migrate legacy flat `buses` array to single-day structure
 function migrateData(raw: Record<string, unknown>): VavData {
   const splits = (raw.splits as Record<string, string[]>) ?? {};
-  const splitStudents = (raw.splitStudents as Record<string, string[][]>) ?? {};
+  const splitStudents = normalizeSplitStudents(raw.splitStudents);
   const actual = (raw.actual as Record<string, string>) ?? {};
 
   if (Array.isArray(raw.days) && raw.days.length > 0) {
@@ -127,6 +157,8 @@ export function AppendixVavClient() {
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
+  const latestDataRef = useRef(data);
+  latestDataRef.current = data;
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
@@ -135,24 +167,48 @@ export function AppendixVavClient() {
       if (isPending.current) return;
       if (raw) setData(migrateData(raw as Record<string, unknown>));
     });
-    return () => unsub();
+    return () => {
+      unsub();
+      clearTimeout(saveTimer.current);
+      if (isPending.current && latestDataRef.current) {
+        saveAppendix(tripId, "vav", latestDataRef.current as unknown as Record<string, unknown>).catch((err) => {
+          console.error("Failed to flush appendix vav on unmount:", err);
+        });
+      }
+    };
   }, [tripId]);
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
-  function save(updated: VavData) {
+  function save(updated: VavData, immediate = false) {
     isPending.current = true;
     setStatus("saving");
     clearTimeout(saveTimer.current);
-    saveTimer.current = setTimeout(async () => {
-      await saveAppendix(tripId, "vav", updated as unknown as Record<string, unknown>);
-      isPending.current = false;
-      setStatus("saved");
-      setTimeout(() => setStatus("idle"), 2000);
-    }, 1200);
+
+    const executeSave = async () => {
+      try {
+        await saveAppendix(tripId, "vav", updated as unknown as Record<string, unknown>);
+        setStatus("saved");
+        setTimeout(() => setStatus("idle"), 2000);
+      } catch (err) {
+        console.error("Failed to save appendix vav:", err);
+        setStatus("idle");
+      } finally {
+        isPending.current = false;
+      }
+    };
+
+    if (immediate) {
+      void executeSave();
+    } else {
+      saveTimer.current = setTimeout(executeSave, 1000);
+    }
   }
 
-  function update(updated: VavData) { setData(updated); save(updated); }
+  function update(updated: VavData, immediate = false) {
+    setData(updated);
+    save(updated, immediate);
+  }
 
   // ── Day mutations ──────────────────────────────────────────────────────────
 
@@ -280,7 +336,7 @@ export function AppendixVavClient() {
     update({
       ...data,
       splits: { ...data.splits, [cls]: ["", ""] },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: [[], []] },
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: { "0": [], "1": [] } },
     });
   }
 
@@ -298,7 +354,7 @@ export function AppendixVavClient() {
         ),
       })),
     }));
-    update({ ...data, splits, splitStudents, days });
+    update({ ...data, splits, splitStudents, days }, true);
   }
 
   function setSplitCount(cls: string, partIdx: number, val: string) {
@@ -310,14 +366,14 @@ export function AppendixVavClient() {
   function addSplitPart(cls: string) {
     const parts = [...(data.splits[cls] ?? [])];
     if (parts.length >= 4) return;
+    const newIdx = parts.length;
     parts.push("");
-    const studentParts = [...(data.splitStudents?.[cls] ?? [])];
-    while (studentParts.length < parts.length - 1) studentParts.push([]);
-    studentParts.push([]);
+    const clsMap = { ...(data.splitStudents?.[cls] ?? {}) };
+    clsMap[String(newIdx)] = [];
     update({
       ...data,
       splits: { ...data.splits, [cls]: parts },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: studentParts },
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: clsMap },
     });
   }
 
@@ -326,8 +382,8 @@ export function AppendixVavClient() {
     if (parts.length <= 2) return;
     const removedPartIdx = parts.length - 1;
     parts.pop();
-    const studentParts = [...(data.splitStudents?.[cls] ?? [])];
-    if (studentParts.length > parts.length) studentParts.pop();
+    const clsMap = { ...(data.splitStudents?.[cls] ?? {}) };
+    delete clsMap[String(removedPartIdx)];
     const removedKey = splitKey(cls, removedPartIdx);
     const days = data.days.map((d) => ({
       ...d,
@@ -339,7 +395,7 @@ export function AppendixVavClient() {
     update({
       ...data,
       splits: { ...data.splits, [cls]: parts },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: studentParts },
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: clsMap },
       days,
     });
   }
@@ -351,11 +407,18 @@ export function AppendixVavClient() {
       return assignedCount > 0 ? String(assignedCount) : (count || "");
     });
 
-    update({
+    const partsMap: Record<string, string[]> = {};
+    newSplitStudents.forEach((ids, pi) => {
+      partsMap[String(pi)] = ids;
+    });
+
+    const updated: VavData = {
       ...data,
       splits: { ...data.splits, [cls]: updatedParts },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: newSplitStudents },
-    });
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: partsMap },
+    };
+
+    update(updated, true);
   }
 
   // ── Computed ───────────────────────────────────────────────────────────────
@@ -378,7 +441,7 @@ export function AppendixVavClient() {
     bus.classSelections.filter(Boolean).forEach((sel) => {
       if (isSplitSel(sel)) {
         const [cls, part] = parseSplit(sel);
-        const studentIds = data.splitStudents?.[cls]?.[part] ?? [];
+        const studentIds = data.splitStudents?.[cls]?.[part] ?? data.splitStudents?.[cls]?.[String(part)] ?? [];
         studentIds.forEach((id) => {
           if (!seen.has(id)) {
             seen.add(id);
@@ -552,19 +615,23 @@ export function AppendixVavClient() {
       </div>`).join("");
 
     // Detailed Split Students Roster for Print
-    const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsArr]) => {
-      if (!partsArr || partsArr.length === 0) return "";
-      const partItems = partsArr.map((studentIds, pi) => {
+    const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsData]) => {
+      if (!partsData || typeof partsData !== "object") return "";
+      const partsEntries = Array.isArray(partsData)
+        ? partsData.map((arr, i) => [i, Array.isArray(arr) ? (arr as string[]) : []] as const)
+        : Object.entries(partsData).map(([k, v]) => [parseInt(k, 10), Array.isArray(v) ? (v as string[]) : []] as const);
+
+      const partItems = partsEntries.map(([pi, studentIds]) => {
         if (!studentIds || studentIds.length === 0) return "";
         const names = studentIds
-          .map((id) => {
+          .map((id: string) => {
             const s = goingStudents.find((st) => st.id === id);
             return s ? `${s.firstName} ${s.lastName}` : "";
           })
           .filter(Boolean);
         if (names.length === 0) return "";
         return `<div style="margin-bottom:4px;font-size:10px;line-height:1.4">
-          <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi]} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
+          <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi] ?? `חלק ${pi + 1}`} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
         </div>`;
       }).filter(Boolean).join("");
 
@@ -974,7 +1041,7 @@ export function AppendixVavClient() {
                       </td>
                     </tr>
                     {isSplit && parts.map((count, pi) => {
-                      const partStudentIds = data.splitStudents?.[cls]?.[pi] ?? [];
+                      const partStudentIds = data.splitStudents?.[cls]?.[pi] ?? data.splitStudents?.[cls]?.[String(pi)] ?? [];
                       const assignedStudents = partStudentIds
                         .map((id) => goingStudents.find((s) => s.id === id))
                         .filter(Boolean) as Student[];
@@ -1077,7 +1144,13 @@ export function AppendixVavClient() {
           className={splitModalClass}
           students={goingStudents.filter((s) => s.class === splitModalClass)}
           partsCount={data.splits[splitModalClass]?.length || 2}
-          initialPartStudents={data.splitStudents?.[splitModalClass] ?? []}
+          initialPartStudents={Array.from(
+            { length: data.splits[splitModalClass]?.length || 2 },
+            (_, pi) =>
+              data.splitStudents?.[splitModalClass]?.[pi] ??
+              data.splitStudents?.[splitModalClass]?.[String(pi)] ??
+              []
+          )}
           onSave={(newPartStudents) => handleSaveSplitStudents(splitModalClass, newPartStudents)}
         />
       )}
