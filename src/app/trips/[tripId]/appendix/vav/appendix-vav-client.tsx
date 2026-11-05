@@ -7,6 +7,13 @@ import { useTrip } from "@/hooks/use-trip";
 import { useStudents } from "@/hooks/use-students";
 import { useStaff } from "@/hooks/use-staff";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { AppendixActions, esc } from "@/components/appendix-actions";
 import type { Student } from "@/lib/types";
 import { SplitStudentsDialog } from "./split-students-dialog";
@@ -154,6 +161,9 @@ export function AppendixVavClient() {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const [splitModalClass, setSplitModalClass] = useState<string | null>(null);
   const [openBusRosters, setOpenBusRosters] = useState<Set<string>>(new Set());
+  const [exportTarget, setExportTarget] = useState<{ cls: string; partIdx: number | "all" } | null>(null);
+  const [exportIncludePhones, setExportIncludePhones] = useState(false);
+  const [copiedPartKey, setCopiedPartKey] = useState<string | null>(null);
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
@@ -432,6 +442,87 @@ export function AppendixVavClient() {
       else next.add(busId);
       return next;
     });
+  }
+
+  function getPartAssignedStudents(cls: string, partIdx: number): Student[] {
+    const partStudentIds =
+      data.splitStudents?.[cls]?.[partIdx] ??
+      data.splitStudents?.[cls]?.[String(partIdx)] ??
+      [];
+    return (partStudentIds
+      .map((id) => goingStudents.find((s) => s.id === id))
+      .filter(Boolean) as Student[])
+      .sort((a, b) => {
+        const l = (a.lastName || "").localeCompare(b.lastName || "", "he");
+        return l !== 0 ? l : (a.firstName || "").localeCompare(b.firstName || "", "he");
+      });
+  }
+
+  function getPartBusLabels(cls: string, partIdx: number): string[] {
+    const key = splitKey(cls, partIdx);
+    const labels: string[] = [];
+    data.days.forEach((day) => {
+      day.buses.forEach((bus, bi) => {
+        if (bus.classSelections.includes(key)) {
+          const label = data.days.length > 1 ? `${day.label} — אוטובוס ${bi + 1}` : `אוטובוס ${bi + 1}`;
+          if (!labels.includes(label)) labels.push(label);
+        }
+      });
+    });
+    return labels;
+  }
+
+  function buildPartWhatsAppText(cls: string, partIdx: number, includePhones = false): string {
+    const partStudents = getPartAssignedStudents(cls, partIdx);
+    const busLabels = getPartBusLabels(cls, partIdx);
+    const headerLines = [
+      `*רשימת תלמידים — כיתה ${cls} (${PART_LABELS[partIdx]})*`,
+      ...(trip?.name ? [`📍 ${trip.name}${trip.schoolName ? ` | ${trip.schoolName}` : ""}`] : []),
+      `${busLabels.length > 0 ? `🚌 ${busLabels.join(", ")} | ` : ""}סה״כ: *${partStudents.length} תלמידים*`,
+    ];
+    const studentLines = partStudents.map((s, idx) => {
+      const phoneSuffix = includePhones && s.phone ? ` (${s.phone})` : "";
+      return `${idx + 1}. ${s.firstName} ${s.lastName}${phoneSuffix}`;
+    });
+    return `${headerLines.join("\n")}\n\n${studentLines.join("\n")}`;
+  }
+
+  function buildAllPartsWhatsAppText(cls: string, includePhones = false): string {
+    const parts = data.splits[cls] ?? [];
+    const sections = parts
+      .map((_, pi) => {
+        const partStudents = getPartAssignedStudents(cls, pi);
+        if (partStudents.length === 0) return "";
+        const busLabels = getPartBusLabels(cls, pi);
+        const busSuffix = busLabels.length > 0 ? ` — 🚌 ${busLabels.join(", ")}` : "";
+        const lines = partStudents.map((s, idx) => {
+          const phoneSuffix = includePhones && s.phone ? ` (${s.phone})` : "";
+          return `${idx + 1}. ${s.firstName} ${s.lastName}${phoneSuffix}`;
+        });
+        return `*${PART_LABELS[pi]} (${partStudents.length} תלמידים)*${busSuffix}\n${lines.join("\n")}`;
+      })
+      .filter(Boolean);
+
+    const header = [
+      `*חלוקת תלמידים — כיתה ${cls}*`,
+      ...(trip?.name ? [`📍 ${trip.name}${trip.schoolName ? ` | ${trip.schoolName}` : ""}`] : []),
+    ].join("\n");
+
+    return `${header}\n\n${sections.join("\n\n")}`;
+  }
+
+  async function copySplitText(text: string, key: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedPartKey(key);
+      setTimeout(() => setCopiedPartKey(null), 2200);
+    } catch (err) {
+      console.error("Failed to copy split list:", err);
+    }
+  }
+
+  function openWhatsAppWithText(text: string) {
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
   function getBusAssignedStudents(bus: Bus): Student[] {
@@ -1041,14 +1132,12 @@ export function AppendixVavClient() {
                       </td>
                     </tr>
                     {isSplit && parts.map((count, pi) => {
-                      const partStudentIds = data.splitStudents?.[cls]?.[pi] ?? data.splitStudents?.[cls]?.[String(pi)] ?? [];
-                      const assignedStudents = partStudentIds
-                        .map((id) => goingStudents.find((s) => s.id === id))
-                        .filter(Boolean) as Student[];
+                      const assignedStudents = getPartAssignedStudents(cls, pi);
                       const hasAssigned = assignedStudents.length > 0;
                       const previewNames = assignedStudents.slice(0, 3).map((s) => `${s.firstName} ${s.lastName}`).join(", ");
                       const extraCount = assignedStudents.length - 3;
                       const fullNamesTitle = assignedStudents.map((s) => `${s.firstName} ${s.lastName}`).join(", ");
+                      const partCopyKey = `${cls}|${pi}`;
 
                       return (
                         <tr key={`${cls}-${pi}`} className="border-b border-border bg-amber-50/30 hover:bg-amber-50/60">
@@ -1082,9 +1171,38 @@ export function AppendixVavClient() {
                                 </svg>
                                 {hasAssigned ? `${assignedStudents.length} שובצו` : "+ שיוך שמות"}
                               </button>
+
+                              {/* Export / WhatsApp button next to each split part */}
+                              <button
+                                type="button"
+                                onClick={() => setExportTarget({ cls, partIdx: pi })}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1.5 ${
+                                  hasAssigned
+                                    ? "bg-emerald-50 border-emerald-200 text-emerald-700 font-medium hover:bg-emerald-100"
+                                    : "bg-white border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                                }`}
+                                title={hasAssigned ? `ייצוא ושליחת רשימת ${PART_LABELS[pi]} בוואטסאפ` : "ייצוא רשימת שמות לוואטסאפ"}
+                              >
+                                <svg className="w-3.5 h-3.5 text-emerald-600" viewBox="0 0 24 24" fill="currentColor">
+                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                                </svg>
+                                ייצוא רשימה
+                              </button>
+
+                              {hasAssigned && (
+                                <button
+                                  type="button"
+                                  onClick={() => copySplitText(buildPartWhatsAppText(cls, pi, exportIncludePhones), partCopyKey)}
+                                  className="text-xs px-2 py-1 rounded-full border border-border bg-white text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+                                  title="העתק רשימת שמות ללוח"
+                                >
+                                  {copiedPartKey === partCopyKey ? "הועתק ✓" : "העתק"}
+                                </button>
+                              )}
+
                               {hasAssigned && (
                                 <span
-                                  className="text-xs text-muted-foreground truncate max-w-[260px] cursor-help"
+                                  className="text-xs text-muted-foreground truncate max-w-[220px] cursor-help"
                                   title={fullNamesTitle}
                                 >
                                   {previewNames}{extraCount > 0 ? ` ועוד ${extraCount}...` : ""}
@@ -1154,6 +1272,135 @@ export function AppendixVavClient() {
           onSave={(newPartStudents) => handleSaveSplitStudents(splitModalClass, newPartStudents)}
         />
       )}
+
+      {/* Export / WhatsApp Split Roster Dialog */}
+      {exportTarget && (() => {
+        const { cls, partIdx } = exportTarget;
+        const parts = data.splits[cls] ?? [];
+        const currentStudents =
+          partIdx === "all"
+            ? parts.flatMap((_, pi) => getPartAssignedStudents(cls, pi))
+            : getPartAssignedStudents(cls, partIdx);
+        const formattedText =
+          partIdx === "all"
+            ? buildAllPartsWhatsAppText(cls, exportIncludePhones)
+            : buildPartWhatsAppText(cls, partIdx, exportIncludePhones);
+        const modalCopyKey = `modal-${cls}-${partIdx}`;
+
+        return (
+          <Dialog open={!!exportTarget} onOpenChange={(open) => { if (!open) setExportTarget(null); }}>
+            <DialogContent className="sm:max-w-md" dir="rtl">
+              <DialogHeader>
+                <DialogTitle className="text-base font-semibold text-foreground">
+                  ייצוא רשימת תלמידים — כיתה {cls} {partIdx !== "all" ? `(${PART_LABELS[partIdx]})` : "(כל החלקים)"}
+                </DialogTitle>
+              </DialogHeader>
+
+              {/* Part selector pills */}
+              <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {parts.map((_, pi) => {
+                    const count = getPartAssignedStudents(cls, pi).length;
+                    const active = partIdx === pi;
+                    return (
+                      <button
+                        key={pi}
+                        type="button"
+                        onClick={() => setExportTarget({ cls, partIdx: pi })}
+                        className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                          active
+                            ? "bg-primary text-primary-foreground border-primary font-medium"
+                            : "bg-white border-border text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {PART_LABELS[pi]} ({count})
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => setExportTarget({ cls, partIdx: "all" })}
+                    className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
+                      partIdx === "all"
+                        ? "bg-primary text-primary-foreground border-primary font-medium"
+                        : "bg-white border-border text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    כל החלקים
+                  </button>
+                </div>
+
+                <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={exportIncludePhones}
+                    onChange={(e) => setExportIncludePhones(e.target.checked)}
+                    className="rounded border-border text-primary focus:ring-primary"
+                  />
+                  כלול מספרי טלפון
+                </label>
+              </div>
+
+              {currentStudents.length === 0 ? (
+                <div className="rounded-[var(--radius-sm)] border border-border bg-muted/30 p-6 text-center space-y-3 my-2">
+                  <p className="text-sm text-muted-foreground">
+                    טרם שובצו שמות תלמידים ל{partIdx === "all" ? `כיתה ${cls}` : `${PART_LABELS[partIdx]} בכיתה ${cls}`}.
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      const targetCls = cls;
+                      setExportTarget(null);
+                      setSplitModalClass(targetCls);
+                    }}
+                  >
+                    שבץ שמות תלמידים כעת
+                  </Button>
+                </div>
+              ) : (
+                <div className="my-2">
+                  <textarea
+                    readOnly
+                    value={formattedText}
+                    rows={10}
+                    className="w-full text-xs leading-relaxed border border-border rounded-[var(--radius-sm)] p-3 bg-muted/30 text-foreground focus:outline-none resize-none font-sans"
+                  />
+                </div>
+              )}
+
+              <DialogFooter className="flex-row items-center justify-between sm:justify-between gap-2">
+                <Button variant="outline" size="sm" onClick={() => setExportTarget(null)}>
+                  סגור
+                </Button>
+                {currentStudents.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => copySplitText(formattedText, modalCopyKey)}
+                    >
+                      {copiedPartKey === modalCopyKey ? "הועתק ללוח ✓" : "העתק רשימה"}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => openWhatsAppWithText(formattedText)}
+                      className="bg-emerald-600 text-white hover:bg-emerald-700"
+                    >
+                      <svg className="w-4 h-4 ml-1.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                      </svg>
+                      שלח בוואטסאפ
+                    </Button>
+                  </div>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        );
+      })()}
 
       <AppendixActions title="נספח ו׳ — טבלת שליטה בטיול" getHTML={getHTML} />
     </div>
