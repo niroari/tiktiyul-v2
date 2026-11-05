@@ -8,6 +8,8 @@ import { useStudents } from "@/hooks/use-students";
 import { useStaff } from "@/hooks/use-staff";
 import { Button } from "@/components/ui/button";
 import { AppendixActions, esc } from "@/components/appendix-actions";
+import type { Student } from "@/lib/types";
+import { SplitStudentsDialog } from "./split-students-dialog";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,7 @@ type VavData = {
   days:   DayData[];
   actual: Record<string, string>;
   splits: Record<string, string[]>;
+  splitStudents?: Record<string, string[][]>;
 };
 
 function makeBus(): Bus {
@@ -70,6 +73,7 @@ function calcEscorts(bus: Bus): number {
 // Migrate legacy flat `buses` array to single-day structure
 function migrateData(raw: Record<string, unknown>): VavData {
   const splits = (raw.splits as Record<string, string[]>) ?? {};
+  const splitStudents = (raw.splitStudents as Record<string, string[][]>) ?? {};
   const actual = (raw.actual as Record<string, string>) ?? {};
 
   if (Array.isArray(raw.days) && raw.days.length > 0) {
@@ -85,6 +89,7 @@ function migrateData(raw: Record<string, unknown>): VavData {
       })),
       actual,
       splits,
+      splitStudents,
     };
   }
 
@@ -102,6 +107,7 @@ function migrateData(raw: Record<string, unknown>): VavData {
     days: [{ id: crypto.randomUUID(), label: "יום 1", buses: legacyBuses }],
     actual,
     splits,
+    splitStudents,
   };
 }
 
@@ -113,9 +119,11 @@ export function AppendixVavClient() {
   const { students } = useStudents(tripId);
   const { staff }    = useStaff(tripId);
 
-  const [data,    setData]    = useState<VavData>({ days: [], actual: {}, splits: {} });
+  const [data,    setData]    = useState<VavData>({ days: [], actual: {}, splits: {}, splitStudents: {} });
   const [status,  setStatus]  = useState<"idle" | "saving" | "saved">("idle");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [splitModalClass, setSplitModalClass] = useState<string | null>(null);
+  const [openBusRosters, setOpenBusRosters] = useState<Set<string>>(new Set());
 
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
@@ -269,12 +277,18 @@ export function AppendixVavClient() {
   }
 
   function splitClass(cls: string) {
-    update({ ...data, splits: { ...data.splits, [cls]: ["", ""] } });
+    update({
+      ...data,
+      splits: { ...data.splits, [cls]: ["", ""] },
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: [[], []] },
+    });
   }
 
   function unsplitClass(cls: string) {
     const splits = { ...data.splits };
     delete splits[cls];
+    const splitStudents = { ...(data.splitStudents ?? {}) };
+    delete splitStudents[cls];
     const days = data.days.map((d) => ({
       ...d,
       buses: d.buses.map((b) => ({
@@ -284,7 +298,7 @@ export function AppendixVavClient() {
         ),
       })),
     }));
-    update({ ...data, splits, days });
+    update({ ...data, splits, splitStudents, days });
   }
 
   function setSplitCount(cls: string, partIdx: number, val: string) {
@@ -297,7 +311,14 @@ export function AppendixVavClient() {
     const parts = [...(data.splits[cls] ?? [])];
     if (parts.length >= 4) return;
     parts.push("");
-    update({ ...data, splits: { ...data.splits, [cls]: parts } });
+    const studentParts = [...(data.splitStudents?.[cls] ?? [])];
+    while (studentParts.length < parts.length - 1) studentParts.push([]);
+    studentParts.push([]);
+    update({
+      ...data,
+      splits: { ...data.splits, [cls]: parts },
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: studentParts },
+    });
   }
 
   function removeSplitPart(cls: string) {
@@ -305,6 +326,8 @@ export function AppendixVavClient() {
     if (parts.length <= 2) return;
     const removedPartIdx = parts.length - 1;
     parts.pop();
+    const studentParts = [...(data.splitStudents?.[cls] ?? [])];
+    if (studentParts.length > parts.length) studentParts.pop();
     const removedKey = splitKey(cls, removedPartIdx);
     const days = data.days.map((d) => ({
       ...d,
@@ -313,12 +336,61 @@ export function AppendixVavClient() {
         classSelections: b.classSelections.map((sel) => (sel === removedKey ? "" : sel)),
       })),
     }));
-    update({ ...data, splits: { ...data.splits, [cls]: parts }, days });
+    update({
+      ...data,
+      splits: { ...data.splits, [cls]: parts },
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: studentParts },
+      days,
+    });
+  }
+
+  function handleSaveSplitStudents(cls: string, newSplitStudents: string[][]) {
+    const currentParts = data.splits[cls] ?? [];
+    const updatedParts = currentParts.map((count, pi) => {
+      const assignedCount = newSplitStudents[pi]?.length ?? 0;
+      return assignedCount > 0 ? String(assignedCount) : (count || "");
+    });
+
+    update({
+      ...data,
+      splits: { ...data.splits, [cls]: updatedParts },
+      splitStudents: { ...(data.splitStudents ?? {}), [cls]: newSplitStudents },
+    });
   }
 
   // ── Computed ───────────────────────────────────────────────────────────────
 
   const goingStudents = students.filter((s) => s.isGoing);
+
+  function toggleBusRoster(busId: string) {
+    setOpenBusRosters((prev) => {
+      const next = new Set(prev);
+      if (next.has(busId)) next.delete(busId);
+      else next.add(busId);
+      return next;
+    });
+  }
+
+  function getBusAssignedStudents(bus: Bus): Student[] {
+    const result: Student[] = [];
+    const seen = new Set<string>();
+
+    bus.classSelections.filter(Boolean).forEach((sel) => {
+      if (isSplitSel(sel)) {
+        const [cls, part] = parseSplit(sel);
+        const studentIds = data.splitStudents?.[cls]?.[part] ?? [];
+        studentIds.forEach((id) => {
+          if (!seen.has(id)) {
+            seen.add(id);
+            const st = goingStudents.find((s) => s.id === id);
+            if (st) result.push(st);
+          }
+        });
+      }
+    });
+
+    return result;
+  }
   const plannedByClass: Record<string, number> = {};
   goingStudents.forEach((s) => { plannedByClass[s.class] = (plannedByClass[s.class] ?? 0) + 1; });
   const classNames = Object.keys(plannedByClass).sort((a, b) => a.localeCompare(b, "he"));
@@ -479,6 +551,33 @@ export function AppendixVavClient() {
         ${dayTable(day)}
       </div>`).join("");
 
+    // Detailed Split Students Roster for Print
+    const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsArr]) => {
+      if (!partsArr || partsArr.length === 0) return "";
+      const partItems = partsArr.map((studentIds, pi) => {
+        if (!studentIds || studentIds.length === 0) return "";
+        const names = studentIds
+          .map((id) => {
+            const s = goingStudents.find((st) => st.id === id);
+            return s ? `${s.firstName} ${s.lastName}` : "";
+          })
+          .filter(Boolean);
+        if (names.length === 0) return "";
+        return `<div style="margin-bottom:4px;font-size:10px;line-height:1.4">
+          <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi]} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
+        </div>`;
+      }).filter(Boolean).join("");
+
+      if (!partItems) return "";
+      return `<div style="margin-bottom:6px">${partItems}</div>`;
+    }).filter(Boolean).join("");
+
+    const splitSection = splitDetailsHTML ? `
+      <div style="margin-top:14px;padding:8px 10px;background:#f9fbf9;border:1px solid #c3e6cb;border-radius:4px;page-break-inside:avoid">
+        <div style="font-size:11px;font-weight:bold;color:#1b4332;margin-bottom:5px">פירוט שמות תלמידים בכיתות מפוצלות:</div>
+        ${splitDetailsHTML}
+      </div>` : "";
+
     return `
       <div class="header">
         <div class="title">נספח ו׳ — טבלת שליטה בטיול</div>
@@ -505,6 +604,7 @@ export function AppendixVavClient() {
           </table>
         </div>
       </div>
+      ${splitSection}
     `;
   }
 
@@ -629,6 +729,47 @@ export function AppendixVavClient() {
                             ))}
                           </div>
                         )}
+
+                        {/* Bus assigned students roster expander */}
+                        {(() => {
+                          const busStudents = getBusAssignedStudents(bus);
+                          if (busStudents.length === 0) return null;
+                          const isRosterOpen = openBusRosters.has(bus.id);
+                          return (
+                            <div className="mt-2.5 pt-2 border-t border-border/40">
+                              <button
+                                type="button"
+                                onClick={() => toggleBusRoster(bus.id)}
+                                className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                              >
+                                <svg
+                                  className={`w-3.5 h-3.5 transition-transform ${isRosterOpen ? "rotate-90" : ""}`}
+                                  fill="none"
+                                  stroke="currentColor"
+                                  viewBox="0 0 24 24"
+                                >
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                                {isRosterOpen
+                                  ? "הסתר שמות תלמידים משובצים"
+                                  : `הצג שמות תלמידים משובצים (${busStudents.length})`}
+                              </button>
+                              {isRosterOpen && (
+                                <div className="mt-1.5 flex flex-wrap gap-1.5 p-2 bg-white/70 rounded-[var(--radius-sm)] border border-border/50 max-h-36 overflow-y-auto">
+                                  {busStudents.map((s) => (
+                                    <span
+                                      key={s.id}
+                                      className="text-xs bg-muted/80 text-foreground px-2 py-0.5 rounded-full border border-border/40"
+                                    >
+                                      {s.firstName} {s.lastName}
+                                      <span className="text-muted-foreground text-[10px] mr-1">({s.class})</span>
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
 
                       {/* Crew table */}
@@ -811,34 +952,82 @@ export function AppendixVavClient() {
                             ↕ פצל
                           </button>
                         ) : (
-                          <button
-                            onClick={() => unsplitClass(cls)}
-                            className="text-xs text-destructive/70 hover:text-destructive border border-destructive/30 rounded px-2 py-0.5 transition-colors"
-                          >
-                            ✕ בטל
-                          </button>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => setSplitModalClass(cls)}
+                              className="text-xs text-primary hover:text-primary/80 border border-primary/30 rounded px-2 py-0.5 transition-colors bg-white font-medium"
+                              title="ערוך חלוקת תלמידים"
+                            >
+                              שיוך שמות
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => unsplitClass(cls)}
+                              className="text-xs text-destructive/70 hover:text-destructive border border-destructive/30 rounded px-2 py-0.5 transition-colors"
+                              title="בטל פיצול כיתה"
+                            >
+                              ✕ בטל
+                            </button>
+                          </div>
                         )}
                       </td>
                     </tr>
-                    {isSplit && parts.map((count, pi) => (
-                      <tr key={`${cls}-${pi}`} className="border-b border-border bg-amber-50/30 hover:bg-amber-50/60">
-                        <td className="px-4 py-1.5 text-xs text-muted-foreground pr-8">
-                          <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 ml-1.5" />
-                          {PART_LABELS[pi]}
-                        </td>
-                        <td className="px-4 py-1.5 text-center">
-                          <input
-                            type="number"
-                            min="0"
-                            value={count}
-                            onChange={(e) => setSplitCount(cls, pi, e.target.value)}
-                            placeholder="כמות"
-                            className="w-20 text-sm text-center border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors"
-                          />
-                        </td>
-                        <td colSpan={2} />
-                      </tr>
-                    ))}
+                    {isSplit && parts.map((count, pi) => {
+                      const partStudentIds = data.splitStudents?.[cls]?.[pi] ?? [];
+                      const assignedStudents = partStudentIds
+                        .map((id) => goingStudents.find((s) => s.id === id))
+                        .filter(Boolean) as Student[];
+                      const hasAssigned = assignedStudents.length > 0;
+                      const previewNames = assignedStudents.slice(0, 3).map((s) => `${s.firstName} ${s.lastName}`).join(", ");
+                      const extraCount = assignedStudents.length - 3;
+                      const fullNamesTitle = assignedStudents.map((s) => `${s.firstName} ${s.lastName}`).join(", ");
+
+                      return (
+                        <tr key={`${cls}-${pi}`} className="border-b border-border bg-amber-50/30 hover:bg-amber-50/60">
+                          <td className="px-4 py-1.5 text-xs text-muted-foreground pr-8">
+                            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400 ml-1.5" />
+                            {PART_LABELS[pi]}
+                          </td>
+                          <td className="px-4 py-1.5 text-center">
+                            <input
+                              type="number"
+                              min="0"
+                              value={count}
+                              onChange={(e) => setSplitCount(cls, pi, e.target.value)}
+                              placeholder="כמות"
+                              className="w-20 text-sm text-center border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors"
+                            />
+                          </td>
+                          <td colSpan={2} className="px-3 py-1.5">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <button
+                                type="button"
+                                onClick={() => setSplitModalClass(cls)}
+                                className={`text-xs px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1.5 ${
+                                  hasAssigned
+                                    ? "bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20"
+                                    : "bg-white border-border text-muted-foreground hover:text-foreground hover:bg-muted"
+                                }`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                                {hasAssigned ? `${assignedStudents.length} שובצו` : "+ שיוך שמות"}
+                              </button>
+                              {hasAssigned && (
+                                <span
+                                  className="text-xs text-muted-foreground truncate max-w-[260px] cursor-help"
+                                  title={fullNamesTitle}
+                                >
+                                  {previewNames}{extraCount > 0 ? ` ועוד ${extraCount}...` : ""}
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                     {isSplit && (
                       <tr key={`${cls}-actions`} className="border-b border-border bg-amber-50/20">
                         <td colSpan={4} className="px-8 py-1">
@@ -879,6 +1068,18 @@ export function AppendixVavClient() {
             </tfoot>
           </table>
         </div>
+      )}
+
+      {splitModalClass && (
+        <SplitStudentsDialog
+          open={!!splitModalClass}
+          onOpenChange={(open) => { if (!open) setSplitModalClass(null); }}
+          className={splitModalClass}
+          students={goingStudents.filter((s) => s.class === splitModalClass)}
+          partsCount={data.splits[splitModalClass]?.length || 2}
+          initialPartStudents={data.splitStudents?.[splitModalClass] ?? []}
+          onSave={(newPartStudents) => handleSaveSplitStudents(splitModalClass, newPartStudents)}
+        />
       )}
 
       <AppendixActions title="נספח ו׳ — טבלת שליטה בטיול" getHTML={getHTML} />

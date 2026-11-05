@@ -340,7 +340,12 @@ function splitLabel(cls: string, part: number) { return `${cls} — ${PART_LABEL
 type CrewMember = { name: string; phone: string };
 type ExtraTeacher = { role: string; name: string; phone: string };
 type VavBus = { id: string; classSelections: string[]; crew: CrewMember[]; extraTeachers: ExtraTeacher[] };
-type VavData = { buses: VavBus[]; actual: Record<string, string>; splits: Record<string, string[]> };
+type VavData = {
+  buses: VavBus[];
+  actual: Record<string, string>;
+  splits: Record<string, string[]>;
+  splitStudents?: Record<string, string[][]>;
+};
 
 function calcEscorts(bus: VavBus): number {
   return bus.crew.filter((c, i) => i !== DRIVER_IDX && c.name.trim()).length
@@ -470,7 +475,35 @@ export function buildVav(data: VavData, students: Student[], trip: Trip | null):
           <tbody>${summaryRows}</tbody>
         </table>
       </div>
-    </div>`;
+    </div>
+    ${(() => {
+      const goingStudents = students.filter((s) => s.isGoing);
+      const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsArr]) => {
+        if (!partsArr || partsArr.length === 0) return "";
+        const partItems = partsArr.map((studentIds, pi) => {
+          if (!studentIds || studentIds.length === 0) return "";
+          const names = studentIds
+            .map((id) => {
+              const s = goingStudents.find((st) => st.id === id);
+              return s ? `${s.firstName} ${s.lastName}` : "";
+            })
+            .filter(Boolean);
+          if (names.length === 0) return "";
+          return `<div style="margin-bottom:3px;font-size:8px;line-height:1.4">
+            <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi]} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
+          </div>`;
+        }).filter(Boolean).join("");
+
+        if (!partItems) return "";
+        return `<div style="margin-bottom:4px">${partItems}</div>`;
+      }).filter(Boolean).join("");
+
+      return splitDetailsHTML ? `
+        <div style="margin-top:10px;padding:6px 8px;background:#f9fbf9;border:1px solid #c3e6cb;border-radius:4px;page-break-inside:avoid">
+          <div style="font-size:9px;font-weight:bold;color:#1b4332;margin-bottom:3px">פירוט שמות תלמידים בכיתות מפוצלות:</div>
+          ${splitDetailsHTML}
+        </div>` : "";
+    })()}`;
 }
 
 // ─── Appendix ז ──────────────────────────────────────────────────────────────
