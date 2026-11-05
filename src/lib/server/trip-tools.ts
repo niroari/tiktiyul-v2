@@ -1010,8 +1010,20 @@ export async function getSecurityApprovalDetails(
     };
   }
 
-  const data = secDoc.data() as { fileUrl?: string; fileName?: string };
-  if (!data?.fileUrl) {
+  const data = secDoc.data() as {
+    fileUrl?: string;
+    fileName?: string;
+    files?: Array<{ fileUrl: string; fileName?: string; title?: string }>;
+  };
+
+  const fileList =
+    Array.isArray(data?.files) && data.files.length > 0
+      ? data.files.filter((f) => f.fileUrl)
+      : data?.fileUrl
+      ? [{ fileUrl: data.fileUrl, fileName: data.fileName }]
+      : [];
+
+  if (fileList.length === 0) {
     return {
       hasFile: false,
       message: "האישור הביטחוני עדיין ריק או שלא צורף קישור תקין לקובץ.",
@@ -1019,10 +1031,20 @@ export async function getSecurityApprovalDetails(
   }
 
   try {
-    const res = await fetch(data.fileUrl);
-    if (!res.ok) throw new Error("Failed to download PDF from storage");
-    const arrayBuffer = await res.arrayBuffer();
-    const base64 = Buffer.from(arrayBuffer).toString("base64");
+    const pdfParts = await Promise.all(
+      fileList.map(async (f) => {
+        const res = await fetch(f.fileUrl);
+        if (!res.ok) throw new Error("Failed to download PDF from storage");
+        const arrayBuffer = await res.arrayBuffer();
+        const base64 = Buffer.from(arrayBuffer).toString("base64");
+        return {
+          inlineData: {
+            mimeType: "application/pdf",
+            data: base64,
+          },
+        };
+      })
+    );
 
     const { GoogleGenAI } = await import("@google/genai");
     const apiKey = process.env.GEMINI_API_KEY;
@@ -1035,27 +1057,23 @@ export async function getSecurityApprovalDetails(
 
     const geminiRes = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: [
-        {
-          inlineData: {
-            mimeType: "application/pdf",
-            data: base64,
-          },
-        },
-        prompt,
-      ],
+      contents: [...pdfParts, prompt],
     });
+
+    const combinedNames = fileList
+      .map((f) => f.title || f.fileName || "אישור ביטחוני.pdf")
+      .join(", ");
 
     return {
       hasFile: true,
-      fileName: data.fileName || "אישור ביטחוני.pdf",
+      fileName: combinedNames,
       analysis: geminiRes.text || "לא התקבל פיענוח מתוך המסמך.",
     };
   } catch (err) {
     console.error("Error analyzing security PDF:", err);
     return {
       hasFile: true,
-      fileName: data.fileName,
+      fileName: fileList.map((f) => f.fileName).join(", "),
       message: "הקובץ קיים במערכת, אך חלה שגיאה בקריאת תוכן ה-PDF.",
     };
   }
