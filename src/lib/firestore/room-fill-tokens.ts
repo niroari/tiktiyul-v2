@@ -16,6 +16,7 @@ export type RoomForToken = {
   number: string;
   capacity?: number;
   gender: "male" | "female";
+  notes?: string;
 };
 
 export type RoomFillToken = {

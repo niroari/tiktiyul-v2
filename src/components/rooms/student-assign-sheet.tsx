@@ -10,6 +10,7 @@ export type AssignSheetRoom = {
   gender?: "male" | "female";
   studentNames: string[];
   currentCount: number;
+  notes?: string;
 };
 
 export type StudentAssignSheetProps = {
@@ -253,6 +254,14 @@ export function StudentAssignSheet({
                       <span className="italic opacity-60">החדר ריק כרגע</span>
                     )}
                   </div>
+
+                  {/* Room note */}
+                  {room.notes && (
+                    <div className="text-[11px] text-muted-foreground/85 flex items-center gap-1 mt-0.5 truncate w-full">
+                      <span className="shrink-0">📝</span>
+                      <span className="truncate">{room.notes}</span>
+                    </div>
+                  )}
                 </button>
               );
             })

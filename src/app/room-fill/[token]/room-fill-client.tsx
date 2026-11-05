@@ -409,6 +409,12 @@ export function RoomFillClient() {
                   ))}
                 </div>
               </div>
+
+              {room.notes && (
+                <div className="px-4 py-1.5 bg-muted/20 border-t border-border/40 text-[11px] text-muted-foreground flex items-center gap-1.5">
+                  <span>📝 {room.notes}</span>
+                </div>
+              )}
             </div>
           );
         })}
@@ -459,6 +465,7 @@ export function RoomFillClient() {
             gender: r.gender,
             studentNames: studs.map((s) => `${s.firstName} ${s.lastName}`),
             currentCount: studs.length,
+            notes: r.notes,
           };
         })}
         onAssignToRoom={(ids, targetRoomId) => {
