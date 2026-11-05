@@ -454,10 +454,12 @@ export function PrintStudentsDialog({
               <Label className="text-xs font-medium text-muted-foreground">כיתה</Label>
               <Select value={selectedClass} onValueChange={(v) => setSelectedClass(v || "all")}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {selectedClass === "all" ? "כל השכבה" : `כיתה ${selectedClass}`}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">כל הכיתות</SelectItem>
+                  <SelectItem value="all">כל השכבה</SelectItem>
                   {classes.map((cls) => (
                     <SelectItem key={cls} value={cls}>
                       כיתה {cls}
@@ -471,7 +473,9 @@ export function PrintStudentsDialog({
               <Label className="text-xs font-medium text-muted-foreground">סדר והצגה</Label>
               <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
                 <SelectTrigger className="w-full">
-                  <SelectValue />
+                  <SelectValue>
+                    {sortBy === "byClass" ? "חלוקה לפי כיתות" : "רשימה רציפה (א-ב)"}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="byClass">חלוקה לפי כיתות</SelectItem>

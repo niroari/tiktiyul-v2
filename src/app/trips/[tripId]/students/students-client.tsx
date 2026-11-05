@@ -311,10 +311,12 @@ export function StudentsClient() {
               onValueChange={(val) => setSelectedClass(val || "all")}
             >
               <SelectTrigger className="w-[145px] text-xs h-9">
-                <SelectValue placeholder="כל הכיתות" />
+                <SelectValue placeholder="כל השכבה">
+                  {selectedClass === "all" ? "כל השכבה" : selectedClass}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent dir="rtl">
-                <SelectItem value="all">כל הכיתות ({students.length})</SelectItem>
+                <SelectItem value="all">כל השכבה ({students.length})</SelectItem>
                 {classes.map((cls) => {
                   const count = students.filter((s) => s.class === cls).length;
                   return (
@@ -661,7 +663,9 @@ export function StudentsClient() {
                   onValueChange={(v) => setForm({ ...form, gender: v as Gender })}
                 >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue>
+                      {form.gender === "female" ? "בת" : "בן"}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="female">בת</SelectItem>
