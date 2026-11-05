@@ -132,3 +132,28 @@ export type DaletData = {
   schedules: TripSchedule[];
   rows: ItineraryRow[]; // Synchronized with active schedule for backward compatibility
 };
+
+// ─── Certificates & Vouchers (תעודות וואוצ׳רים) ──────────────────────────────
+
+export type CertificateGroup = {
+  id: string;
+  name: string;
+  isDefault?: boolean;
+};
+
+export type CertificateItem = {
+  id: string;
+  title: string;        // Editable document title
+  notes?: string;       // Optional note / voucher # / validity / person name
+  groupId: string;      // ID of the CertificateGroup
+  fileUrl: string;      // Firebase Storage download URL
+  fileName: string;     // Original file name
+  fileType: string;     // MIME type or extension
+  fileSize: number;     // Size in bytes
+  uploadedAt: string;   // ISO timestamp
+};
+
+export type CertificatesData = {
+  groups: CertificateGroup[];
+  items: CertificateItem[];
+};

@@ -97,7 +97,12 @@ export function DashboardClient() {
 
   // Security approval
   if (!(appendixMap["security"]?.fileUrl as string))
-    alerts.push({ type: "warn", text: "אישור ביטחוני לא הועלה" });
+    alerts.push({ type: "warn", text: "אישור ביטחוני לא הועלה", href: "security" });
+
+  // Certificates & vouchers
+  const certItems = (appendixMap["certificates"]?.items as unknown[]) ?? [];
+  if (certItems.length === 0)
+    alerts.push({ type: "info", text: "טרם הועלו תעודות וואוצ׳רים לטיול", href: "certificates" });
 
   // Key appendices not started
   if (!appendixMap["bet"])

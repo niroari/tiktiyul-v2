@@ -47,6 +47,7 @@ export function getTripNav(tripId: string): NavGroup[] {
         { label: "חלוקת חדרים", href: `${base}/rooms`, icon: "rooms" },
         { label: "שילוט אוטובוסים", href: `${base}/signs`, icon: "signs" },
         { label: "אישור ביטחוני", href: `${base}/security`, icon: "security" },
+        { label: "תעודות וואוצ׳רים", href: `${base}/certificates`, icon: "certificates" },
         { label: "נספחים נוספים", href: `${base}/extra-appendices`, icon: "extra" },
       ],
     },
