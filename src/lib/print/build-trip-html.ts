@@ -337,7 +337,7 @@ function parseSplit(sel: string): [string, number] {
 }
 function splitLabel(cls: string, part: number) { return `${cls} — ${PART_LABELS[part]}`; }
 
-type CrewMember = { name: string; phone: string };
+type CrewMember = { name: string; phone: string; note?: string };
 type ExtraTeacher = { role: string; name: string; phone: string };
 type VavBus = { id: string; classSelections: string[]; crew: CrewMember[]; extraTeachers: ExtraTeacher[] };
 type VavDay = {
@@ -411,16 +411,18 @@ export function buildVav(data: VavData, students: Student[], trip: Trip | null):
     }, 0);
   }
 
-  function renderCrewCell(name?: string, phone?: string, rolePrefix?: string) {
+  function renderCrewCell(name?: string, phone?: string, rolePrefix?: string, note?: string) {
     const cleanName = (name ?? "").trim();
     const cleanPhone = (phone ?? "").trim();
-    if (!cleanName && !cleanPhone) return "";
+    const cleanNote = (note ?? "").trim();
+    if (!cleanName && !cleanPhone && !cleanNote) return "";
     const prefixHTML = rolePrefix ? `<span style="color:#555;font-size:8.5px">${esc(rolePrefix)}: </span>` : "";
     const nameHTML = cleanName ? `<div style="font-weight:500;line-height:1.25">${prefixHTML}${esc(cleanName)}</div>` : "";
+    const noteHTML = cleanNote ? `<div style="font-size:8.5px;color:#555;line-height:1.2;margin-top:${cleanName ? "1px" : "0"}">(${esc(cleanNote)})</div>` : "";
     const phoneHTML = cleanPhone
-      ? `<div style="direction:ltr;font-size:8.5px;color:#444;line-height:1.2;margin-top:${cleanName ? "1px" : "0"}">${esc(cleanPhone)}</div>`
+      ? `<div style="direction:ltr;font-size:8.5px;color:#444;line-height:1.2;margin-top:${cleanName || cleanNote ? "1px" : "0"}">${esc(cleanPhone)}</div>`
       : "";
-    return `${nameHTML}${phoneHTML}`;
+    return `${nameHTML}${noteHTML}${phoneHTML}`;
   }
 
   function renderDayTable(day: VavDay): string {
@@ -439,7 +441,7 @@ export function buildVav(data: VavData, students: Student[], trip: Trip | null):
     const crewRows = CREW_ROLES.map((role, ri) => `
       <tr>
         <td style="padding:3px 6px;border:1px solid #bbb;font-size:9.5px;font-weight:bold;color:#1b4332;background:#eef7f1;white-space:nowrap">${role}</td>
-        ${day.buses.map((b) => `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;vertical-align:middle">${renderCrewCell(b.crew[ri]?.name, b.crew[ri]?.phone)}</td>`).join("")}
+        ${day.buses.map((b) => `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;vertical-align:middle">${renderCrewCell(b.crew[ri]?.name, b.crew[ri]?.phone, undefined, b.crew[ri]?.note)}</td>`).join("")}
       </tr>`).join("");
 
     const maxExtra = Math.max(0, ...day.buses.map((b) => b.extraTeachers.length));

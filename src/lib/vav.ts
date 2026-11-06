@@ -2,6 +2,7 @@ export type VavCrewMember = {
   role?: string;
   name: string;
   phone: string;
+  note?: string;
 };
 
 export type VavExtraTeacher = {

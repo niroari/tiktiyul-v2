@@ -94,7 +94,7 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
             label: String(d.label ?? `יום ${di + 1}`),
             buses: ((d.buses as Record<string, unknown>[]) ?? []).map((b) => ({
               id:              String(b.id ?? ""),
-              crew:            (b.crew ?? []) as { name: string; phone: string }[],
+              crew:            (b.crew ?? []) as { name: string; phone: string; note?: string }[],
               extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string }[],
               classSelections: (b.classSelections ?? []) as string[],
             })),
@@ -107,7 +107,7 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
         days: rawDays,
         buses: rawBuses.map((b) => ({
           id:              b.id ?? "",
-          crew:            (b.crew ?? []) as { name: string; phone: string }[],
+          crew:            (b.crew ?? []) as { name: string; phone: string; note?: string }[],
           extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string }[],
           classSelections: b.classSelections ?? [],
         })),
