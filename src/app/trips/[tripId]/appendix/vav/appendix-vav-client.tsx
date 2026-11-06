@@ -744,6 +744,20 @@ export function AppendixVavClient() {
     return opts;
   }
 
+  function getUnassignedStaffForDay(day: DayData | null | undefined) {
+    if (!day) return staff;
+    const assignedNames = new Set<string>();
+    day.buses.forEach((b) => {
+      b.crew.forEach((c) => {
+        if (c.name?.trim()) assignedNames.add(c.name.trim());
+      });
+      b.extraTeachers.forEach((et) => {
+        if (et.name?.trim()) assignedNames.add(et.name.trim());
+      });
+    });
+    return staff.filter((s) => s.name?.trim() && !assignedNames.has(s.name.trim()));
+  }
+
   // ── Print HTML ─────────────────────────────────────────────────────────────
 
   function getHTML() {
@@ -1547,6 +1561,100 @@ export function AppendixVavClient() {
           </table>
         </div>
       )}
+
+      {/* Unassigned staff card */}
+      {staff.length > 0 && activeSplitDay && (() => {
+        const unassignedStaff = getUnassignedStaffForDay(activeSplitDay);
+
+        return (
+          <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+              <div>
+                <h2 className="text-sm font-semibold text-foreground">
+                  אנשי צוות לא משובצים לאוטובוסים{data.days.length > 1 ? ` — ${activeSplitDay.label}` : ""}
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  אנשי צוות מרשימת הצוות של הטיול שטרם שובצו לאף אוטובוס{data.days.length > 1 ? ` ב${activeSplitDay.label}` : ""}
+                </p>
+              </div>
+              <span
+                className={`text-xs px-2.5 py-1 rounded-full border font-medium ${
+                  unassignedStaff.length === 0
+                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                    : "bg-amber-50 text-amber-800 border-amber-200"
+                }`}
+              >
+                {unassignedStaff.length === 0
+                  ? `כולם משובצים (${staff.length}) ✓`
+                  : `${unassignedStaff.length} מתוך ${staff.length} לא שובצו`}
+              </span>
+            </div>
+
+            {data.days.length > 1 && (
+              <div className="flex items-center gap-1.5 flex-wrap mb-4 pb-3 border-b border-border">
+                {data.days.map((d) => {
+                  const isActive = d.id === activeSplitDay.id;
+                  const dUnassignedCount = getUnassignedStaffForDay(d).length;
+
+                  return (
+                    <button
+                      key={d.id}
+                      type="button"
+                      onClick={() => setActiveSplitDayId(d.id)}
+                      className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${
+                        isActive
+                          ? "bg-[#1b4332] text-white font-semibold border-[#1b4332] shadow-xs"
+                          : "bg-muted/40 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                      }`}
+                    >
+                      <span>{d.label}</span>
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : dUnassignedCount > 0
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-emerald-100 text-emerald-800"
+                        }`}
+                      >
+                        {dUnassignedCount > 0 ? `${dUnassignedCount} לא שובצו` : "✓"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {unassignedStaff.length === 0 ? (
+              <div className="rounded-[var(--radius-sm)] bg-emerald-50/60 border border-emerald-200/70 px-4 py-3 text-xs text-emerald-800 flex items-center gap-2">
+                <span>✓</span>
+                <span>כל אנשי הצוות ({staff.length}) משובצים לאוטובוסים{data.days.length > 1 ? ` ב${activeSplitDay.label}` : ""}.</span>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {unassignedStaff.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-[var(--radius-sm)] border border-amber-200/80 bg-amber-50/40 text-xs"
+                  >
+                    <span className="font-medium text-foreground">{member.name}</span>
+                    {member.role && (
+                      <span className="text-[11px] text-muted-foreground bg-white px-1.5 py-0.5 rounded border border-border/60">
+                        {member.role}
+                      </span>
+                    )}
+                    {member.phone && (
+                      <span className="text-[11px] text-muted-foreground" dir="ltr">
+                        {member.phone}
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {splitModalTarget && (() => {
         const modalDay = data.days.find((d) => d.id === splitModalTarget.dayId) ?? activeSplitDay;
