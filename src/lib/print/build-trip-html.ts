@@ -340,7 +340,16 @@ function splitLabel(cls: string, part: number) { return `${cls} — ${PART_LABEL
 type CrewMember = { name: string; phone: string };
 type ExtraTeacher = { role: string; name: string; phone: string };
 type VavBus = { id: string; classSelections: string[]; crew: CrewMember[]; extraTeachers: ExtraTeacher[] };
+type VavDay = {
+  id: string;
+  label: string;
+  buses: VavBus[];
+  actual?: Record<string, string>;
+  splits?: Record<string, string[]>;
+  splitStudents?: Record<string, Record<string, string[]>>;
+};
 type VavData = {
+  days?: VavDay[];
   buses: VavBus[];
   actual: Record<string, string>;
   splits: Record<string, string[]>;
@@ -353,161 +362,226 @@ function calcEscorts(bus: VavBus): number {
 }
 
 export function buildVav(data: VavData, students: Student[], trip: Trip | null): string {
+  const goingStudents = students.filter((s) => s.isGoing);
   const plannedByClass: Record<string, number> = {};
-  students.filter((s) => s.isGoing).forEach((s) => {
+  goingStudents.forEach((s) => {
     plannedByClass[s.class] = (plannedByClass[s.class] ?? 0) + 1;
   });
   const classNames = Object.keys(plannedByClass).sort((a, b) => a.localeCompare(b, "he"));
 
-  function busStudentCount(bus: VavBus): number {
+  const days: VavDay[] =
+    data.days && data.days.length > 0
+      ? data.days
+      : [
+          {
+            id: "day-1",
+            label: "יום 1",
+            buses: data.buses,
+            actual: data.actual,
+            splits: data.splits,
+            splitStudents: data.splitStudents,
+          },
+        ];
+
+  function getDaySplits(day: VavDay): Record<string, string[]> {
+    return day.splits ?? data.splits ?? {};
+  }
+
+  function getDaySplitStudents(day: VavDay): Record<string, Record<string, string[]>> {
+    return day.splitStudents ?? data.splitStudents ?? {};
+  }
+
+  function getDayActual(day: VavDay): Record<string, string> {
+    return day.actual ?? data.actual ?? {};
+  }
+
+  function busStudentCount(day: VavDay, bus: VavBus): number {
+    const daySplits = getDaySplits(day);
     return bus.classSelections.filter(Boolean).reduce((sum, sel) => {
       if (isSplitSel(sel)) {
         const [cls, part] = parseSplit(sel);
-        return sum + (parseInt(data.splits[cls]?.[part]) || 0);
+        return sum + (parseInt(daySplits[cls]?.[part] ?? "0") || 0);
       }
       return sum + (plannedByClass[sel] ?? 0);
     }, 0);
   }
 
-  const n = data.buses.length;
-  const busHeaders = data.buses.map((b, bi) => {
-    const labels = b.classSelections.filter(Boolean).map((sel) =>
-      isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ");
-    const sc = busStudentCount(b);
-    return `<th style="padding:5px 6px;border:1px solid #999;font-size:9px;font-weight:bold;background:#1b4332;color:white;text-align:center;min-width:110px">
-      אוטובוס ${bi + 1}${labels ? `<br><span style="font-weight:normal">${esc(labels)}</span>` : ""}${sc ? `<br><span style="font-weight:normal;font-size:8px">${sc} תלמידים</span>` : ""}
-    </th>`;
-  }).join("");
+  function renderCrewCell(name?: string, phone?: string, rolePrefix?: string) {
+    const cleanName = (name ?? "").trim();
+    const cleanPhone = (phone ?? "").trim();
+    if (!cleanName && !cleanPhone) return "";
+    const prefixHTML = rolePrefix ? `<span style="color:#555;font-size:8.5px">${esc(rolePrefix)}: </span>` : "";
+    const nameHTML = cleanName ? `<div style="font-weight:500;line-height:1.25">${prefixHTML}${esc(cleanName)}</div>` : "";
+    const phoneHTML = cleanPhone
+      ? `<div style="direction:ltr;font-size:8.5px;color:#444;line-height:1.2;margin-top:${cleanName ? "1px" : "0"}">${esc(cleanPhone)}</div>`
+      : "";
+    return `${nameHTML}${phoneHTML}`;
+  }
 
-  const crewRows = CREW_ROLES.map((role, ri) => `
-    <tr style="background:#d4edda">
-      <td colspan="${n + 1}" style="padding:3px 6px;border:1px solid #bbb;font-size:9px;font-weight:bold;color:#1b4332">${role}</td>
-    </tr>
-    <tr>
-      <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">שם</td>
-      ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${esc(b.crew[ri]?.name)}</td>`).join("")}
-    </tr>
-    <tr>
-      <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">טלפון</td>
-      ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${esc(b.crew[ri]?.phone)}</td>`).join("")}
-    </tr>`).join("");
+  function renderDayTable(day: VavDay): string {
+    const n = day.buses.length;
+    if (n === 0) return `<p style="color:#aaa;font-size:10px;text-align:center">לא הוזנו אוטובוסים</p>`;
 
-  const maxExtra = Math.max(0, ...data.buses.map((b) => b.extraTeachers.length));
-  const extraRows = Array.from({ length: maxExtra }, (_, ei) => `
-    <tr style="background:#d4edda">
-      <td colspan="${n + 1}" style="padding:3px 6px;border:1px solid #bbb;font-size:9px;font-weight:bold;color:#1b4332">מלווה נוסף ${ei + 1}</td>
-    </tr>
-    <tr>
-      <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">תפקיד / שם</td>
-      ${data.buses.map((b) => { const e = b.extraTeachers[ei]; return `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${e ? `${esc(e.role)} — ${esc(e.name)}` : ""}</td>`; }).join("")}
-    </tr>
-    <tr>
-      <td style="padding:3px 6px;border:1px solid #ccc;font-size:8px;color:#555;background:#f9f9f9">טלפון</td>
-      ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;direction:ltr">${esc(b.extraTeachers[ei]?.phone)}</td>`).join("")}
-    </tr>`).join("");
+    const busHeaders = day.buses.map((b, bi) => {
+      const labels = b.classSelections.filter(Boolean).map((sel) =>
+        isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ");
+      const sc = busStudentCount(day, b);
+      return `<th style="padding:4px 5px;border:1px solid #999;font-size:9.5px;font-weight:bold;background:#1b4332;color:white;text-align:center">
+        אוטובוס ${bi + 1}${labels ? `<br><span style="font-weight:normal;font-size:9px">${esc(labels)}</span>` : ""}${sc ? `<br><span style="font-weight:normal;font-size:8.5px">${sc} תלמידים</span>` : ""}
+      </th>`;
+    }).join("");
 
-  const classRows = classNames.flatMap((cls) => {
-    const parts = data.splits[cls];
-    if (parts && parts.length >= 2) {
-      const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
-      return [
-        `<tr style="background:#fff8e1"><td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;font-weight:bold">${esc(cls)}</td><td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${esc(String(plannedByClass[cls]))}</td><td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${esc(data.actual[cls])}</td></tr>`,
-        ...parts.map((count, pi) => `<tr style="background:#fffde7"><td style="padding:2px 6px 2px 16px;border:1px solid #ddd;font-size:8.5px;color:#666">${PART_LABELS[pi]}</td><td style="padding:2px 6px;border:1px solid #ddd;font-size:8.5px;text-align:center">${count || "—"}</td><td style="border:1px solid #ddd"></td></tr>`),
-        splitSum > 0 && splitSum !== plannedByClass[cls]
-          ? `<tr style="background:#fff3cd"><td colspan="3" style="padding:2px 8px;font-size:8px;color:#856404;border:1px solid #ddd">סה״כ חלקים: ${splitSum} ${splitSum > plannedByClass[cls] ? "⚠ חורג" : ""}</td></tr>`
-          : "",
-      ].filter(Boolean) as string[];
-    }
-    return [`<tr><td style="padding:3px 6px;border:1px solid #ddd;font-size:9px">${esc(cls)}</td><td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center;font-weight:bold">${esc(String(plannedByClass[cls]))}</td><td style="padding:3px 6px;border:1px solid #ddd;font-size:9px;text-align:center">${esc(data.actual[cls])}</td></tr>`];
-  }).join("") || `<tr><td colspan="3" style="padding:6px;color:#aaa;text-align:center;font-size:9px">אין נתוני תלמידים</td></tr>`;
+    const crewRows = CREW_ROLES.map((role, ri) => `
+      <tr>
+        <td style="padding:3px 6px;border:1px solid #bbb;font-size:9.5px;font-weight:bold;color:#1b4332;background:#eef7f1;white-space:nowrap">${role}</td>
+        ${day.buses.map((b) => `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;vertical-align:middle">${renderCrewCell(b.crew[ri]?.name, b.crew[ri]?.phone)}</td>`).join("")}
+      </tr>`).join("");
 
-  const totalStudents = data.buses.reduce((s, b) => s + busStudentCount(b), 0);
-  const totalEscorts  = data.buses.reduce((s, b) => s + calcEscorts(b), 0);
-  const summaryRows = [
-    ["תלמידים", String(totalStudents || "")],
-    ["מורים ומלווים", String(totalEscorts || "")],
-    ['סה"כ נוכחים', String(totalStudents + totalEscorts || "")],
-  ].map(([label, val], i) => `<tr style="${i === 2 ? "font-weight:bold;background:#d4edda" : ""}"><td style="padding:3px 8px;border:1px solid #ccc;font-size:9px">${label}</td><td style="padding:3px 8px;border:1px solid #ccc;font-size:9px;text-align:center;width:50px">${val}</td></tr>`).join("");
+    const maxExtra = Math.max(0, ...day.buses.map((b) => b.extraTeachers.length));
+    const extraRows = Array.from({ length: maxExtra }, (_, ei) => `
+      <tr>
+        <td style="padding:3px 6px;border:1px solid #bbb;font-size:9.5px;font-weight:bold;color:#1b4332;background:#eef7f1;white-space:nowrap">מלווה נוסף ${ei + 1}</td>
+        ${day.buses.map((b) => {
+          const e = b.extraTeachers[ei];
+          return `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;vertical-align:middle">${e ? renderCrewCell(e.name, e.phone, e.role) : ""}</td>`;
+        }).join("")}
+      </tr>`).join("");
 
-  return `
-    <div class="header">
-      <div class="title">נספח ו׳ — טבלת שליטה בטיול</div>
-      ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
-    </div>
-    ${n === 0 ? `<p style="color:#aaa;font-size:10px;text-align:center">לא הוזנו אוטובוסים</p>` : `
-    <table>
-      <thead><tr>
-        <th style="padding:5px 6px;border:1px solid #999;font-size:9px;background:#1b4332;color:white;min-width:90px"></th>
-        ${busHeaders}
-      </tr></thead>
-      <tbody>
-        <tr style="background:#e8f5e9">
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;font-weight:bold">כיתות</td>
-          ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${b.classSelections.filter(Boolean).map((sel) => isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ")}</td>`).join("")}
+    return `
+      <table style="table-layout:fixed;width:100%;margin-bottom:4px">
+        <thead><tr>
+          <th style="padding:4px 6px;border:1px solid #999;font-size:9.5px;background:#1b4332;color:white;width:90px">תפקיד / אוטובוס</th>
+          ${busHeaders}
+        </tr></thead>
+        <tbody>
+          <tr style="background:#e8f5e9">
+            <td style="padding:3px 6px;border:1px solid #ccc;font-size:9.5px;font-weight:bold">כיתות</td>
+            ${day.buses.map((b) => `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center">${b.classSelections.filter(Boolean).map((sel) => isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ")}</td>`).join("")}
+          </tr>
+          ${crewRows}${extraRows}
+          <tr style="background:#e8f5e9">
+            <td style="padding:3px 6px;border:1px solid #ccc;font-size:9.5px;font-weight:bold">מספר תלמידים</td>
+            ${day.buses.map((b) => `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;font-weight:bold">${busStudentCount(day, b) || ""}</td>`).join("")}
+          </tr>
+          <tr>
+            <td style="padding:3px 6px;border:1px solid #ccc;font-size:9.5px;font-weight:bold">מספר מלווים</td>
+            ${day.buses.map((b) => `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center">${calcEscorts(b) || ""}</td>`).join("")}
+          </tr>
+          <tr style="background:#d4edda;font-weight:bold">
+            <td style="padding:3px 6px;border:1px solid #ccc;font-size:9.5px">סה"כ באוטובוס</td>
+            ${day.buses.map((b) => `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;font-weight:bold">${(busStudentCount(day, b) + calcEscorts(b)) || ""}</td>`).join("")}
+          </tr>
+        </tbody>
+      </table>`;
+  }
+
+  return days.map((day, di) => {
+    const dayActual = getDayActual(day);
+    const daySplits = getDaySplits(day);
+    const daySplitStudents = getDaySplitStudents(day);
+    const totalStudents = day.buses.reduce((s, b) => s + busStudentCount(day, b), 0);
+    const totalEscorts = day.buses.reduce((s, b) => s + calcEscorts(b), 0);
+
+    const classRows = classNames.flatMap((cls) => {
+      const parts = daySplits[cls];
+      if (parts && parts.length >= 2) {
+        const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
+        return [
+          `<tr style="background:#fff8e1"><td style="padding:2px 6px;border:1px solid #ddd;font-size:9.5px;font-weight:bold">${esc(cls)}</td><td style="padding:2px 6px;border:1px solid #ddd;font-size:9.5px;text-align:center;font-weight:bold">${esc(String(plannedByClass[cls]))}</td><td style="padding:2px 6px;border:1px solid #ddd;font-size:9.5px;text-align:center">${esc(dayActual[cls] || (splitSum ? String(splitSum) : ""))}</td></tr>`,
+          ...parts.map((count, pi) => `<tr style="background:#fffde7"><td style="padding:1.5px 6px 1.5px 14px;border:1px solid #ddd;font-size:8.5px;color:#666">${PART_LABELS[pi]}</td><td style="padding:1.5px 6px;border:1px solid #ddd;font-size:8.5px;text-align:center">${count || "—"}</td><td style="border:1px solid #ddd"></td></tr>`),
+          splitSum > 0 && splitSum !== plannedByClass[cls]
+            ? `<tr style="background:#fff3cd"><td colspan="3" style="padding:1.5px 6px;font-size:8px;color:#856404;border:1px solid #ddd">סה״כ חלקים: ${splitSum} ${splitSum > plannedByClass[cls] ? "⚠ חורג" : ""}</td></tr>`
+            : "",
+        ].filter(Boolean) as string[];
+      }
+      return [`<tr><td style="padding:2px 6px;border:1px solid #ddd;font-size:9.5px">${esc(cls)}</td><td style="padding:2px 6px;border:1px solid #ddd;font-size:9.5px;text-align:center;font-weight:bold">${esc(String(plannedByClass[cls]))}</td><td style="padding:2px 6px;border:1px solid #ddd;font-size:9.5px;text-align:center">${esc(dayActual[cls])}</td></tr>`];
+    }).join("") || `<tr><td colspan="3" style="padding:6px;color:#aaa;text-align:center;font-size:9.5px">אין נתוני תלמידים</td></tr>`;
+
+    const actualTotal = classNames.reduce((sum, cls) => {
+      const parts = daySplits[cls];
+      if (parts && parts.length >= 2) {
+        const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
+        return sum + (parseInt(dayActual[cls]) || splitSum || 0);
+      }
+      return sum + (parseInt(dayActual[cls]) || 0);
+    }, 0);
+
+    const classFooterRow = classNames.length > 0 ? `
+      <tfoot>
+        <tr style="background:#e8f5e9;font-weight:bold">
+          <td style="padding:2.5px 6px;border:1px solid #bbb;font-size:9.5px;color:#1b4332">סה"כ</td>
+          <td style="padding:2.5px 6px;border:1px solid #bbb;font-size:9.5px;text-align:center;color:#1b4332">${goingStudents.length}</td>
+          <td style="padding:2.5px 6px;border:1px solid #bbb;font-size:9.5px;text-align:center;color:#1b4332">${actualTotal || ""}</td>
         </tr>
-        ${crewRows}${extraRows}
-        <tr style="background:#e8f5e9">
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;font-weight:bold">מספר תלמידים</td>
-          ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;font-weight:bold">${busStudentCount(b) || ""}</td>`).join("")}
-        </tr>
-        <tr>
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;font-weight:bold">מספר מלווים</td>
-          ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center">${calcEscorts(b) || ""}</td>`).join("")}
-        </tr>
-        <tr style="background:#d4edda;font-weight:bold">
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:9px">סה"כ באוטובוס</td>
-          ${data.buses.map((b) => `<td style="padding:4px 6px;border:1px solid #ccc;font-size:9px;text-align:center;font-weight:bold">${(busStudentCount(b) + calcEscorts(b)) || ""}</td>`).join("")}
-        </tr>
-      </tbody>
-    </table>`}
-    <div style="display:flex;gap:20px;margin-top:12px;align-items:flex-start">
-      <div>
-        <div class="section-title">סיכום לפי כיתה</div>
-        <table style="width:auto">
-          <thead><tr><th style="width:110px">כיתה</th><th style="width:65px;text-align:center">מתוכנן</th><th style="width:65px;text-align:center">בפועל</th></tr></thead>
-          <tbody>${classRows}</tbody>
-        </table>
-      </div>
-      <div>
-        <div class="section-title">סיכום כללי</div>
-        <table style="width:auto">
-          <thead><tr><th>קטגוריה</th><th style="width:60px;text-align:center">מספר</th></tr></thead>
-          <tbody>${summaryRows}</tbody>
-        </table>
-      </div>
-    </div>
-    ${(() => {
-      const goingStudents = students.filter((s) => s.isGoing);
-      const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsData]) => {
-        if (!partsData || typeof partsData !== "object") return "";
-        const partsEntries = Array.isArray(partsData)
-          ? partsData.map((arr, i) => [i, Array.isArray(arr) ? (arr as string[]) : []] as const)
-          : Object.entries(partsData).map(([k, v]) => [parseInt(k, 10), Array.isArray(v) ? (v as string[]) : []] as const);
+      </tfoot>` : "";
 
-        const partItems = partsEntries.map(([pi, studentIds]) => {
-          if (!studentIds || studentIds.length === 0) return "";
-          const names = studentIds
-            .map((id: string) => {
-              const s = goingStudents.find((st) => st.id === id);
-              return s ? `${s.firstName} ${s.lastName}` : "";
-            })
-            .filter(Boolean);
-          if (names.length === 0) return "";
-          return `<div style="margin-bottom:3px;font-size:8px;line-height:1.4">
-            <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi] ?? `חלק ${pi + 1}`} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
-          </div>`;
-        }).filter(Boolean).join("");
+    const summaryRows = [
+      ["תלמידים", String(totalStudents || "")],
+      ["מורים ומלווים", String(totalEscorts || "")],
+      ['סה"כ נוכחים', String(totalStudents + totalEscorts || "")],
+    ].map(([label, val], i) => `<tr style="${i === 2 ? "font-weight:bold;background:#d4edda" : ""}"><td style="padding:2.5px 8px;border:1px solid #ccc;font-size:9.5px">${label}</td><td style="padding:2.5px 8px;border:1px solid #ccc;font-size:9.5px;text-align:center;width:50px">${val}</td></tr>`).join("");
 
-        if (!partItems) return "";
-        return `<div style="margin-bottom:4px">${partItems}</div>`;
+    const splitDetailsHTML = Object.entries(daySplitStudents).map(([cls, partsData]) => {
+      if (!daySplits[cls] || daySplits[cls].length < 2) return "";
+      if (!partsData || typeof partsData !== "object") return "";
+      const partsEntries = Array.isArray(partsData)
+        ? partsData.map((arr, i) => [i, Array.isArray(arr) ? (arr as string[]) : []] as const)
+        : Object.entries(partsData).map(([k, v]) => [parseInt(k, 10), Array.isArray(v) ? (v as string[]) : []] as const);
+
+      const partItems = partsEntries.map(([pi, studentIds]) => {
+        if (!studentIds || studentIds.length === 0) return "";
+        const names = studentIds
+          .map((id: string) => {
+            const s = goingStudents.find((st) => st.id === id);
+            return s ? `${s.firstName} ${s.lastName}` : "";
+          })
+          .filter(Boolean);
+        if (names.length === 0) return "";
+        return `<div style="margin-bottom:2px;font-size:8.5px;line-height:1.35">
+          <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi] ?? `חלק ${pi + 1}`} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
+        </div>`;
       }).filter(Boolean).join("");
 
-      return splitDetailsHTML ? `
-        <div style="margin-top:10px;padding:6px 8px;background:#f9fbf9;border:1px solid #c3e6cb;border-radius:4px;page-break-inside:avoid">
-          <div style="font-size:9px;font-weight:bold;color:#1b4332;margin-bottom:3px">פירוט שמות תלמידים בכיתות מפוצלות:</div>
-          ${splitDetailsHTML}
-        </div>` : "";
-    })()}`;
+      if (!partItems) return "";
+      return `<div style="margin-bottom:3px">${partItems}</div>`;
+    }).filter(Boolean).join("");
+
+    const splitSection = splitDetailsHTML ? `
+      <div style="flex:1;min-width:200px;padding:5px 7px;background:#f9fbf9;border:1px solid #c3e6cb;border-radius:4px">
+        <div style="font-size:9px;font-weight:bold;color:#1b4332;margin-bottom:2px">פירוט שמות תלמידים בכיתות מפוצלות:</div>
+        ${splitDetailsHTML}
+      </div>` : "";
+
+    return `
+      <div style="${di > 0 ? "page-break-before:always;break-before:page;" : ""}page-break-inside:avoid;break-inside:avoid">
+        <div class="header" style="padding-bottom:6px;margin-bottom:8px">
+          <div class="title" style="font-size:16px">נספח ו׳ — טבלת שליטה בטיול</div>
+          ${trip ? `<div class="ministry">${esc(trip.name)} | ${esc(trip.schoolName)}</div>` : ""}
+        </div>
+        <div style="margin-bottom:8px">
+          <div style="font-size:10.5px;font-weight:bold;padding:4px 8px;background:#1b4332;color:white;border-radius:3px 3px 0 0;margin-bottom:4px">${esc(day.label)} — ${day.buses.length} אוטובוסים</div>
+          ${renderDayTable(day)}
+        </div>
+        <div style="display:flex;gap:16px;margin-top:8px;align-items:flex-start;flex-wrap:wrap">
+          <div>
+            <div class="section-title" style="font-size:11px;margin:4px 0 4px">סיכום לפי כיתה</div>
+            <table style="width:auto;margin-bottom:0">
+              <thead><tr><th style="width:90px;padding:2.5px 6px;font-size:9.5px">כיתה</th><th style="width:55px;padding:2.5px 6px;font-size:9.5px;text-align:center">מתוכנן</th><th style="width:55px;padding:2.5px 6px;font-size:9.5px;text-align:center">בפועל</th></tr></thead>
+              <tbody>${classRows}</tbody>
+              ${classFooterRow}
+            </table>
+          </div>
+          <div>
+            <div class="section-title" style="font-size:11px;margin:4px 0 4px">סיכום כללי</div>
+            <table style="width:auto;margin-bottom:0">
+              <thead><tr><th style="padding:2.5px 8px;font-size:9.5px">קטגוריה</th><th style="width:50px;padding:2.5px 6px;font-size:9.5px;text-align:center">מספר</th></tr></thead>
+              <tbody>${summaryRows}</tbody>
+            </table>
+          </div>
+          ${splitSection}
+        </div>
+      </div>`;
+  }).join("");
 }
 
 // ─── Appendix ז ──────────────────────────────────────────────────────────────

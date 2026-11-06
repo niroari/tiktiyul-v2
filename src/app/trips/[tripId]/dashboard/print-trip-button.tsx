@@ -88,7 +88,23 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
 
       // ו
       const rawBuses = extractVavBuses(vavRaw);
+      const rawDays = Array.isArray(vavRaw?.days)
+        ? (vavRaw.days as Record<string, unknown>[]).map((d, di) => ({
+            id: String(d.id ?? `day-${di + 1}`),
+            label: String(d.label ?? `יום ${di + 1}`),
+            buses: ((d.buses as Record<string, unknown>[]) ?? []).map((b) => ({
+              id:              String(b.id ?? ""),
+              crew:            (b.crew ?? []) as { name: string; phone: string }[],
+              extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string }[],
+              classSelections: (b.classSelections ?? []) as string[],
+            })),
+            actual: (d.actual ?? vavRaw?.actual ?? {}) as Record<string, string>,
+            splits: (d.splits ?? vavRaw?.splits ?? {}) as Record<string, string[]>,
+            splitStudents: (d.splitStudents ?? vavRaw?.splitStudents ?? {}) as Record<string, Record<string, string[]>>,
+          }))
+        : undefined;
       const vavData = {
+        days: rawDays,
         buses: rawBuses.map((b) => ({
           id:              b.id ?? "",
           crew:            (b.crew ?? []) as { name: string; phone: string }[],

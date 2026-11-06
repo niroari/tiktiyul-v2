@@ -48,6 +48,9 @@ type DayData = {
   id: string;
   label: string;
   buses: Bus[];
+  actual?: Record<string, string>;
+  splits?: Record<string, string[]>;
+  splitStudents?: Record<string, Record<string, string[]>>;
 };
 
 type VavData = {
@@ -67,7 +70,14 @@ function makeBus(): Bus {
 }
 
 function makeDay(n: number): DayData {
-  return { id: crypto.randomUUID(), label: `יום ${n}`, buses: [] };
+  return {
+    id: crypto.randomUUID(),
+    label: `יום ${n}`,
+    buses: [],
+    actual: {},
+    splits: {},
+    splitStudents: {},
+  };
 }
 
 const DRIVER_IDX = CREW_ROLES.indexOf("נהג");
@@ -75,6 +85,17 @@ const DRIVER_IDX = CREW_ROLES.indexOf("נהג");
 function calcEscorts(bus: Bus): number {
   return bus.crew.filter((c, i) => i !== DRIVER_IDX && c.name.trim()).length
     + bus.extraTeachers.filter((e) => e.name.trim()).length;
+}
+
+function cloneSplits(raw: unknown): Record<string, string[]> {
+  if (!raw || typeof raw !== "object") return {};
+  const result: Record<string, string[]> = {};
+  for (const [cls, arr] of Object.entries(raw as Record<string, unknown>)) {
+    if (Array.isArray(arr)) {
+      result[cls] = arr.map((v) => String(v ?? ""));
+    }
+  }
+  return result;
 }
 
 // Normalize splitStudents so that it stores objects with string keys { "0": [...], "1": [...] }
@@ -107,26 +128,33 @@ function normalizeSplitStudents(raw: unknown): Record<string, Record<string, str
   return result;
 }
 
-// Migrate legacy flat `buses` array to single-day structure
+// Migrate legacy flat `buses` array and top-level `splits` to per-day structure
 function migrateData(raw: Record<string, unknown>): VavData {
-  const splits = (raw.splits as Record<string, string[]>) ?? {};
-  const splitStudents = normalizeSplitStudents(raw.splitStudents);
-  const actual = (raw.actual as Record<string, string>) ?? {};
+  const fallbackSplits = cloneSplits(raw.splits);
+  const fallbackSplitStudents = normalizeSplitStudents(raw.splitStudents);
+  const fallbackActual = (raw.actual as Record<string, string>) ?? {};
 
   if (Array.isArray(raw.days) && raw.days.length > 0) {
-    return {
-      days: (raw.days as DayData[]).map((d) => ({
-        ...d,
-        buses: (d.buses ?? []).map((b: Bus) => ({
-          ...b,
-          crew:            b.crew            ?? CREW_ROLES.map(() => ({ name: "", phone: "" })),
-          extraTeachers:   b.extraTeachers   ?? [],
-          classSelections: b.classSelections ?? ["", "", "", ""],
-        })),
+    const days = (raw.days as DayData[]).map((d) => ({
+      ...d,
+      buses: (d.buses ?? []).map((b: Bus) => ({
+        ...b,
+        crew:            b.crew            ?? CREW_ROLES.map(() => ({ name: "", phone: "" })),
+        extraTeachers:   b.extraTeachers   ?? [],
+        classSelections: b.classSelections ?? ["", "", "", ""],
       })),
-      actual,
-      splits,
-      splitStudents,
+      actual: d.actual ? { ...d.actual } : { ...fallbackActual },
+      splits: d.splits ? cloneSplits(d.splits) : cloneSplits(fallbackSplits),
+      splitStudents: d.splitStudents
+        ? normalizeSplitStudents(d.splitStudents)
+        : normalizeSplitStudents(fallbackSplitStudents),
+    }));
+
+    return {
+      days,
+      actual: days[0]?.actual ?? fallbackActual,
+      splits: days[0]?.splits ?? fallbackSplits,
+      splitStudents: days[0]?.splitStudents ?? fallbackSplitStudents,
     };
   }
 
@@ -141,10 +169,19 @@ function migrateData(raw: Record<string, unknown>): VavData {
     : [];
 
   return {
-    days: [{ id: crypto.randomUUID(), label: "יום 1", buses: legacyBuses }],
-    actual,
-    splits,
-    splitStudents,
+    days: [
+      {
+        id: crypto.randomUUID(),
+        label: "יום 1",
+        buses: legacyBuses,
+        actual: { ...fallbackActual },
+        splits: cloneSplits(fallbackSplits),
+        splitStudents: normalizeSplitStudents(fallbackSplitStudents),
+      },
+    ],
+    actual: fallbackActual,
+    splits: fallbackSplits,
+    splitStudents: fallbackSplitStudents,
   };
 }
 
@@ -159,23 +196,45 @@ export function AppendixVavClient() {
   const [data,    setData]    = useState<VavData>({ days: [], actual: {}, splits: {}, splitStudents: {} });
   const [status,  setStatus]  = useState<"idle" | "saving" | "saved">("idle");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
-  const [splitModalClass, setSplitModalClass] = useState<string | null>(null);
+  const [activeSplitDayId, setActiveSplitDayId] = useState<string>("");
+  const [splitModalTarget, setSplitModalTarget] = useState<{ dayId: string; cls: string } | null>(null);
   const [openBusRosters, setOpenBusRosters] = useState<Set<string>>(new Set());
-  const [exportTarget, setExportTarget] = useState<{ cls: string; partIdx: number | "all" } | null>(null);
+  const [exportTarget, setExportTarget] = useState<{ dayId: string; cls: string; partIdx: number | "all" } | null>(null);
   const [exportIncludePhones, setExportIncludePhones] = useState(false);
   const [copiedPartKey, setCopiedPartKey] = useState<string | null>(null);
 
+  const classControlRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending = useRef(false);
   const latestDataRef = useRef(data);
   latestDataRef.current = data;
+
+  const activeSplitDay = data.days.find((d) => d.id === activeSplitDayId) ?? data.days[0] ?? null;
+
+  function getDaySplits(day?: DayData | null): Record<string, string[]> {
+    return day?.splits ?? data.splits ?? {};
+  }
+
+  function getDaySplitStudents(day?: DayData | null): Record<string, Record<string, string[]>> {
+    return day?.splitStudents ?? data.splitStudents ?? {};
+  }
+
+  function getDayActual(day?: DayData | null): Record<string, string> {
+    return day?.actual ?? data.actual ?? {};
+  }
 
   // ── Load ───────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "vav", (raw) => {
       if (isPending.current) return;
-      if (raw) setData(migrateData(raw as Record<string, unknown>));
+      if (raw) {
+        const migrated = migrateData(raw as Record<string, unknown>);
+        setData(migrated);
+        setActiveSplitDayId((prev) =>
+          migrated.days.some((d) => d.id === prev) ? prev : (migrated.days[0]?.id ?? "")
+        );
+      }
     });
     return () => {
       unsub();
@@ -216,31 +275,55 @@ export function AppendixVavClient() {
   }
 
   function update(updated: VavData, immediate = false) {
-    setData(updated);
-    save(updated, immediate);
+    const primaryDay = updated.days[0];
+    const normalized: VavData = primaryDay
+      ? {
+          ...updated,
+          actual: primaryDay.actual ?? updated.actual,
+          splits: primaryDay.splits ?? updated.splits,
+          splitStudents: primaryDay.splitStudents ?? updated.splitStudents,
+        }
+      : updated;
+    setData(normalized);
+    save(normalized, immediate);
+  }
+
+  function updateDay(dayId: string, updater: (day: DayData) => DayData, immediate = false) {
+    const days = data.days.map((d) => (d.id === dayId ? updater(d) : d));
+    update({ ...data, days }, immediate);
   }
 
   // ── Day mutations ──────────────────────────────────────────────────────────
 
   function addDay() {
-    update({ ...data, days: [...data.days, makeDay(data.days.length + 1)] });
+    const newDay = makeDay(data.days.length + 1);
+    update({ ...data, days: [...data.days, newDay] });
+    setActiveSplitDayId(newDay.id);
   }
 
   function deleteDay(dayId: string) {
     if (!confirm("למחוק יום זה וכל האוטובוסים שבו?")) return;
-    update({ ...data, days: data.days.filter((d) => d.id !== dayId) });
+    const remaining = data.days.filter((d) => d.id !== dayId);
+    update({ ...data, days: remaining });
+    if (activeSplitDayId === dayId) {
+      setActiveSplitDayId(remaining[0]?.id ?? "");
+    }
   }
 
   function setDayLabel(dayId: string, label: string) {
-    update({ ...data, days: data.days.map((d) => d.id === dayId ? { ...d, label } : d) });
+    updateDay(dayId, (d) => ({ ...d, label }));
   }
 
   function toggleCollapse(dayId: string) {
+    const wasCollapsed = collapsed.has(dayId);
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(dayId)) { next.delete(dayId); } else { next.add(dayId); }
       return next;
     });
+    if (wasCollapsed) {
+      setActiveSplitDayId(dayId);
+    }
   }
 
   function collapseAll() {
@@ -251,14 +334,20 @@ export function AppendixVavClient() {
     setCollapsed(new Set());
   }
 
+  function focusDaySplits(dayId: string) {
+    setActiveSplitDayId(dayId);
+    classControlRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   // ── Bus mutations ──────────────────────────────────────────────────────────
 
   function updateDayBuses(dayId: string, buses: Bus[]) {
-    update({ ...data, days: data.days.map((d) => d.id === dayId ? { ...d, buses } : d) });
+    updateDay(dayId, (d) => ({ ...d, buses }));
   }
 
   function addBus(dayId: string) {
     const day = data.days.find((d) => d.id === dayId)!;
+    setActiveSplitDayId(dayId);
     updateDayBuses(dayId, [...day.buses, makeBus()]);
   }
 
@@ -269,6 +358,7 @@ export function AppendixVavClient() {
 
   function setBusClass(dayId: string, busIdx: number, slotIdx: number, val: string) {
     const day = data.days.find((d) => d.id === dayId)!;
+    setActiveSplitDayId(dayId);
     const buses = day.buses.map((b, i) => {
       if (i !== busIdx) return b;
       const cs = [...b.classSelections];
@@ -336,99 +426,169 @@ export function AppendixVavClient() {
     updateDayBuses(dayId, buses);
   }
 
-  // ── Class / split mutations ────────────────────────────────────────────────
+  // ── Class / split mutations (per day) ──────────────────────────────────────
 
-  function setActual(cls: string, val: string) {
-    update({ ...data, actual: { ...data.actual, [cls]: val } });
-  }
-
-  function splitClass(cls: string) {
-    update({
-      ...data,
-      splits: { ...data.splits, [cls]: ["", ""] },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: { "0": [], "1": [] } },
-    });
-  }
-
-  function unsplitClass(cls: string) {
-    const splits = { ...data.splits };
-    delete splits[cls];
-    const splitStudents = { ...(data.splitStudents ?? {}) };
-    delete splitStudents[cls];
-    const days = data.days.map((d) => ({
+  function setActual(cls: string, val: string, targetDayId = activeSplitDay?.id) {
+    if (!targetDayId) {
+      update({ ...data, actual: { ...data.actual, [cls]: val } });
+      return;
+    }
+    updateDay(targetDayId, (d) => ({
       ...d,
-      buses: d.buses.map((b) => ({
-        ...b,
-        classSelections: b.classSelections.map((sel) =>
-          isSplitSel(sel) && parseSplit(sel)[0] === cls ? "" : sel
-        ),
-      })),
+      actual: { ...getDayActual(d), [cls]: val },
     }));
-    update({ ...data, splits, splitStudents, days }, true);
   }
 
-  function setSplitCount(cls: string, partIdx: number, val: string) {
-    const parts = [...(data.splits[cls] ?? [])];
-    parts[partIdx] = val;
-    update({ ...data, splits: { ...data.splits, [cls]: parts } });
+  function splitClass(cls: string, targetDayId = activeSplitDay?.id) {
+    if (!targetDayId) return;
+    updateDay(targetDayId, (d) => ({
+      ...d,
+      splits: { ...getDaySplits(d), [cls]: ["", ""] },
+      splitStudents: { ...getDaySplitStudents(d), [cls]: { "0": [], "1": [] } },
+    }));
   }
 
-  function addSplitPart(cls: string) {
-    const parts = [...(data.splits[cls] ?? [])];
-    if (parts.length >= 4) return;
-    const newIdx = parts.length;
-    parts.push("");
-    const clsMap = { ...(data.splitStudents?.[cls] ?? {}) };
-    clsMap[String(newIdx)] = [];
-    update({
-      ...data,
-      splits: { ...data.splits, [cls]: parts },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: clsMap },
+  function unsplitClass(cls: string, targetDayId = activeSplitDay?.id) {
+    if (!targetDayId) return;
+    updateDay(
+      targetDayId,
+      (d) => {
+        const splits = { ...getDaySplits(d) };
+        delete splits[cls];
+        const splitStudents = { ...getDaySplitStudents(d) };
+        delete splitStudents[cls];
+        const buses = d.buses.map((b) => ({
+          ...b,
+          classSelections: b.classSelections.map((sel) =>
+            isSplitSel(sel) && parseSplit(sel)[0] === cls ? "" : sel
+          ),
+        }));
+        return { ...d, splits, splitStudents, buses };
+      },
+      true
+    );
+  }
+
+  function setSplitCount(cls: string, partIdx: number, val: string, targetDayId = activeSplitDay?.id) {
+    if (!targetDayId) return;
+    updateDay(targetDayId, (d) => {
+      const daySplits = getDaySplits(d);
+      const parts = [...(daySplits[cls] ?? [])];
+      parts[partIdx] = val;
+      return { ...d, splits: { ...daySplits, [cls]: parts } };
     });
   }
 
-  function removeSplitPart(cls: string) {
-    const parts = [...(data.splits[cls] ?? [])];
-    if (parts.length <= 2) return;
-    const removedPartIdx = parts.length - 1;
-    parts.pop();
-    const clsMap = { ...(data.splitStudents?.[cls] ?? {}) };
-    delete clsMap[String(removedPartIdx)];
-    const removedKey = splitKey(cls, removedPartIdx);
-    const days = data.days.map((d) => ({
-      ...d,
-      buses: d.buses.map((b) => ({
+  function addSplitPart(cls: string, targetDayId = activeSplitDay?.id) {
+    if (!targetDayId) return;
+    updateDay(targetDayId, (d) => {
+      const daySplits = getDaySplits(d);
+      const parts = [...(daySplits[cls] ?? [])];
+      if (parts.length >= 4) return d;
+      const newIdx = parts.length;
+      parts.push("");
+      const daySplitStudents = getDaySplitStudents(d);
+      const clsMap = { ...(daySplitStudents[cls] ?? {}) };
+      clsMap[String(newIdx)] = [];
+      return {
+        ...d,
+        splits: { ...daySplits, [cls]: parts },
+        splitStudents: { ...daySplitStudents, [cls]: clsMap },
+      };
+    });
+  }
+
+  function removeSplitPart(cls: string, targetDayId = activeSplitDay?.id) {
+    if (!targetDayId) return;
+    updateDay(targetDayId, (d) => {
+      const daySplits = getDaySplits(d);
+      const parts = [...(daySplits[cls] ?? [])];
+      if (parts.length <= 2) return d;
+      const removedPartIdx = parts.length - 1;
+      parts.pop();
+      const daySplitStudents = getDaySplitStudents(d);
+      const clsMap = { ...(daySplitStudents[cls] ?? {}) };
+      delete clsMap[String(removedPartIdx)];
+      const removedKey = splitKey(cls, removedPartIdx);
+      const buses = d.buses.map((b) => ({
         ...b,
         classSelections: b.classSelections.map((sel) => (sel === removedKey ? "" : sel)),
-      })),
-    }));
-    update({
-      ...data,
-      splits: { ...data.splits, [cls]: parts },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: clsMap },
-      days,
+      }));
+      return {
+        ...d,
+        splits: { ...daySplits, [cls]: parts },
+        splitStudents: { ...daySplitStudents, [cls]: clsMap },
+        buses,
+      };
     });
   }
 
-  function handleSaveSplitStudents(cls: string, newSplitStudents: string[][]) {
-    const currentParts = data.splits[cls] ?? [];
-    const updatedParts = currentParts.map((count, pi) => {
-      const assignedCount = newSplitStudents[pi]?.length ?? 0;
-      return assignedCount > 0 ? String(assignedCount) : (count || "");
-    });
+  function handleSaveSplitStudents(targetDayId: string, cls: string, newSplitStudents: string[][]) {
+    updateDay(
+      targetDayId,
+      (d) => {
+        const daySplits = getDaySplits(d);
+        const currentParts = daySplits[cls] ?? [];
+        const updatedParts = currentParts.map((count, pi) => {
+          const assignedCount = newSplitStudents[pi]?.length ?? 0;
+          return assignedCount > 0 ? String(assignedCount) : (count || "");
+        });
 
-    const partsMap: Record<string, string[]> = {};
-    newSplitStudents.forEach((ids, pi) => {
-      partsMap[String(pi)] = ids;
-    });
+        const partsMap: Record<string, string[]> = {};
+        newSplitStudents.forEach((ids, pi) => {
+          partsMap[String(pi)] = ids;
+        });
 
-    const updated: VavData = {
-      ...data,
-      splits: { ...data.splits, [cls]: updatedParts },
-      splitStudents: { ...(data.splitStudents ?? {}), [cls]: partsMap },
-    };
+        const daySplitStudents = getDaySplitStudents(d);
+        return {
+          ...d,
+          splits: { ...daySplits, [cls]: updatedParts },
+          splitStudents: { ...daySplitStudents, [cls]: partsMap },
+        };
+      },
+      true
+    );
+  }
 
-    update(updated, true);
+  function copySplitsFromDay(sourceDayId: string, targetDayId = activeSplitDay?.id) {
+    if (!targetDayId || sourceDayId === targetDayId) return;
+    const sourceDay = data.days.find((d) => d.id === sourceDayId);
+    if (!sourceDay) return;
+
+    const copiedSplits = cloneSplits(getDaySplits(sourceDay));
+    const copiedSplitStudents = normalizeSplitStudents(getDaySplitStudents(sourceDay));
+
+    updateDay(
+      targetDayId,
+      (d) => {
+        // Clean up any bus selections on targetDay that don't match the new split structure
+        const buses = d.buses.map((b) => ({
+          ...b,
+          classSelections: b.classSelections.map((sel) => {
+            if (!sel) return "";
+            if (isSplitSel(sel)) {
+              const [cls, part] = parseSplit(sel);
+              const parts = copiedSplits[cls];
+              if (!parts || parts.length < 2 || part >= parts.length) return "";
+              return sel;
+            }
+            // Whole class selected, but now it is split in copiedSplits
+            if (copiedSplits[sel] && copiedSplits[sel].length >= 2) {
+              return "";
+            }
+            return sel;
+          }),
+        }));
+
+        return {
+          ...d,
+          splits: copiedSplits,
+          splitStudents: copiedSplitStudents,
+          buses,
+        };
+      },
+      true
+    );
   }
 
   // ── Computed ───────────────────────────────────────────────────────────────
@@ -444,10 +604,11 @@ export function AppendixVavClient() {
     });
   }
 
-  function getPartAssignedStudents(cls: string, partIdx: number): Student[] {
+  function getPartAssignedStudents(day: DayData | null | undefined, cls: string, partIdx: number): Student[] {
+    const daySplitStudents = getDaySplitStudents(day);
     const partStudentIds =
-      data.splitStudents?.[cls]?.[partIdx] ??
-      data.splitStudents?.[cls]?.[String(partIdx)] ??
+      daySplitStudents[cls]?.[partIdx] ??
+      daySplitStudents[cls]?.[String(partIdx)] ??
       [];
     return (partStudentIds
       .map((id) => goingStudents.find((s) => s.id === id))
@@ -458,25 +619,25 @@ export function AppendixVavClient() {
       });
   }
 
-  function getPartBusLabels(cls: string, partIdx: number): string[] {
+  function getPartBusLabels(day: DayData | null | undefined, cls: string, partIdx: number): string[] {
+    if (!day) return [];
     const key = splitKey(cls, partIdx);
     const labels: string[] = [];
-    data.days.forEach((day) => {
-      day.buses.forEach((bus, bi) => {
-        if (bus.classSelections.includes(key)) {
-          const label = data.days.length > 1 ? `${day.label} — אוטובוס ${bi + 1}` : `אוטובוס ${bi + 1}`;
-          if (!labels.includes(label)) labels.push(label);
-        }
-      });
+    day.buses.forEach((bus, bi) => {
+      if (bus.classSelections.includes(key)) {
+        const label = data.days.length > 1 ? `${day.label} — אוטובוס ${bi + 1}` : `אוטובוס ${bi + 1}`;
+        if (!labels.includes(label)) labels.push(label);
+      }
     });
     return labels;
   }
 
-  function buildPartWhatsAppText(cls: string, partIdx: number, includePhones = false): string {
-    const partStudents = getPartAssignedStudents(cls, partIdx);
-    const busLabels = getPartBusLabels(cls, partIdx);
+  function buildPartWhatsAppText(day: DayData | null | undefined, cls: string, partIdx: number, includePhones = false): string {
+    const partStudents = getPartAssignedStudents(day, cls, partIdx);
+    const busLabels = getPartBusLabels(day, cls, partIdx);
+    const daySuffix = data.days.length > 1 && day ? ` — ${day.label}` : "";
     const headerLines = [
-      `*רשימת תלמידים — כיתה ${cls} (${PART_LABELS[partIdx]})*`,
+      `*רשימת תלמידים — כיתה ${cls} (${PART_LABELS[partIdx]})${daySuffix}*`,
       ...(trip?.name ? [`📍 ${trip.name}${trip.schoolName ? ` | ${trip.schoolName}` : ""}`] : []),
       `${busLabels.length > 0 ? `🚌 ${busLabels.join(", ")} | ` : ""}סה״כ: *${partStudents.length} תלמידים*`,
     ];
@@ -487,13 +648,14 @@ export function AppendixVavClient() {
     return `${headerLines.join("\n")}\n\n${studentLines.join("\n")}`;
   }
 
-  function buildAllPartsWhatsAppText(cls: string, includePhones = false): string {
-    const parts = data.splits[cls] ?? [];
+  function buildAllPartsWhatsAppText(day: DayData | null | undefined, cls: string, includePhones = false): string {
+    const parts = getDaySplits(day)[cls] ?? [];
+    const daySuffix = data.days.length > 1 && day ? ` — ${day.label}` : "";
     const sections = parts
       .map((_, pi) => {
-        const partStudents = getPartAssignedStudents(cls, pi);
+        const partStudents = getPartAssignedStudents(day, cls, pi);
         if (partStudents.length === 0) return "";
-        const busLabels = getPartBusLabels(cls, pi);
+        const busLabels = getPartBusLabels(day, cls, pi);
         const busSuffix = busLabels.length > 0 ? ` — 🚌 ${busLabels.join(", ")}` : "";
         const lines = partStudents.map((s, idx) => {
           const phoneSuffix = includePhones && s.phone ? ` (${s.phone})` : "";
@@ -504,7 +666,7 @@ export function AppendixVavClient() {
       .filter(Boolean);
 
     const header = [
-      `*חלוקת תלמידים — כיתה ${cls}*`,
+      `*חלוקת תלמידים — כיתה ${cls}${daySuffix}*`,
       ...(trip?.name ? [`📍 ${trip.name}${trip.schoolName ? ` | ${trip.schoolName}` : ""}`] : []),
     ].join("\n");
 
@@ -525,14 +687,15 @@ export function AppendixVavClient() {
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
   }
 
-  function getBusAssignedStudents(bus: Bus): Student[] {
+  function getBusAssignedStudents(day: DayData, bus: Bus): Student[] {
     const result: Student[] = [];
     const seen = new Set<string>();
+    const daySplitStudents = getDaySplitStudents(day);
 
     bus.classSelections.filter(Boolean).forEach((sel) => {
       if (isSplitSel(sel)) {
         const [cls, part] = parseSplit(sel);
-        const studentIds = data.splitStudents?.[cls]?.[part] ?? data.splitStudents?.[cls]?.[String(part)] ?? [];
+        const studentIds = daySplitStudents[cls]?.[part] ?? daySplitStudents[cls]?.[String(part)] ?? [];
         studentIds.forEach((id) => {
           if (!seen.has(id)) {
             seen.add(id);
@@ -545,30 +708,33 @@ export function AppendixVavClient() {
 
     return result;
   }
+
   const plannedByClass: Record<string, number> = {};
   goingStudents.forEach((s) => { plannedByClass[s.class] = (plannedByClass[s.class] ?? 0) + 1; });
   const classNames = Object.keys(plannedByClass).sort((a, b) => a.localeCompare(b, "he"));
 
-  function busStudentCount(bus: Bus): number {
+  function busStudentCount(day: DayData, bus: Bus): number {
+    const daySplits = getDaySplits(day);
     return bus.classSelections.filter(Boolean).reduce((sum, sel) => {
       if (isSplitSel(sel)) {
         const [cls, part] = parseSplit(sel);
-        return sum + (parseInt(data.splits[cls]?.[part] ?? "0") || 0);
+        return sum + (parseInt(daySplits[cls]?.[part] ?? "0") || 0);
       }
       return sum + (plannedByClass[sel] ?? 0);
     }, 0);
   }
 
   function dayTotals(day: DayData) {
-    const students = day.buses.reduce((s, b) => s + busStudentCount(b), 0);
+    const students = day.buses.reduce((s, b) => s + busStudentCount(day, b), 0);
     const escorts  = day.buses.reduce((s, b) => s + calcEscorts(b), 0);
     return { students, escorts, total: students + escorts };
   }
 
-  function classOptions() {
+  function classOptions(day: DayData) {
+    const daySplits = getDaySplits(day);
     const opts: { value: string; label: string }[] = [];
     classNames.forEach((cls) => {
-      const parts = data.splits[cls];
+      const parts = daySplits[cls];
       if (parts && parts.length >= 2) {
         parts.forEach((_, pi) => opts.push({ value: splitKey(cls, pi), label: splitLabel(cls, pi) }));
       } else {
@@ -583,193 +749,227 @@ export function AppendixVavClient() {
   function getHTML() {
     const t = trip;
 
+    function renderCrewCell(name?: string, phone?: string, rolePrefix?: string) {
+      const cleanName = (name ?? "").trim();
+      const cleanPhone = (phone ?? "").trim();
+      if (!cleanName && !cleanPhone) return "";
+      const prefixHTML = rolePrefix ? `<span style="color:#555;font-size:9.5px">${esc(rolePrefix)}: </span>` : "";
+      const nameHTML = cleanName ? `<div style="font-weight:500;line-height:1.25">${prefixHTML}${esc(cleanName)}</div>` : "";
+      const phoneHTML = cleanPhone
+        ? `<div style="direction:ltr;font-size:9.5px;color:#444;line-height:1.2;margin-top:${cleanName ? "1px" : "0"}">${esc(cleanPhone)}</div>`
+        : "";
+      return `${nameHTML}${phoneHTML}`;
+    }
+
     function dayTable(day: DayData) {
       const n = day.buses.length;
-      if (n === 0) return `<p style="color:#aaa;font-size:10px;text-align:center">לא הוזנו אוטובוסים</p>`;
+      if (n === 0) return `<p style="color:#aaa;font-size:10px;text-align:center;margin:8px 0">לא הוזנו אוטובוסים</p>`;
 
       const busHeaders = day.buses.map((b, bi) => {
         const labels = b.classSelections.filter(Boolean).map((sel) =>
           isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel
         ).join(", ");
-        const sc = busStudentCount(b);
-        return `<th style="padding:6px 6px;border:1px solid #999;font-size:11.5px;font-weight:bold;background:#1b4332;color:white;text-align:center;min-width:110px">
-          אוטובוס ${bi + 1}${labels ? `<br><span style="font-weight:normal">${labels}</span>` : ""}${sc ? `<br><span style="font-weight:normal;font-size:10px">${sc} תלמידים</span>` : ""}
+        const sc = busStudentCount(day, b);
+        return `<th style="padding:4px 5px;border:1px solid #999;font-size:11px;font-weight:bold;background:#1b4332;color:white;text-align:center">
+          אוטובוס ${bi + 1}${labels ? `<br><span style="font-weight:normal;font-size:10px">${esc(labels)}</span>` : ""}${sc ? `<br><span style="font-weight:normal;font-size:9.5px">${sc} תלמידים</span>` : ""}
         </th>`;
       }).join("");
 
       const crewRows = CREW_ROLES.map((role, ri) => `
-        <tr style="background:#d4edda">
-          <td colspan="${n + 1}" style="padding:4px 6px;border:1px solid #bbb;font-size:11.5px;font-weight:bold;color:#1b4332">${role}</td>
-        </tr>
         <tr>
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">שם</td>
-          ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${esc(b.crew[ri]?.name)}</td>`).join("")}
-        </tr>
-        <tr>
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">טלפון</td>
-          ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;direction:ltr">${esc(b.crew[ri]?.phone)}</td>`).join("")}
+          <td style="padding:3.5px 6px;border:1px solid #bbb;font-size:10.5px;font-weight:bold;color:#1b4332;background:#eef7f1;white-space:nowrap">${role}</td>
+          ${day.buses.map((b) => `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center;vertical-align:middle">${renderCrewCell(b.crew[ri]?.name, b.crew[ri]?.phone)}</td>`).join("")}
         </tr>`).join("");
 
       const maxExtra = Math.max(0, ...day.buses.map((b) => b.extraTeachers.length));
       const extraRows = Array.from({ length: maxExtra }, (_, ei) => `
-        <tr style="background:#d4edda">
-          <td colspan="${n + 1}" style="padding:4px 6px;border:1px solid #bbb;font-size:11.5px;font-weight:bold;color:#1b4332">מלווה נוסף ${ei + 1}</td>
-        </tr>
         <tr>
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">תפקיד / שם</td>
+          <td style="padding:3.5px 6px;border:1px solid #bbb;font-size:10.5px;font-weight:bold;color:#1b4332;background:#eef7f1;white-space:nowrap">מלווה נוסף ${ei + 1}</td>
           ${day.buses.map((b) => {
             const e = b.extraTeachers[ei];
-            return `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${e ? `${esc(e.role)} — ${esc(e.name)}` : ""}</td>`;
+            return `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center;vertical-align:middle">${e ? renderCrewCell(e.name, e.phone, e.role) : ""}</td>`;
           }).join("")}
-        </tr>
-        <tr>
-          <td style="padding:4px 6px;border:1px solid #ccc;font-size:10.5px;color:#555;background:#f9f9f9">טלפון</td>
-          ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;direction:ltr">${esc(b.extraTeachers[ei]?.phone)}</td>`).join("")}
         </tr>`).join("");
 
       const dt = dayTotals(day);
       return `
-        <table>
+        <table style="table-layout:fixed;width:100%;margin-bottom:4px">
           <thead><tr>
-            <th style="padding:6px 6px;border:1px solid #999;font-size:11.5px;background:#1b4332;color:white;min-width:90px"></th>
+            <th style="padding:4px 6px;border:1px solid #999;font-size:10.5px;background:#1b4332;color:white;width:92px">תפקיד / אוטובוס</th>
             ${busHeaders}
           </tr></thead>
           <tbody>
             <tr style="background:#e8f5e9">
-              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;font-weight:bold">כיתות</td>
-              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${b.classSelections.filter(Boolean).map((sel) => isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ")}</td>`).join("")}
+              <td style="padding:3.5px 6px;border:1px solid #ccc;font-size:10.5px;font-weight:bold">כיתות</td>
+              ${day.buses.map((b) => `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center">${b.classSelections.filter(Boolean).map((sel) => isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel).join(", ")}</td>`).join("")}
             </tr>
             ${crewRows}${extraRows}
             <tr style="background:#e8f5e9">
-              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;font-weight:bold">מספר תלמידים</td>
-              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;font-weight:bold">${busStudentCount(b) || ""}</td>`).join("")}
+              <td style="padding:3.5px 6px;border:1px solid #ccc;font-size:10.5px;font-weight:bold">מספר תלמידים</td>
+              ${day.buses.map((b) => `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center;font-weight:bold">${busStudentCount(day, b) || ""}</td>`).join("")}
             </tr>
             <tr>
-              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;font-weight:bold">מספר מלווים</td>
-              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center">${calcEscorts(b) || ""}</td>`).join("")}
+              <td style="padding:3.5px 6px;border:1px solid #ccc;font-size:10.5px;font-weight:bold">מספר מלווים</td>
+              ${day.buses.map((b) => `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center">${calcEscorts(b) || ""}</td>`).join("")}
             </tr>
             <tr style="background:#d4edda;font-weight:bold">
-              <td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px">סה"כ באוטובוס</td>
-              ${day.buses.map((b) => `<td style="padding:5px 6px;border:1px solid #ccc;font-size:11.5px;text-align:center;font-weight:bold">${(busStudentCount(b) + calcEscorts(b)) || ""}</td>`).join("")}
+              <td style="padding:3.5px 6px;border:1px solid #ccc;font-size:10.5px">סה"כ באוטובוס</td>
+              ${day.buses.map((b) => `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center;font-weight:bold">${(busStudentCount(day, b) + calcEscorts(b)) || ""}</td>`).join("")}
             </tr>
           </tbody>
         </table>
-        <div style="font-size:11.5px;color:#555;margin-top:5px">
+        <div style="font-size:10.5px;color:#555;margin-top:3px">
           סה"כ ביום: <strong>${dt.students}</strong> תלמידים · <strong>${dt.escorts}</strong> מלווים · <strong>${dt.total}</strong> סה"כ
         </div>`;
     }
 
-    const classRows = classNames.flatMap((cls) => {
-      const parts = data.splits[cls];
-      if (parts && parts.length >= 2) {
-        const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
-        return [
-          `<tr style="background:#fff8e1">
-            <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;font-weight:bold">${esc(cls)}</td>
-            <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
-            <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center">${esc(data.actual[cls])}</td>
-          </tr>`,
-          ...parts.map((count, pi) => `<tr style="background:#fffde7">
-            <td style="padding:3px 8px 3px 18px;border:1px solid #ddd;font-size:11px;color:#666">${PART_LABELS[pi]}</td>
-            <td style="padding:3px 8px;border:1px solid #ddd;font-size:11px;text-align:center">${count || "—"}</td>
-            <td style="border:1px solid #ddd"></td>
-          </tr>`),
-          splitSum > 0 && splitSum !== plannedByClass[cls]
-            ? `<tr style="background:#fff3cd"><td colspan="3" style="padding:3px 8px;font-size:11px;color:#856404;border:1px solid #ddd">סה״כ חלקים: ${splitSum} ${splitSum > plannedByClass[cls] ? "⚠ חורג" : ""}</td></tr>`
-            : "",
-        ].filter(Boolean);
-      }
-      return [`<tr>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px">${esc(cls)}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
-        <td style="padding:4px 8px;border:1px solid #ddd;font-size:12px;text-align:center">${esc(data.actual[cls])}</td>
-      </tr>`];
-    }).join("") || `<tr><td colspan="3" style="padding:8px;color:#aaa;text-align:center;font-size:12px">אין נתוני תלמידים</td></tr>`;
+    function renderDayPage(day: DayData) {
+      const dayActual = getDayActual(day);
+      const daySplits = getDaySplits(day);
+      const daySplitStudents = getDaySplitStudents(day);
+      const dt = dayTotals(day);
 
-    const totalStudents = data.days.reduce((s, d) => s + dayTotals(d).students, 0);
-    const totalEscorts  = data.days.reduce((s, d) => s + dayTotals(d).escorts, 0);
-    const summaryRows = [
-      ["תלמידים", totalStudents || ""],
-      ["מורים ומלווים", totalEscorts || ""],
-      ['סה"כ נוכחים', totalStudents + totalEscorts || ""],
-    ].map(([label, val], i) => `<tr style="${i === 2 ? "font-weight:bold;background:#d4edda" : ""}">
-      <td style="padding:4px 10px;border:1px solid #ccc;font-size:12px">${label}</td>
-      <td style="padding:4px 10px;border:1px solid #ccc;font-size:12px;text-align:center;width:60px">${val}</td>
-    </tr>`).join("");
+      const classRows = classNames.flatMap((cls) => {
+        const parts = daySplits[cls];
+        if (parts && parts.length >= 2) {
+          const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
+          return [
+            `<tr style="background:#fff8e1">
+              <td style="padding:2.5px 6px;border:1px solid #ddd;font-size:10.5px;font-weight:bold">${esc(cls)}</td>
+              <td style="padding:2.5px 6px;border:1px solid #ddd;font-size:10.5px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
+              <td style="padding:2.5px 6px;border:1px solid #ddd;font-size:10.5px;text-align:center">${esc(dayActual[cls] || (splitSum ? String(splitSum) : ""))}</td>
+            </tr>`,
+            ...parts.map((count, pi) => `<tr style="background:#fffde7">
+              <td style="padding:2px 6px 2px 14px;border:1px solid #ddd;font-size:9.5px;color:#666">${PART_LABELS[pi]}</td>
+              <td style="padding:2px 6px;border:1px solid #ddd;font-size:9.5px;text-align:center">${count || "—"}</td>
+              <td style="border:1px solid #ddd"></td>
+            </tr>`),
+            splitSum > 0 && splitSum !== plannedByClass[cls]
+              ? `<tr style="background:#fff3cd"><td colspan="3" style="padding:2px 6px;font-size:9.5px;color:#856404;border:1px solid #ddd">סה״כ חלקים: ${splitSum} ${splitSum > plannedByClass[cls] ? "⚠ חורג" : ""}</td></tr>`
+              : "",
+          ].filter(Boolean);
+        }
 
-    const daysHTML = data.days.map((day, di) => `
-      <div style="margin-bottom:20px;${di > 0 ? "page-break-before:always;break-before:page;" : ""}">
-        <div style="font-size:13px;font-weight:bold;padding:6px 10px;background:#1b4332;color:white;border-radius:4px 4px 0 0;margin-bottom:6px">
-          ${esc(day.label)} — ${day.buses.length} אוטובוסים
-        </div>
-        ${dayTable(day)}
-      </div>`).join("");
+        return [`<tr>
+          <td style="padding:2.5px 6px;border:1px solid #ddd;font-size:10.5px">${esc(cls)}</td>
+          <td style="padding:2.5px 6px;border:1px solid #ddd;font-size:10.5px;text-align:center;font-weight:bold">${esc(plannedByClass[cls])}</td>
+          <td style="padding:2.5px 6px;border:1px solid #ddd;font-size:10.5px;text-align:center">${esc(dayActual[cls])}</td>
+        </tr>`];
+      }).join("") || `<tr><td colspan="3" style="padding:6px;color:#aaa;text-align:center;font-size:10.5px">אין נתוני תלמידים</td></tr>`;
 
-    // Detailed Split Students Roster for Print
-    const splitDetailsHTML = Object.entries(data.splitStudents ?? {}).map(([cls, partsData]) => {
-      if (!partsData || typeof partsData !== "object") return "";
-      const partsEntries = Array.isArray(partsData)
-        ? partsData.map((arr, i) => [i, Array.isArray(arr) ? (arr as string[]) : []] as const)
-        : Object.entries(partsData).map(([k, v]) => [parseInt(k, 10), Array.isArray(v) ? (v as string[]) : []] as const);
+      const actualTotal = classNames.reduce((sum, cls) => {
+        const parts = daySplits[cls];
+        if (parts && parts.length >= 2) {
+          const splitSum = parts.reduce((s, v) => s + (parseInt(v) || 0), 0);
+          return sum + (parseInt(dayActual[cls]) || splitSum || 0);
+        }
+        return sum + (parseInt(dayActual[cls]) || 0);
+      }, 0);
 
-      const partItems = partsEntries.map(([pi, studentIds]) => {
-        if (!studentIds || studentIds.length === 0) return "";
-        const names = studentIds
-          .map((id: string) => {
-            const s = goingStudents.find((st) => st.id === id);
-            return s ? `${s.firstName} ${s.lastName}` : "";
-          })
-          .filter(Boolean);
-        if (names.length === 0) return "";
-        return `<div style="margin-bottom:4px;font-size:10px;line-height:1.4">
-          <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi] ?? `חלק ${pi + 1}`} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
-        </div>`;
+      const classFooterRow = classNames.length > 0 ? `
+        <tfoot>
+          <tr style="background:#e8f5e9;font-weight:bold">
+            <td style="padding:3px 6px;border:1px solid #bbb;font-size:10.5px;color:#1b4332">סה"כ</td>
+            <td style="padding:3px 6px;border:1px solid #bbb;font-size:10.5px;text-align:center;color:#1b4332">${goingStudents.length}</td>
+            <td style="padding:3px 6px;border:1px solid #bbb;font-size:10.5px;text-align:center;color:#1b4332">${actualTotal || ""}</td>
+          </tr>
+        </tfoot>` : "";
+
+      const summaryRows = [
+        ["תלמידים", dt.students || ""],
+        ["מורים ומלווים", dt.escorts || ""],
+        ['סה"כ נוכחים', dt.total || ""],
+      ].map(([label, val], i) => `<tr style="${i === 2 ? "font-weight:bold;background:#d4edda" : ""}">
+        <td style="padding:3px 8px;border:1px solid #ccc;font-size:10.5px">${label}</td>
+        <td style="padding:3px 8px;border:1px solid #ccc;font-size:10.5px;text-align:center;width:55px">${val}</td>
+      </tr>`).join("");
+
+      const splitDetailsHTML = Object.entries(daySplitStudents).map(([cls, partsData]) => {
+        if (!daySplits[cls] || daySplits[cls].length < 2) return "";
+        if (!partsData || typeof partsData !== "object") return "";
+        const partsEntries = Array.isArray(partsData)
+          ? partsData.map((arr, i) => [i, Array.isArray(arr) ? (arr as string[]) : []] as const)
+          : Object.entries(partsData).map(([k, v]) => [parseInt(k, 10), Array.isArray(v) ? (v as string[]) : []] as const);
+
+        const partItems = partsEntries.map(([pi, studentIds]) => {
+          if (!studentIds || studentIds.length === 0) return "";
+          const names = studentIds
+            .map((id: string) => {
+              const s = goingStudents.find((st) => st.id === id);
+              return s ? `${s.firstName} ${s.lastName}` : "";
+            })
+            .filter(Boolean);
+          if (names.length === 0) return "";
+          return `<div style="margin-bottom:2px;font-size:9.5px;line-height:1.35">
+            <strong style="color:#1b4332">${esc(cls)} — ${PART_LABELS[pi] ?? `חלק ${pi + 1}`} (${names.length} תלמידים):</strong> ${esc(names.join(", "))}
+          </div>`;
+        }).filter(Boolean).join("");
+
+        if (!partItems) return "";
+        return `<div style="margin-bottom:3px">${partItems}</div>`;
       }).filter(Boolean).join("");
 
-      if (!partItems) return "";
-      return `<div style="margin-bottom:6px">${partItems}</div>`;
-    }).filter(Boolean).join("");
+      const splitSection = splitDetailsHTML ? `
+        <div style="flex:1;min-width:220px;padding:6px 8px;background:#f9fbf9;border:1px solid #c3e6cb;border-radius:4px">
+          <div style="font-size:10px;font-weight:bold;color:#1b4332;margin-bottom:3px">פירוט שמות תלמידים בכיתות מפוצלות:</div>
+          ${splitDetailsHTML}
+        </div>` : "";
 
-    const splitSection = splitDetailsHTML ? `
-      <div style="margin-top:14px;padding:8px 10px;background:#f9fbf9;border:1px solid #c3e6cb;border-radius:4px;page-break-inside:avoid">
-        <div style="font-size:11px;font-weight:bold;color:#1b4332;margin-bottom:5px">פירוט שמות תלמידים בכיתות מפוצלות:</div>
-        ${splitDetailsHTML}
-      </div>` : "";
+      return `
+        <div class="print-page">
+          <div class="header" style="padding-bottom:6px;margin-bottom:8px">
+            <div class="title" style="font-size:16px;margin-top:0">נספח ו׳ — טבלת שליטה בטיול</div>
+            ${t ? `<div class="ministry" style="font-size:10.5px">${esc(t.name ?? "")} | ${esc(t.schoolName ?? "")}</div>` : ""}
+          </div>
+          <div style="margin-bottom:10px">
+            <div style="font-size:11.5px;font-weight:bold;padding:4px 8px;background:#1b4332;color:white;border-radius:4px 4px 0 0;margin-bottom:4px">
+              ${esc(day.label)} — ${day.buses.length} אוטובוסים
+            </div>
+            ${dayTable(day)}
+          </div>
+          <div style="display:flex;gap:16px;margin-top:8px;align-items:flex-start;flex-wrap:wrap">
+            <div>
+              <div class="section-title" style="font-size:12px;margin:4px 0 4px">סיכום לפי כיתה</div>
+              <table style="width:auto;margin-bottom:0">
+                <thead><tr>
+                  <th style="width:95px;padding:3px 6px;font-size:10.5px">כיתה</th>
+                  <th style="width:55px;padding:3px 6px;font-size:10.5px;text-align:center">מתוכנן</th>
+                  <th style="width:55px;padding:3px 6px;font-size:10.5px;text-align:center">בפועל</th>
+                </tr></thead>
+                <tbody>${classRows}</tbody>
+                ${classFooterRow}
+              </table>
+            </div>
+            <div>
+              <div class="section-title" style="font-size:12px;margin:4px 0 4px">סיכום כללי</div>
+              <table style="width:auto;margin-bottom:0">
+                <thead><tr>
+                  <th style="padding:3px 8px;font-size:10.5px">קטגוריה</th>
+                  <th style="width:55px;padding:3px 6px;font-size:10.5px;text-align:center">מספר</th>
+                </tr></thead>
+                <tbody>${summaryRows}</tbody>
+              </table>
+            </div>
+            ${splitSection}
+          </div>
+        </div>
+      `;
+    }
 
-    return `
-      <div class="header">
-        <div class="title">נספח ו׳ — טבלת שליטה בטיול</div>
-        ${t ? `<div class="ministry">${t.name ?? ""} | ${t.schoolName ?? ""}</div>` : ""}
-      </div>
-      ${daysHTML}
-      <div style="display:flex;gap:20px;margin-top:12px;align-items:flex-start">
-        <div>
-          <div class="section-title">סיכום לפי כיתה</div>
-          <table style="width:auto">
-            <thead><tr>
-              <th style="width:110px">כיתה</th>
-              <th style="width:65px;text-align:center">מתוכנן</th>
-              <th style="width:65px;text-align:center">בפועל</th>
-            </tr></thead>
-            <tbody>${classRows}</tbody>
-          </table>
-        </div>
-        <div>
-          <div class="section-title">סיכום כללי</div>
-          <table style="width:auto">
-            <thead><tr><th>קטגוריה</th><th style="width:60px;text-align:center">מספר</th></tr></thead>
-            <tbody>${summaryRows}</tbody>
-          </table>
-        </div>
-      </div>
-      ${splitSection}
-    `;
+    const daysToRender = data.days.length > 0 ? data.days : [makeDay(1)];
+    return daysToRender.map((day) => renderDayPage(day)).join("");
   }
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const opts = classOptions();
   const allCollapsed = data.days.length > 0 && data.days.every((d) => collapsed.has(d.id));
+  const activeDaySplits = getDaySplits(activeSplitDay);
+  const activeDayActual = getDayActual(activeSplitDay);
+  const otherDaysWithSplits = data.days.filter(
+    (d) =>
+      d.id !== activeSplitDay?.id &&
+      Object.values(getDaySplits(d)).some((parts) => parts && parts.length >= 2)
+  );
 
   return (
     <div className="space-y-6">
@@ -799,6 +999,11 @@ export function AppendixVavClient() {
         {data.days.map((day, dayIdx) => {
           const isCollapsed = collapsed.has(day.id);
           const dt = dayTotals(day);
+          const opts = classOptions(day);
+          const daySplits = getDaySplits(day);
+          const splitClassNamesOnDay = classNames.filter(
+            (cls) => daySplits[cls] && daySplits[cls].length >= 2
+          );
 
           return (
             <div key={day.id} className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] overflow-hidden">
@@ -824,7 +1029,7 @@ export function AppendixVavClient() {
                 />
 
                 {/* Day stats */}
-                <div className="flex items-center gap-3 mr-2 flex-1">
+                <div className="flex items-center gap-3 mr-2 flex-1 flex-wrap">
                   <span className="text-white/70 text-xs">{day.buses.length} אוטובוסים</span>
                   {dt.students > 0 && (
                     <>
@@ -834,7 +1039,27 @@ export function AppendixVavClient() {
                       <span className="text-white/70 text-xs">🧑‍🏫 {dt.escorts} מלווים</span>
                     </>
                   )}
+                  {splitClassNamesOnDay.length > 0 && (
+                    <>
+                      <span className="text-white/50 text-xs">·</span>
+                      <span className="text-amber-200 text-xs">
+                        ✂️ מפוצלות: {splitClassNamesOnDay.join(", ")}
+                      </span>
+                    </>
+                  )}
                 </div>
+
+                {/* Quick jump to split classes for this day */}
+                {classNames.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => focusDaySplits(day.id)}
+                    className="text-xs text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-[var(--radius-sm)] px-2.5 py-1 transition-colors flex-shrink-0"
+                    title={`ניהול פיצול כיתות עבור ${day.label}`}
+                  >
+                    ✂️ פיצול כיתות ({splitClassNamesOnDay.length})
+                  </button>
+                )}
 
                 {/* Delete day (only if >1 day) */}
                 {data.days.length > 1 && (
@@ -860,9 +1085,9 @@ export function AppendixVavClient() {
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-semibold text-primary text-sm">אוטובוס {bi + 1}</span>
                           <div className="flex items-center gap-4">
-                            <span className="text-xs font-medium text-foreground">👥 {busStudentCount(bus)} תלמידים</span>
+                            <span className="text-xs font-medium text-foreground">👥 {busStudentCount(day, bus)} תלמידים</span>
                             <span className="text-xs font-medium text-foreground">🧑‍🏫 {calcEscorts(bus)} מלווים</span>
-                            <span className="text-xs font-bold text-primary">סה״כ {busStudentCount(bus) + calcEscorts(bus)}</span>
+                            <span className="text-xs font-bold text-primary">סה״כ {busStudentCount(day, bus) + calcEscorts(bus)}</span>
                             <button onClick={() => deleteBus(day.id, bi)} className="text-muted-foreground hover:text-destructive transition-colors">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -890,7 +1115,7 @@ export function AppendixVavClient() {
 
                         {/* Bus assigned students roster expander */}
                         {(() => {
-                          const busStudents = getBusAssignedStudents(bus);
+                          const busStudents = getBusAssignedStudents(day, bus);
                           if (busStudents.length === 0) return null;
                           const isRosterOpen = openBusRosters.has(bus.id);
                           return (
@@ -1060,9 +1285,77 @@ export function AppendixVavClient() {
       </div>
 
       {/* Class control table */}
-      {classNames.length > 0 && (
-        <div className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5">
-          <h2 className="text-sm font-semibold text-foreground mb-3">בקרת נוכחות לפי כיתה</h2>
+      {classNames.length > 0 && activeSplitDay && (
+        <div ref={classControlRef} className="bg-white rounded-[var(--radius)] border border-border shadow-[var(--shadow-card)] p-5 scroll-mt-4">
+          <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+            <div>
+              <h2 className="text-sm font-semibold text-foreground">
+                בקרת נוכחות ופיצול כיתות{data.days.length > 1 ? ` — ${activeSplitDay.label}` : ""}
+              </h2>
+              {data.days.length > 1 && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  בחר יום כדי להגדיר אילו כיתות מפוצלות באותו יום (השיבוץ באוטובוסים מתעדכן בהתאם ליום)
+                </p>
+              )}
+            </div>
+
+            {data.days.length > 1 && otherDaysWithSplits.length > 0 && (
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs text-muted-foreground">העתק פיצולים מ:</span>
+                {otherDaysWithSplits.map((srcDay) => (
+                  <button
+                    key={srcDay.id}
+                    type="button"
+                    onClick={() => copySplitsFromDay(srcDay.id, activeSplitDay.id)}
+                    className="text-xs px-2.5 py-1 rounded-[var(--radius-sm)] border border-border bg-muted/40 hover:bg-muted text-foreground transition-colors"
+                    title={`העתק את פיצולי הכיתות ושיוך השמות מ${srcDay.label} ל${activeSplitDay.label}`}
+                  >
+                    📋 {srcDay.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Day Selector Tabs when trip has multiple days */}
+          {data.days.length > 1 && (
+            <div className="flex items-center gap-1.5 flex-wrap mb-4 pb-3 border-b border-border">
+              {data.days.map((d) => {
+                const isActive = d.id === activeSplitDay.id;
+                const dSplits = getDaySplits(d);
+                const splitCountOnDay = classNames.filter(
+                  (cls) => dSplits[cls] && dSplits[cls].length >= 2
+                ).length;
+
+                return (
+                  <button
+                    key={d.id}
+                    type="button"
+                    onClick={() => setActiveSplitDayId(d.id)}
+                    className={`text-xs px-3 py-1.5 rounded-full border transition-all flex items-center gap-1.5 ${
+                      isActive
+                        ? "bg-[#1b4332] text-white font-semibold border-[#1b4332] shadow-xs"
+                        : "bg-muted/40 text-muted-foreground border-border hover:bg-muted hover:text-foreground"
+                    }`}
+                  >
+                    <span>{d.label}</span>
+                    {splitCountOnDay > 0 && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                          isActive
+                            ? "bg-white/20 text-white"
+                            : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {splitCountOnDay} מפוצלות
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
           <table className="w-full text-sm">
             <thead className="bg-muted border-b border-border">
               <tr>
@@ -1074,7 +1367,7 @@ export function AppendixVavClient() {
             </thead>
             <tbody>
               {classNames.map((cls) => {
-                const parts = data.splits[cls];
+                const parts = activeDaySplits[cls];
                 const isSplit = parts && parts.length >= 2;
                 const splitSum = isSplit ? parts.reduce((s, v) => s + (parseInt(v) || 0), 0) : 0;
                 const isOver = isSplit && splitSum > plannedByClass[cls];
@@ -1089,8 +1382,8 @@ export function AppendixVavClient() {
                           <input
                             type="number"
                             min="0"
-                            value={data.actual[cls] ?? ""}
-                            onChange={(e) => setActual(cls, e.target.value)}
+                            value={activeDayActual[cls] ?? ""}
+                            onChange={(e) => setActual(cls, e.target.value, activeSplitDay.id)}
                             placeholder="—"
                             className="w-20 text-sm text-center border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors"
                           />
@@ -1104,7 +1397,7 @@ export function AppendixVavClient() {
                       <td className="px-3 py-1.5 text-center">
                         {!isSplit ? (
                           <button
-                            onClick={() => splitClass(cls)}
+                            onClick={() => splitClass(cls, activeSplitDay.id)}
                             className="text-xs text-muted-foreground hover:text-primary border border-border rounded px-2 py-0.5 transition-colors"
                           >
                             ↕ פצל
@@ -1113,7 +1406,7 @@ export function AppendixVavClient() {
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               type="button"
-                              onClick={() => setSplitModalClass(cls)}
+                              onClick={() => setSplitModalTarget({ dayId: activeSplitDay.id, cls })}
                               className="text-xs text-primary hover:text-primary/80 border border-primary/30 rounded px-2 py-0.5 transition-colors bg-white font-medium"
                               title="ערוך חלוקת תלמידים"
                             >
@@ -1121,9 +1414,9 @@ export function AppendixVavClient() {
                             </button>
                             <button
                               type="button"
-                              onClick={() => unsplitClass(cls)}
+                              onClick={() => unsplitClass(cls, activeSplitDay.id)}
                               className="text-xs text-destructive/70 hover:text-destructive border border-destructive/30 rounded px-2 py-0.5 transition-colors"
-                              title="בטל פיצול כיתה"
+                              title="בטל פיצול כיתה ביום זה"
                             >
                               ✕ בטל
                             </button>
@@ -1132,12 +1425,12 @@ export function AppendixVavClient() {
                       </td>
                     </tr>
                     {isSplit && parts.map((count, pi) => {
-                      const assignedStudents = getPartAssignedStudents(cls, pi);
+                      const assignedStudents = getPartAssignedStudents(activeSplitDay, cls, pi);
                       const hasAssigned = assignedStudents.length > 0;
                       const previewNames = assignedStudents.slice(0, 3).map((s) => `${s.firstName} ${s.lastName}`).join(", ");
                       const extraCount = assignedStudents.length - 3;
                       const fullNamesTitle = assignedStudents.map((s) => `${s.firstName} ${s.lastName}`).join(", ");
-                      const partCopyKey = `${cls}|${pi}`;
+                      const partCopyKey = `${activeSplitDay.id}|${cls}|${pi}`;
 
                       return (
                         <tr key={`${cls}-${pi}`} className="border-b border-border bg-amber-50/30 hover:bg-amber-50/60">
@@ -1150,7 +1443,7 @@ export function AppendixVavClient() {
                               type="number"
                               min="0"
                               value={count}
-                              onChange={(e) => setSplitCount(cls, pi, e.target.value)}
+                              onChange={(e) => setSplitCount(cls, pi, e.target.value, activeSplitDay.id)}
                               placeholder="כמות"
                               className="w-20 text-sm text-center border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors"
                             />
@@ -1159,7 +1452,7 @@ export function AppendixVavClient() {
                             <div className="flex items-center gap-2 flex-wrap">
                               <button
                                 type="button"
-                                onClick={() => setSplitModalClass(cls)}
+                                onClick={() => setSplitModalTarget({ dayId: activeSplitDay.id, cls })}
                                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1.5 ${
                                   hasAssigned
                                     ? "bg-primary/10 border-primary/30 text-primary font-medium hover:bg-primary/20"
@@ -1175,7 +1468,7 @@ export function AppendixVavClient() {
                               {/* Export / WhatsApp button next to each split part */}
                               <button
                                 type="button"
-                                onClick={() => setExportTarget({ cls, partIdx: pi })}
+                                onClick={() => setExportTarget({ dayId: activeSplitDay.id, cls, partIdx: pi })}
                                 className={`text-xs px-2.5 py-1 rounded-full border transition-colors flex items-center gap-1.5 ${
                                   hasAssigned
                                     ? "bg-emerald-50 border-emerald-200 text-emerald-700 font-medium hover:bg-emerald-100"
@@ -1192,7 +1485,7 @@ export function AppendixVavClient() {
                               {hasAssigned && (
                                 <button
                                   type="button"
-                                  onClick={() => copySplitText(buildPartWhatsAppText(cls, pi, exportIncludePhones), partCopyKey)}
+                                  onClick={() => copySplitText(buildPartWhatsAppText(activeSplitDay, cls, pi, exportIncludePhones), partCopyKey)}
                                   className="text-xs px-2 py-1 rounded-full border border-border bg-white text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
                                   title="העתק רשימת שמות ללוח"
                                 >
@@ -1219,7 +1512,7 @@ export function AppendixVavClient() {
                           <div className="flex items-center gap-3">
                             {parts.length < 4 && (
                               <button
-                                onClick={() => addSplitPart(cls)}
+                                onClick={() => addSplitPart(cls, activeSplitDay.id)}
                                 className="text-xs text-primary/70 hover:text-primary transition-colors"
                               >
                                 + הוסף {PART_LABELS[parts.length]}
@@ -1227,7 +1520,7 @@ export function AppendixVavClient() {
                             )}
                             {parts.length > 2 && (
                               <button
-                                onClick={() => removeSplitPart(cls)}
+                                onClick={() => removeSplitPart(cls, activeSplitDay.id)}
                                 className="text-xs text-destructive/70 hover:text-destructive transition-colors"
                               >
                                 - הסר {PART_LABELS[parts.length - 1]}
@@ -1246,7 +1539,7 @@ export function AppendixVavClient() {
                 <td className="px-4 py-2 font-semibold text-primary text-sm">{'סה"כ'}</td>
                 <td className="px-4 py-2 text-center font-bold text-primary">{goingStudents.length}</td>
                 <td className="px-4 py-2 text-center font-bold text-primary">
-                  {Object.values(data.actual).reduce((s, v) => s + (parseInt(v) || 0), 0) || ""}
+                  {Object.values(activeDayActual).reduce((s, v) => s + (parseInt(v) || 0), 0) || ""}
                 </td>
                 <td />
               </tr>
@@ -1255,37 +1548,48 @@ export function AppendixVavClient() {
         </div>
       )}
 
-      {splitModalClass && (
-        <SplitStudentsDialog
-          open={!!splitModalClass}
-          onOpenChange={(open) => { if (!open) setSplitModalClass(null); }}
-          className={splitModalClass}
-          students={goingStudents.filter((s) => s.class === splitModalClass)}
-          partsCount={data.splits[splitModalClass]?.length || 2}
-          initialPartStudents={Array.from(
-            { length: data.splits[splitModalClass]?.length || 2 },
-            (_, pi) =>
-              data.splitStudents?.[splitModalClass]?.[pi] ??
-              data.splitStudents?.[splitModalClass]?.[String(pi)] ??
-              []
-          )}
-          onSave={(newPartStudents) => handleSaveSplitStudents(splitModalClass, newPartStudents)}
-        />
-      )}
+      {splitModalTarget && (() => {
+        const modalDay = data.days.find((d) => d.id === splitModalTarget.dayId) ?? activeSplitDay;
+        const modalDaySplits = getDaySplits(modalDay);
+        const modalDaySplitStudents = getDaySplitStudents(modalDay);
+        const partsCount = modalDaySplits[splitModalTarget.cls]?.length || 2;
+
+        return (
+          <SplitStudentsDialog
+            open={!!splitModalTarget}
+            onOpenChange={(open) => { if (!open) setSplitModalTarget(null); }}
+            className={splitModalTarget.cls}
+            dayLabel={data.days.length > 1 ? modalDay?.label : undefined}
+            students={goingStudents.filter((s) => s.class === splitModalTarget.cls)}
+            partsCount={partsCount}
+            initialPartStudents={Array.from(
+              { length: partsCount },
+              (_, pi) =>
+                modalDaySplitStudents[splitModalTarget.cls]?.[pi] ??
+                modalDaySplitStudents[splitModalTarget.cls]?.[String(pi)] ??
+                []
+            )}
+            onSave={(newPartStudents) =>
+              handleSaveSplitStudents(splitModalTarget.dayId, splitModalTarget.cls, newPartStudents)
+            }
+          />
+        );
+      })()}
 
       {/* Export / WhatsApp Split Roster Dialog */}
       {exportTarget && (() => {
-        const { cls, partIdx } = exportTarget;
-        const parts = data.splits[cls] ?? [];
+        const { dayId, cls, partIdx } = exportTarget;
+        const targetDay = data.days.find((d) => d.id === dayId) ?? activeSplitDay;
+        const parts = getDaySplits(targetDay)[cls] ?? [];
         const currentStudents =
           partIdx === "all"
-            ? parts.flatMap((_, pi) => getPartAssignedStudents(cls, pi))
-            : getPartAssignedStudents(cls, partIdx);
+            ? parts.flatMap((_, pi) => getPartAssignedStudents(targetDay, cls, pi))
+            : getPartAssignedStudents(targetDay, cls, partIdx);
         const formattedText =
           partIdx === "all"
-            ? buildAllPartsWhatsAppText(cls, exportIncludePhones)
-            : buildPartWhatsAppText(cls, partIdx, exportIncludePhones);
-        const modalCopyKey = `modal-${cls}-${partIdx}`;
+            ? buildAllPartsWhatsAppText(targetDay, cls, exportIncludePhones)
+            : buildPartWhatsAppText(targetDay, cls, partIdx, exportIncludePhones);
+        const modalCopyKey = `modal-${dayId}-${cls}-${partIdx}`;
 
         return (
           <Dialog open={!!exportTarget} onOpenChange={(open) => { if (!open) setExportTarget(null); }}>
@@ -1293,6 +1597,7 @@ export function AppendixVavClient() {
               <DialogHeader>
                 <DialogTitle className="text-base font-semibold text-foreground">
                   ייצוא רשימת תלמידים — כיתה {cls} {partIdx !== "all" ? `(${PART_LABELS[partIdx]})` : "(כל החלקים)"}
+                  {data.days.length > 1 && targetDay ? ` — ${targetDay.label}` : ""}
                 </DialogTitle>
               </DialogHeader>
 
@@ -1300,13 +1605,13 @@ export function AppendixVavClient() {
               <div className="flex items-center justify-between gap-2 flex-wrap pt-1">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {parts.map((_, pi) => {
-                    const count = getPartAssignedStudents(cls, pi).length;
+                    const count = getPartAssignedStudents(targetDay, cls, pi).length;
                     const active = partIdx === pi;
                     return (
                       <button
                         key={pi}
                         type="button"
-                        onClick={() => setExportTarget({ cls, partIdx: pi })}
+                        onClick={() => setExportTarget({ dayId, cls, partIdx: pi })}
                         className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                           active
                             ? "bg-primary text-primary-foreground border-primary font-medium"
@@ -1319,7 +1624,7 @@ export function AppendixVavClient() {
                   })}
                   <button
                     type="button"
-                    onClick={() => setExportTarget({ cls, partIdx: "all" })}
+                    onClick={() => setExportTarget({ dayId, cls, partIdx: "all" })}
                     className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${
                       partIdx === "all"
                         ? "bg-primary text-primary-foreground border-primary font-medium"
@@ -1350,9 +1655,8 @@ export function AppendixVavClient() {
                     type="button"
                     size="sm"
                     onClick={() => {
-                      const targetCls = cls;
                       setExportTarget(null);
-                      setSplitModalClass(targetCls);
+                      setSplitModalTarget({ dayId, cls });
                     }}
                   >
                     שבץ שמות תלמידים כעת
@@ -1402,7 +1706,7 @@ export function AppendixVavClient() {
         );
       })()}
 
-      <AppendixActions title="נספח ו׳ — טבלת שליטה בטיול" getHTML={getHTML} />
+      <AppendixActions title="נספח ו׳ — טבלת שליטה בטיול" getHTML={getHTML} fitPages />
     </div>
   );
 }

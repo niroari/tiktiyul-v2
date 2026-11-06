@@ -18,6 +18,7 @@ interface SplitStudentsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   className: string;
+  dayLabel?: string;
   students: Student[]; // All active/going students in this class
   partsCount: number;  // 2, 3, or 4
   initialPartStudents: string[][]; // array of student IDs per part
@@ -28,6 +29,7 @@ export function SplitStudentsDialog({
   open,
   onOpenChange,
   className,
+  dayLabel,
   students,
   partsCount,
   initialPartStudents,
@@ -139,7 +141,7 @@ export function SplitStudentsDialog({
           <div className="flex items-center justify-between gap-4">
             <div>
               <DialogTitle className="text-base font-semibold text-foreground">
-                פיצול תלמידי כיתה {className}
+                פיצול תלמידי כיתה {className}{dayLabel ? ` — ${dayLabel}` : ""}
               </DialogTitle>
               <p className="text-xs text-muted-foreground mt-0.5">
                 שיוך שמות התלמידים לפי חלקי הכיתה (הכמויות יתעדכנו אוטומטית בטבלת השליטה)
