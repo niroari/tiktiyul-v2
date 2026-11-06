@@ -357,8 +357,13 @@ type VavData = {
 };
 
 function calcEscorts(bus: VavBus): number {
-  return bus.crew.filter((c, i) => i !== DRIVER_IDX && c.name.trim()).length
-    + bus.extraTeachers.filter((e) => e.name.trim()).length;
+  const crewCount = (bus.crew ?? []).filter(
+    (c, i) => i !== DRIVER_IDX && Boolean(c?.name?.trim() || c?.phone?.trim())
+  ).length;
+  const extraCount = (bus.extraTeachers ?? []).filter(
+    (e) => Boolean(e?.name?.trim() || e?.phone?.trim())
+  ).length;
+  return crewCount + extraCount;
 }
 
 export function buildVav(data: VavData, students: Student[], trip: Trip | null): string {

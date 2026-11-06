@@ -21,7 +21,6 @@ import { SplitStudentsDialog } from "./split-students-dialog";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CREW_ROLES = ["מורה אחראי/ת", "מורה נוסף", "נהג", "מאבטח/חובש", "מדריך"];
-const STAFF_DROPDOWN_LIMIT = 2;
 const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳", "חלק ד׳"];
 
 function splitKey(cls: string, part: number) { return `${cls}|${part}`; }
@@ -83,8 +82,13 @@ function makeDay(n: number): DayData {
 const DRIVER_IDX = CREW_ROLES.indexOf("נהג");
 
 function calcEscorts(bus: Bus): number {
-  return bus.crew.filter((c, i) => i !== DRIVER_IDX && c.name.trim()).length
-    + bus.extraTeachers.filter((e) => e.name.trim()).length;
+  const crewCount = (bus.crew ?? []).filter(
+    (c, i) => i !== DRIVER_IDX && Boolean(c?.name?.trim() || c?.phone?.trim())
+  ).length;
+  const extraCount = (bus.extraTeachers ?? []).filter(
+    (e) => Boolean(e?.name?.trim() || e?.phone?.trim())
+  ).length;
+  return crewCount + extraCount;
 }
 
 function cloneSplits(raw: unknown): Record<string, string[]> {
@@ -139,7 +143,7 @@ function migrateData(raw: Record<string, unknown>): VavData {
       ...d,
       buses: (d.buses ?? []).map((b: Bus) => ({
         ...b,
-        crew:            b.crew            ?? CREW_ROLES.map(() => ({ name: "", phone: "" })),
+        crew:            CREW_ROLES.map((_, ri) => b.crew?.[ri] ?? { name: "", phone: "" }),
         extraTeachers:   b.extraTeachers   ?? [],
         classSelections: b.classSelections ?? ["", "", "", ""],
       })),
@@ -372,7 +376,8 @@ export function AppendixVavClient() {
     const day = data.days.find((d) => d.id === dayId)!;
     const buses = day.buses.map((b, i) => {
       if (i !== busIdx) return b;
-      const crew = b.crew.map((c, ri) => ri === roleIdx ? { ...c, [field]: val } : c);
+      const baseCrew = CREW_ROLES.map((_, ri) => b.crew?.[ri] ?? { name: "", phone: "" });
+      const crew = baseCrew.map((c, ri) => ri === roleIdx ? { ...c, [field]: val } : c);
       return { ...b, crew };
     });
     updateDayBuses(dayId, buses);
@@ -383,8 +388,9 @@ export function AppendixVavClient() {
     const day = data.days.find((d) => d.id === dayId)!;
     const buses = day.buses.map((b, i) => {
       if (i !== busIdx) return b;
-      const crew = b.crew.map((c, ri) =>
-        ri === roleIdx ? { name, phone: member?.phone ?? c.phone } : c
+      const baseCrew = CREW_ROLES.map((_, ri) => b.crew?.[ri] ?? { name: "", phone: "" });
+      const crew = baseCrew.map((c, ri) =>
+        ri === roleIdx ? { name, phone: member?.phone ?? (name ? c.phone : "") } : c
       );
       return { ...b, crew };
     });
@@ -409,7 +415,7 @@ export function AppendixVavClient() {
     updateDayBuses(dayId, buses);
   }
 
-  function setExtraTeacher(dayId: string, busIdx: number, ti: number, field: keyof ExtraTeacher, val: string) {
+  function setExtraTeacher(dayId: string, busIdx: number, ti: number, field: keyof ExtraTeacher, val: string, fromSelect = false) {
     const day = data.days.find((d) => d.id === dayId)!;
     const buses = day.buses.map((b, i) => {
       if (i !== busIdx) return b;
@@ -417,7 +423,11 @@ export function AppendixVavClient() {
         if (j !== ti) return e;
         if (field === "name") {
           const member = staff.find((s) => s.name === val);
-          return { ...e, name: val, phone: member?.phone ?? e.phone };
+          return {
+            ...e,
+            name: val,
+            phone: member?.phone ?? (fromSelect && !val ? "" : e.phone),
+          };
         }
         return { ...e, [field]: val };
       });
@@ -1091,9 +1101,9 @@ export function AppendixVavClient() {
 
               {/* Day content */}
               {!isCollapsed && (
-                <div className="divide-y divide-border">
+                <div className="p-4 space-y-5 bg-muted/15">
                   {day.buses.map((bus, bi) => (
-                    <div key={bus.id}>
+                    <div key={bus.id} className="bg-white rounded-[var(--radius-sm)] border border-border shadow-xs overflow-hidden">
                       {/* Bus header */}
                       <div className="px-5 py-3 border-b border-border bg-[var(--brand-light)]">
                         <div className="flex items-center justify-between mb-2">
@@ -1180,103 +1190,136 @@ export function AppendixVavClient() {
                             </tr>
                           </thead>
                           <tbody>
-                            {CREW_ROLES.map((role, ri) => (
-                              <tr key={role} className="border-b border-border last:border-0 hover:bg-muted/20">
-                                <td className="px-3 py-2 text-sm text-muted-foreground">{role}</td>
-                                <td className="px-2 py-1.5">
-                                  {ri < STAFF_DROPDOWN_LIMIT ? (
-                                    <select
-                                      value={bus.crew[ri]?.name ?? ""}
-                                      onChange={(e) => selectStaff(day.id, bi, ri, e.target.value)}
-                                      className="w-full text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-white focus:outline-none focus:border-primary"
-                                    >
-                                      <option value="">— בחר מצוות הטיול —</option>
-                                      {staff.map((s) => (
-                                        <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
-                                      ))}
-                                    </select>
-                                  ) : (
-                                    <input
-                                      type="text"
-                                      value={bus.crew[ri]?.name ?? ""}
-                                      onChange={(e) => setCrewField(day.id, bi, ri, "name", e.target.value)}
-                                      placeholder="שם מלא..."
-                                      className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50"
-                                    />
-                                  )}
-                                </td>
-                                <td className="px-2 py-1.5">
-                                  <input
-                                    type="tel"
-                                    value={bus.crew[ri]?.phone ?? ""}
-                                    onChange={(e) => setCrewField(day.id, bi, ri, "phone", e.target.value)}
-                                    placeholder="050-0000000"
-                                    dir="ltr"
-                                    className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50 text-left"
-                                  />
-                                </td>
-                              </tr>
-                            ))}
+                            {CREW_ROLES.map((role, ri) => {
+                              const currentName = bus.crew[ri]?.name ?? "";
+                              const matchedStaffVal = staff.some((s) => s.name === currentName) ? currentName : "";
 
-                            {bus.extraTeachers.map((et, ti) => (
-                              <tr key={ti} className="border-b border-border last:border-0 hover:bg-muted/20 bg-muted/5">
-                                <td className="px-2 py-1.5">
-                                  <div className="flex items-center gap-1">
-                                    <select
-                                      value={et.role}
-                                      onChange={(e) => setExtraTeacher(day.id, bi, ti, "role", e.target.value)}
-                                      className="text-xs border border-border rounded-[var(--radius-sm)] px-1.5 py-1 bg-white focus:outline-none focus:border-primary"
-                                    >
-                                      <option value="מורה">מורה</option>
-                                      <option value="מלווה">מלווה</option>
-                                    </select>
-                                    <button onClick={() => removeExtraTeacher(day.id, bi, ti)} className="text-muted-foreground hover:text-destructive transition-colors">
-                                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                    </button>
-                                  </div>
-                                </td>
-                                <td className="px-2 py-1.5">
-                                  <select
-                                    value={et.name}
-                                    onChange={(e) => setExtraTeacher(day.id, bi, ti, "name", e.target.value)}
-                                    className="w-full text-sm border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-white focus:outline-none focus:border-primary"
-                                  >
-                                    <option value="">— בחר מצוות הטיול —</option>
-                                    {staff.map((s) => (
-                                      <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
-                                    ))}
-                                  </select>
-                                </td>
-                                <td className="px-2 py-1.5">
-                                  <input
-                                    type="tel"
-                                    value={et.phone}
-                                    onChange={(e) => setExtraTeacher(day.id, bi, ti, "phone", e.target.value)}
-                                    placeholder="טלפון..."
-                                    dir="ltr"
-                                    className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50 text-left"
-                                  />
-                                </td>
-                              </tr>
-                            ))}
+                              return (
+                                <tr key={role} className="border-b border-border last:border-0 hover:bg-muted/20">
+                                  <td className="px-3 py-2 text-sm text-muted-foreground">{role}</td>
+                                  <td className="px-2 py-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      {staff.length > 0 && (
+                                        <select
+                                          value={matchedStaffVal}
+                                          onChange={(e) => selectStaff(day.id, bi, ri, e.target.value)}
+                                          className="w-40 shrink-0 text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-white focus:outline-none focus:border-primary"
+                                          title="בחר מרשימת צוות הטיול"
+                                        >
+                                          <option value="">— בחר מצוות הטיול —</option>
+                                          {staff.map((s) => (
+                                            <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
+                                          ))}
+                                        </select>
+                                      )}
+                                      <input
+                                        type="text"
+                                        value={currentName}
+                                        onChange={(e) => setCrewField(day.id, bi, ri, "name", e.target.value)}
+                                        placeholder={staff.length > 0 ? "או הקלד שם ידנית..." : "שם מלא..."}
+                                        className="w-full min-w-0 text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 px-1 transition-colors placeholder:text-muted-foreground/50"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-2 py-1.5">
+                                    <input
+                                      type="tel"
+                                      value={bus.crew[ri]?.phone ?? ""}
+                                      onChange={(e) => setCrewField(day.id, bi, ri, "phone", e.target.value)}
+                                      placeholder="050-0000000"
+                                      dir="ltr"
+                                      className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50 text-left"
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+
+                            {bus.extraTeachers.map((et, ti) => {
+                              const matchedExtraVal = staff.some((s) => s.name === et.name) ? et.name : "";
+
+                              return (
+                                <tr key={ti} className="border-b border-border last:border-0 hover:bg-muted/20 bg-muted/5">
+                                  <td className="px-2 py-1.5">
+                                    <div className="flex items-center gap-1">
+                                      <select
+                                        value={et.role}
+                                        onChange={(e) => setExtraTeacher(day.id, bi, ti, "role", e.target.value)}
+                                        className="text-xs border border-border rounded-[var(--radius-sm)] px-1.5 py-1 bg-white focus:outline-none focus:border-primary"
+                                      >
+                                        <option value="מורה">מורה</option>
+                                        <option value="מלווה">מלווה</option>
+                                      </select>
+                                      <button onClick={() => removeExtraTeacher(day.id, bi, ti)} className="text-muted-foreground hover:text-destructive transition-colors">
+                                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="px-2 py-1.5">
+                                    <div className="flex items-center gap-1.5">
+                                      {staff.length > 0 && (
+                                        <select
+                                          value={matchedExtraVal}
+                                          onChange={(e) => setExtraTeacher(day.id, bi, ti, "name", e.target.value, true)}
+                                          className="w-40 shrink-0 text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-white focus:outline-none focus:border-primary"
+                                          title="בחר מרשימת צוות הטיול"
+                                        >
+                                          <option value="">— בחר מצוות הטיול —</option>
+                                          {staff.map((s) => (
+                                            <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
+                                          ))}
+                                        </select>
+                                      )}
+                                      <input
+                                        type="text"
+                                        value={et.name}
+                                        onChange={(e) => setExtraTeacher(day.id, bi, ti, "name", e.target.value)}
+                                        placeholder={staff.length > 0 ? "או הקלד שם ידנית..." : "שם מלא..."}
+                                        className="w-full min-w-0 text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 px-1 transition-colors placeholder:text-muted-foreground/50"
+                                      />
+                                    </div>
+                                  </td>
+                                  <td className="px-2 py-1.5">
+                                    <input
+                                      type="tel"
+                                      value={et.phone}
+                                      onChange={(e) => setExtraTeacher(day.id, bi, ti, "phone", e.target.value)}
+                                      placeholder="טלפון..."
+                                      dir="ltr"
+                                      className="w-full text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 transition-colors placeholder:text-muted-foreground/50 text-left"
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
 
-                        <Button variant="ghost" size="sm" onClick={() => addExtraTeacher(day.id, bi)} className="text-primary text-xs" type="button">
-                          <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                          הוסף מלווה נוסף
-                        </Button>
+                        <div className="flex items-center justify-between gap-3 flex-wrap pt-2 border-t border-border/60">
+                          <Button variant="ghost" size="sm" onClick={() => addExtraTeacher(day.id, bi)} className="text-primary text-xs" type="button">
+                            <svg className="w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                            הוסף מלווה נוסף
+                          </Button>
+                          <div className="flex items-center gap-3 text-xs bg-[var(--brand-light)]/70 border border-primary/20 rounded-full px-3 py-1">
+                            <span className="font-semibold text-primary">אוטובוס {bi + 1}:</span>
+                            <span className="text-foreground">👥 {busStudentCount(day, bus)} תלמידים</span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="text-foreground">🧑‍🏫 {calcEscorts(bus)} מלווים (ללא נהג)</span>
+                            <span className="text-muted-foreground">·</span>
+                            <span className="font-bold text-primary">סה״כ {busStudentCount(day, bus) + calcEscorts(bus)} נוסעים</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   ))}
 
                   {/* Add bus */}
-                  <div className="px-5 py-3">
-                    <Button variant="outline" size="sm" onClick={() => addBus(day.id)} className="w-full" type="button">
+                  <div>
+                    <Button variant="outline" size="sm" onClick={() => addBus(day.id)} className="w-full bg-white" type="button">
                       <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                       </svg>
