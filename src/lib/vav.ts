@@ -9,6 +9,7 @@ export type VavExtraTeacher = {
   role?: string;
   name: string;
   phone: string;
+  note?: string;
 };
 
 export type VavBus = {

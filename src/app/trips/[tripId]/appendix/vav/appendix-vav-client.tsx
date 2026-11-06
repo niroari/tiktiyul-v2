@@ -21,6 +21,22 @@ import { SplitStudentsDialog } from "./split-students-dialog";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CREW_ROLES = ["מורה אחראי/ת", "מורה נוסף", "נהג", "מאבטח/חובש", "מדריך"];
+const DEFAULT_EXTRA_ROLES = [
+  "מורה",
+  "מורה מלווה",
+  "מורה אחראי/ת",
+  "מחנך",
+  "מלווה",
+  "הורה מלווה",
+  "מדריך",
+  "מאבטח",
+  "חובש",
+  "מאבטח/חובש",
+  "אחות",
+  "רכז טיול",
+  "מנהל טיול",
+  "נהג",
+];
 const PART_LABELS = ["חלק א׳", "חלק ב׳", "חלק ג׳", "חלק ד׳"];
 
 function splitKey(cls: string, part: number) { return `${cls}|${part}`; }
@@ -34,7 +50,7 @@ function splitLabel(cls: string, part: number) { return `${cls} — ${PART_LABEL
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type CrewMember   = { name: string; phone: string; note?: string };
-type ExtraTeacher = { role: "מורה" | "מלווה"; name: string; phone: string };
+type ExtraTeacher = { role: string; name: string; phone: string; note?: string };
 
 type Bus = {
   id: string;
@@ -86,7 +102,7 @@ function calcEscorts(bus: Bus): number {
     (c, i) => i !== DRIVER_IDX && Boolean(c?.name?.trim() || c?.phone?.trim())
   ).length;
   const extraCount = (bus.extraTeachers ?? []).filter(
-    (e) => Boolean(e?.name?.trim() || e?.phone?.trim())
+    (e) => e?.role !== "נהג" && Boolean(e?.name?.trim() || e?.phone?.trim())
   ).length;
   return crewCount + extraCount;
 }
@@ -401,7 +417,7 @@ export function AppendixVavClient() {
     const day = data.days.find((d) => d.id === dayId)!;
     const buses = day.buses.map((b, i) =>
       i === busIdx
-        ? { ...b, extraTeachers: [...b.extraTeachers, { role: "מורה" as const, name: "", phone: "" }] }
+        ? { ...b, extraTeachers: [...b.extraTeachers, { role: "מורה", name: "", phone: "", note: "" }] }
         : b
     );
     updateDayBuses(dayId, buses);
@@ -426,6 +442,7 @@ export function AppendixVavClient() {
           return {
             ...e,
             name: val,
+            role: fromSelect && member?.role?.trim() ? member.role.trim() : e.role,
             phone: member?.phone ?? (fromSelect && !val ? "" : e.phone),
           };
         }
@@ -813,7 +830,7 @@ export function AppendixVavClient() {
           <td style="padding:3.5px 6px;border:1px solid #bbb;font-size:10.5px;font-weight:bold;color:#1b4332;background:#eef7f1;white-space:nowrap">מלווה נוסף ${ei + 1}</td>
           ${day.buses.map((b) => {
             const e = b.extraTeachers[ei];
-            return `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center;vertical-align:middle">${e ? renderCrewCell(e.name, e.phone, e.role) : ""}</td>`;
+            return `<td style="padding:3.5px 5px;border:1px solid #ccc;font-size:10.5px;text-align:center;vertical-align:middle">${e ? renderCrewCell(e.name, e.phone, e.role, e.note) : ""}</td>`;
           }).join("")}
         </tr>`).join("");
 
@@ -1221,15 +1238,13 @@ export function AppendixVavClient() {
                                         placeholder={staff.length > 0 ? "או הקלד שם ידנית..." : "שם מלא..."}
                                         className="w-full min-w-0 text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 px-1 transition-colors placeholder:text-muted-foreground/50"
                                       />
-                                      {role === "מדריך" && (
-                                        <input
-                                          type="text"
-                                          value={bus.crew[ri]?.note ?? ""}
-                                          onChange={(e) => setCrewField(day.id, bi, ri, "note", e.target.value)}
-                                          placeholder="הערה (עולה בדרך, יורד בדרך...)"
-                                          className="w-56 shrink-0 text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-muted/20 hover:bg-white focus:bg-white focus:border-primary focus:outline-none transition-colors placeholder:text-muted-foreground/60"
-                                        />
-                                      )}
+                                      <input
+                                        type="text"
+                                        value={bus.crew[ri]?.note ?? ""}
+                                        onChange={(e) => setCrewField(day.id, bi, ri, "note", e.target.value)}
+                                        placeholder="הערה (עולה בדרך, יורד בדרך...)"
+                                        className="w-56 shrink-0 text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-muted/20 hover:bg-white focus:bg-white focus:border-primary focus:outline-none transition-colors placeholder:text-muted-foreground/60"
+                                      />
                                     </div>
                                   </td>
                                   <td className="px-2 py-1.5">
@@ -1248,6 +1263,13 @@ export function AppendixVavClient() {
 
                             {bus.extraTeachers.map((et, ti) => {
                               const matchedExtraVal = staff.some((s) => s.name === et.name) ? et.name : "";
+                              const extraRoleOptions = Array.from(
+                                new Set([
+                                  ...DEFAULT_EXTRA_ROLES,
+                                  ...staff.map((s) => s.role?.trim()).filter((r): r is string => Boolean(r)),
+                                  ...(et.role ? [et.role] : []),
+                                ])
+                              );
 
                               return (
                                 <tr key={ti} className="border-b border-border last:border-0 hover:bg-muted/20 bg-muted/5">
@@ -1256,12 +1278,13 @@ export function AppendixVavClient() {
                                       <select
                                         value={et.role}
                                         onChange={(e) => setExtraTeacher(day.id, bi, ti, "role", e.target.value)}
-                                        className="text-xs border border-border rounded-[var(--radius-sm)] px-1.5 py-1 bg-white focus:outline-none focus:border-primary"
+                                        className="w-full text-xs border border-border rounded-[var(--radius-sm)] px-1.5 py-1 bg-white focus:outline-none focus:border-primary"
                                       >
-                                        <option value="מורה">מורה</option>
-                                        <option value="מלווה">מלווה</option>
+                                        {extraRoleOptions.map((roleOpt) => (
+                                          <option key={roleOpt} value={roleOpt}>{roleOpt}</option>
+                                        ))}
                                       </select>
-                                      <button onClick={() => removeExtraTeacher(day.id, bi, ti)} className="text-muted-foreground hover:text-destructive transition-colors">
+                                      <button onClick={() => removeExtraTeacher(day.id, bi, ti)} className="text-muted-foreground hover:text-destructive transition-colors shrink-0">
                                         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                         </svg>
@@ -1289,6 +1312,13 @@ export function AppendixVavClient() {
                                         onChange={(e) => setExtraTeacher(day.id, bi, ti, "name", e.target.value)}
                                         placeholder={staff.length > 0 ? "או הקלד שם ידנית..." : "שם מלא..."}
                                         className="w-full min-w-0 text-sm border-b border-transparent hover:border-border focus:border-primary focus:outline-none bg-transparent py-0.5 px-1 transition-colors placeholder:text-muted-foreground/50"
+                                      />
+                                      <input
+                                        type="text"
+                                        value={et.note ?? ""}
+                                        onChange={(e) => setExtraTeacher(day.id, bi, ti, "note", e.target.value)}
+                                        placeholder="הערה (עולה בדרך, יורד בדרך...)"
+                                        className="w-56 shrink-0 text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1 bg-muted/20 hover:bg-white focus:bg-white focus:border-primary focus:outline-none transition-colors placeholder:text-muted-foreground/60"
                                       />
                                     </div>
                                   </td>

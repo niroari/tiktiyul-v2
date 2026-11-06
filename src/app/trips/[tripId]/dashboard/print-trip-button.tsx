@@ -95,7 +95,7 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
             buses: ((d.buses as Record<string, unknown>[]) ?? []).map((b) => ({
               id:              String(b.id ?? ""),
               crew:            (b.crew ?? []) as { name: string; phone: string; note?: string }[],
-              extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string }[],
+              extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string; note?: string }[],
               classSelections: (b.classSelections ?? []) as string[],
             })),
             actual: (d.actual ?? vavRaw?.actual ?? {}) as Record<string, string>,
@@ -108,7 +108,7 @@ export function PrintTripButton({ tripId }: { tripId: string }) {
         buses: rawBuses.map((b) => ({
           id:              b.id ?? "",
           crew:            (b.crew ?? []) as { name: string; phone: string; note?: string }[],
-          extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string }[],
+          extraTeachers:   (b.extraTeachers ?? []) as { role: string; name: string; phone: string; note?: string }[],
           classSelections: b.classSelections ?? [],
         })),
         actual: (vavRaw?.actual ?? {}) as Record<string, string>,

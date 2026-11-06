@@ -338,7 +338,7 @@ function parseSplit(sel: string): [string, number] {
 function splitLabel(cls: string, part: number) { return `${cls} — ${PART_LABELS[part]}`; }
 
 type CrewMember = { name: string; phone: string; note?: string };
-type ExtraTeacher = { role: string; name: string; phone: string };
+type ExtraTeacher = { role: string; name: string; phone: string; note?: string };
 type VavBus = { id: string; classSelections: string[]; crew: CrewMember[]; extraTeachers: ExtraTeacher[] };
 type VavDay = {
   id: string;
@@ -361,7 +361,7 @@ function calcEscorts(bus: VavBus): number {
     (c, i) => i !== DRIVER_IDX && Boolean(c?.name?.trim() || c?.phone?.trim())
   ).length;
   const extraCount = (bus.extraTeachers ?? []).filter(
-    (e) => Boolean(e?.name?.trim() || e?.phone?.trim())
+    (e) => e?.role !== "נהג" && Boolean(e?.name?.trim() || e?.phone?.trim())
   ).length;
   return crewCount + extraCount;
 }
@@ -450,7 +450,7 @@ export function buildVav(data: VavData, students: Student[], trip: Trip | null):
         <td style="padding:3px 6px;border:1px solid #bbb;font-size:9.5px;font-weight:bold;color:#1b4332;background:#eef7f1;white-space:nowrap">מלווה נוסף ${ei + 1}</td>
         ${day.buses.map((b) => {
           const e = b.extraTeachers[ei];
-          return `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;vertical-align:middle">${e ? renderCrewCell(e.name, e.phone, e.role) : ""}</td>`;
+          return `<td style="padding:3px 5px;border:1px solid #ccc;font-size:9.5px;text-align:center;vertical-align:middle">${e ? renderCrewCell(e.name, e.phone, e.role, e.note) : ""}</td>`;
         }).join("")}
       </tr>`).join("");
 
