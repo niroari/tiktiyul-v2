@@ -216,6 +216,7 @@ export function AppendixVavClient() {
   const [data,    setData]    = useState<VavData>({ days: [], actual: {}, splits: {}, splitStudents: {} });
   const [status,  setStatus]  = useState<"idle" | "saving" | "saved">("idle");
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsedBuses, setCollapsedBuses] = useState<Set<string>>(new Set());
   const [activeSplitDayId, setActiveSplitDayId] = useState<string>("");
   const [splitModalTarget, setSplitModalTarget] = useState<{ dayId: string; cls: string } | null>(null);
   const [openBusRosters, setOpenBusRosters] = useState<Set<string>>(new Set());
@@ -352,6 +353,28 @@ export function AppendixVavClient() {
 
   function expandAll() {
     setCollapsed(new Set());
+  }
+
+  function toggleBusCollapse(busId: string) {
+    setCollapsedBuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(busId)) { next.delete(busId); } else { next.add(busId); }
+      return next;
+    });
+  }
+
+  function toggleAllDayBuses(day: DayData) {
+    const allBusIds = day.buses.map((b) => b.id);
+    const allCollapsedInDay = allBusIds.length > 0 && allBusIds.every((id) => collapsedBuses.has(id));
+    setCollapsedBuses((prev) => {
+      const next = new Set(prev);
+      if (allCollapsedInDay) {
+        allBusIds.forEach((id) => next.delete(id));
+      } else {
+        allBusIds.forEach((id) => next.add(id));
+      }
+      return next;
+    });
   }
 
   function focusDaySplits(dayId: string) {
@@ -1041,6 +1064,7 @@ export function AppendixVavClient() {
       <div className="space-y-4">
         {data.days.map((day, dayIdx) => {
           const isCollapsed = collapsed.has(day.id);
+          const allBusesCollapsedInDay = day.buses.length > 0 && day.buses.every((b) => collapsedBuses.has(b.id));
           const dt = dayTotals(day);
           const opts = classOptions(day);
           const daySplits = getDaySplits(day);
@@ -1094,7 +1118,19 @@ export function AppendixVavClient() {
                   )}
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+                  {/* Collapse / Expand all buses in this day */}
+                  {!isCollapsed && day.buses.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleAllDayBuses(day)}
+                      className="text-xs text-white/90 hover:text-white bg-white/10 hover:bg-white/20 border border-white/20 rounded-[var(--radius-sm)] px-2 sm:px-2.5 py-1 transition-colors flex-shrink-0"
+                      title={allBusesCollapsedInDay ? "הרחב את כל האוטובוסים ביום זה" : "כווץ את כל האוטובוסים ביום זה"}
+                    >
+                      {allBusesCollapsedInDay ? "הרחב אוטובוסים" : "כווץ אוטובוסים"}
+                    </button>
+                  )}
+
                   {/* Quick jump to split classes for this day */}
                   {classNames.length > 0 && (
                     <button
@@ -1125,85 +1161,128 @@ export function AppendixVavClient() {
               {/* Day content */}
               {!isCollapsed && (
                 <div className="p-3 sm:p-4 space-y-4 sm:space-y-5 bg-muted/15">
-                  {day.buses.map((bus, bi) => (
-                    <div key={bus.id} className="bg-white rounded-[var(--radius-sm)] border border-border shadow-xs overflow-hidden">
-                      {/* Bus header */}
-                      <div className="px-3.5 sm:px-5 py-3 border-b border-border bg-[var(--brand-light)]">
-                        <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                          <span className="font-semibold text-primary text-sm">אוטובוס {bi + 1}</span>
-                          <div className="flex items-center gap-2.5 sm:gap-4 flex-wrap">
-                            <span className="text-xs font-medium text-foreground">👥 {busStudentCount(day, bus)} תלמידים</span>
-                            <span className="text-xs font-medium text-foreground">🧑‍🏫 {calcEscorts(bus)} מלווים</span>
-                            <span className="text-xs font-bold text-primary">סה״כ {busStudentCount(day, bus) + calcEscorts(bus)}</span>
-                            <button onClick={() => deleteBus(day.id, bi)} className="text-muted-foreground hover:text-destructive transition-colors p-0.5">
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            </button>
-                          </div>
-                        </div>
-                        {classNames.length === 0 ? (
-                          <p className="text-xs text-muted-foreground">ייבא רשימת תלמידים בנספח ז׳ כדי לבחור כיתות</p>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap">
-                            {[0, 1, 2, 3].map((si) => (
-                              <select
-                                key={si}
-                                value={bus.classSelections[si] ?? ""}
-                                onChange={(e) => setBusClass(day.id, bi, si, e.target.value)}
-                                className="w-full sm:w-auto text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1.5 sm:py-1 bg-white text-foreground focus:outline-none focus:border-primary"
-                              >
-                                <option value="">— כיתה {si + 1} —</option>
-                                {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-                              </select>
-                            ))}
-                          </div>
-                        )}
+                  {day.buses.map((bus, bi) => {
+                    const isBusCollapsed = collapsedBuses.has(bus.id);
+                    const busClassLabels = bus.classSelections
+                      .filter(Boolean)
+                      .map((sel) => (isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel))
+                      .join(", ");
+                    const leadTeacher = bus.crew[0]?.name?.trim() || "";
 
-                        {/* Bus assigned students roster expander */}
-                        {(() => {
-                          const busStudents = getBusAssignedStudents(day, bus);
-                          if (busStudents.length === 0) return null;
-                          const isRosterOpen = openBusRosters.has(bus.id);
-                          return (
-                            <div className="mt-2.5 pt-2 border-t border-border/40">
+                    return (
+                      <div key={bus.id} className="bg-white rounded-[var(--radius-sm)] border border-border shadow-xs overflow-hidden">
+                        {/* Bus header */}
+                        <div className={`px-3.5 sm:px-5 py-3 bg-[var(--brand-light)] ${isBusCollapsed ? "" : "border-b border-border"}`}>
+                          <div className={`flex items-center justify-between gap-2 flex-wrap ${isBusCollapsed ? "" : "mb-2"}`}>
+                            <div className="flex items-center gap-2 min-w-0">
                               <button
                                 type="button"
-                                onClick={() => toggleBusRoster(bus.id)}
-                                className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                                onClick={() => toggleBusCollapse(bus.id)}
+                                className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity text-right"
+                                title={isBusCollapsed ? "הרחב אוטובוס" : "כווץ אוטובוס"}
                               >
                                 <svg
-                                  className={`w-3.5 h-3.5 transition-transform ${isRosterOpen ? "rotate-90" : ""}`}
+                                  className={`w-4 h-4 transition-transform shrink-0 ${isBusCollapsed ? "-rotate-90" : ""}`}
                                   fill="none"
                                   stroke="currentColor"
                                   viewBox="0 0 24 24"
                                 >
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                                 </svg>
-                                {isRosterOpen
-                                  ? "הסתר שמות תלמידים משובצים"
-                                  : `הצג שמות תלמידים משובצים (${busStudents.length})`}
+                                <span className="font-semibold text-sm">אוטובוס {bi + 1}</span>
                               </button>
-                              {isRosterOpen && (
-                                <div className="mt-1.5 flex flex-wrap gap-1.5 p-2 bg-white/70 rounded-[var(--radius-sm)] border border-border/50 max-h-36 overflow-y-auto">
-                                  {busStudents.map((s) => (
-                                    <span
-                                      key={s.id}
-                                      className="text-xs bg-muted/80 text-foreground px-2 py-0.5 rounded-full border border-border/40"
+
+                              {isBusCollapsed && busClassLabels && (
+                                <span className="text-xs text-muted-foreground bg-white/80 border border-border/60 rounded-full px-2 py-0.5 truncate max-w-[180px] sm:max-w-xs">
+                                  {busClassLabels}
+                                </span>
+                              )}
+                              {isBusCollapsed && leadTeacher && (
+                                <span className="hidden sm:inline text-xs text-muted-foreground truncate max-w-[160px]">
+                                  · {leadTeacher}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2.5 sm:gap-4 flex-wrap">
+                              <span className="text-xs font-medium text-foreground">👥 {busStudentCount(day, bus)} תלמידים</span>
+                              <span className="text-xs font-medium text-foreground">🧑‍🏫 {calcEscorts(bus)} מלווים</span>
+                              <span className="text-xs font-bold text-primary">סה״כ {busStudentCount(day, bus) + calcEscorts(bus)}</span>
+                              <button onClick={() => deleteBus(day.id, bi)} className="text-muted-foreground hover:text-destructive transition-colors p-0.5" title="מחק אוטובוס">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+
+                          {!isBusCollapsed && (
+                            <>
+                              {classNames.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">ייבא רשימת תלמידים בנספח ז׳ כדי לבחור כיתות</p>
+                              ) : (
+                                <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:flex-wrap">
+                                  {[0, 1, 2, 3].map((si) => (
+                                    <select
+                                      key={si}
+                                      value={bus.classSelections[si] ?? ""}
+                                      onChange={(e) => setBusClass(day.id, bi, si, e.target.value)}
+                                      className="w-full sm:w-auto text-xs border border-border rounded-[var(--radius-sm)] px-2 py-1.5 sm:py-1 bg-white text-foreground focus:outline-none focus:border-primary"
                                     >
-                                      {s.firstName} {s.lastName}
-                                      <span className="text-muted-foreground text-[10px] mr-1">({s.class})</span>
-                                    </span>
+                                      <option value="">— כיתה {si + 1} —</option>
+                                      {opts.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                                    </select>
                                   ))}
                                 </div>
                               )}
-                            </div>
-                          );
-                        })()}
-                      </div>
 
-                      {/* Crew table & mobile list */}
-                      <div className="p-3 sm:p-4">
+                              {/* Bus assigned students roster expander */}
+                              {(() => {
+                                const busStudents = getBusAssignedStudents(day, bus);
+                                if (busStudents.length === 0) return null;
+                                const isRosterOpen = openBusRosters.has(bus.id);
+                                return (
+                                  <div className="mt-2.5 pt-2 border-t border-border/40">
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleBusRoster(bus.id)}
+                                      className="text-xs text-primary hover:underline flex items-center gap-1 font-medium"
+                                    >
+                                      <svg
+                                        className={`w-3.5 h-3.5 transition-transform ${isRosterOpen ? "rotate-90" : ""}`}
+                                        fill="none"
+                                        stroke="currentColor"
+                                        viewBox="0 0 24 24"
+                                      >
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                      </svg>
+                                      {isRosterOpen
+                                        ? "הסתר שמות תלמידים משובצים"
+                                        : `הצג שמות תלמידים משובצים (${busStudents.length})`}
+                                    </button>
+                                    {isRosterOpen && (
+                                      <div className="mt-1.5 flex flex-wrap gap-1.5 p-2 bg-white/70 rounded-[var(--radius-sm)] border border-border/50 max-h-36 overflow-y-auto">
+                                        {busStudents.map((s) => (
+                                          <span
+                                            key={s.id}
+                                            className="text-xs bg-muted/80 text-foreground px-2 py-0.5 rounded-full border border-border/40"
+                                          >
+                                            {s.firstName} {s.lastName}
+                                            <span className="text-muted-foreground text-[10px] mr-1">({s.class})</span>
+                                          </span>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </>
+                          )}
+                        </div>
+
+                        {/* Crew table & mobile list */}
+                        {!isBusCollapsed && (
+                          <div className="p-3 sm:p-4">
                         {/* Mobile stacked cards (< md) + horizontally scrollable table wrapper */}
                         <div className="md:hidden space-y-2.5 mb-3">
                           {CREW_ROLES.map((role, ri) => {
@@ -1518,9 +1597,11 @@ export function AppendixVavClient() {
                             <span className="font-bold text-primary">סה״כ {busStudentCount(day, bus) + calcEscorts(bus)} נוסעים</span>
                           </div>
                         </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   {/* Add bus */}
                   <div>
