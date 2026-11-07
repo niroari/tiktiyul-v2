@@ -6,7 +6,8 @@ import { saveAppendix, subscribeToAppendix } from "@/lib/firestore/appendix";
 import { useStudents } from "@/hooks/use-students";
 import { useTrip } from "@/hooks/use-trip";
 import { useStaff } from "@/hooks/use-staff";
-import { AppendixActions, esc } from "@/components/appendix-actions";
+import { AppendixActions, printHTML, sharePDF, esc } from "@/components/appendix-actions";
+import { Button } from "@/components/ui/button";
 import { StudentAssignSheet } from "@/components/rooms/student-assign-sheet";
 import { HostelMessageDialog } from "@/components/rooms/hostel-message-dialog";
 import { createRoomFillToken, listRoomFillTokensForTrip } from "@/lib/firestore/room-fill-tokens";
@@ -551,6 +552,9 @@ export function RoomsClient() {
   const [generatingClass, setGeneratingClass] = useState<string | null>(null);
   const [copiedToken,    setCopiedToken]    = useState<string | null>(null);
   const [shareError,     setShareError]     = useState<string | null>(null);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
+  const [printTargetClass, setPrintTargetClass] = useState<string>("all");
+  const [pdfLoading,     setPdfLoading]     = useState(false);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const isPending  = useRef(false);
@@ -921,27 +925,45 @@ export function RoomsClient() {
 
   // ── Print ─────────────────────────────────────────────────────────────────────
 
-  function getHTML() {
+  const printableClasses = [...new Set([
+    ...going.map((s) => s.class),
+    ...rooms.map((r) => r.classLabel ?? ""),
+  ].filter(Boolean))].sort((a, b) => a.localeCompare(b, "he"));
+
+  function roomBelongsToClass(room: Room, targetClass: string): boolean {
+    if (targetClass === "all") return true;
+    const studs = room.studentIds.map((id) => studentById[id]).filter(Boolean);
+    if (studs.length > 0) {
+      return studs.some((s) => s.class === targetClass);
+    }
+    return room.classLabel === targetClass;
+  }
+
+  function getHTML(targetClass: string = "all") {
+    const isSingleClass = targetClass !== "all";
     const sections = (["male", "female"] as const).map((gender) => {
-      const gRooms = rooms.filter((r) => r.gender === gender);
+      const gRooms = rooms.filter((r) => r.gender === gender && roomBelongsToClass(r, targetClass));
       if (gRooms.length === 0) return "";
       const label = gender === "female" ? "בנות" : "בנים";
       const bgColor = gender === "female" ? "#fce4ec" : "#e3f2fd";
       const chipColor = bgColor;
       const chipBorder = gender === "female" ? "#f48fb1" : "#90caf9";
 
-      const cards = gRooms.map((room) => {
+      const cards = gRooms.map((room, idx) => {
         const studs = room.studentIds.map((id) => studentById[id]).filter(Boolean);
         const chips = studs.map((s) =>
-          `<span style="background:${chipColor};border:1px solid ${chipBorder};border-radius:12px;padding:3px 9px;font-size:12px;display:inline-block;margin:2px">${s.lastName} ${s.firstName} <span style="color:#666;font-size:11px">(${s.class})</span></span>`
+          `<span style="background:${chipColor};border:1px solid ${chipBorder};border-radius:12px;padding:3px 9px;font-size:12px;display:inline-block;margin:2px">${esc(s.lastName)} ${esc(s.firstName)} <span style="color:#666;font-size:11px">(${esc(s.class)})</span></span>`
         ).join("");
-        const classLabel = [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ");
+        const classLabel = studs.length > 0
+          ? [...new Set(studs.map((s) => s.class).filter(Boolean))].sort((a, b) => a.localeCompare(b, "he")).join(" + ")
+          : (room.classLabel ?? "");
         const capLabel = room.capacity !== undefined ? ` · ${room.capacity} מקומות` : "";
         const noteHTML = room.notes
           ? `<div style="font-size:11.5px;color:#444;margin-top:6px;background:#f9f9f9;padding:3px 8px;border-radius:4px;border:1px solid #eee">📝 הערה: ${esc(room.notes)}</div>`
           : "";
+        const isLast = idx === gRooms.length - 1;
         return `
-          <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:10px;break-inside:avoid">
+          <div data-print-block style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:10px;margin-bottom:${isLast ? "18px" : "10px"};page-break-inside:avoid;break-inside:avoid">
             <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;font-size:13px">
               <strong>חדר ${esc(room.number) || "—"}</strong>
               ${classLabel ? `<span style="background:#e8f5e9;color:#2d6a4f;border-radius:8px;padding:2px 8px;font-size:11.5px">${esc(classLabel)}</span>` : ""}
@@ -953,51 +975,72 @@ export function RoomsClient() {
       }).join("");
 
       return `
-        <div style="margin-bottom:20px">
-          <div style="font-size:14px;font-weight:bold;padding:6px 10px;background:${bgColor};border-radius:6px;margin-bottom:10px">${label} — ${gRooms.length} חדרים</div>
-          ${cards}
-        </div>`;
+        <div data-print-block data-keep-with-next="true" style="font-size:14px;font-weight:bold;padding:6px 10px;background:${bgColor};border-radius:6px;margin-bottom:10px;page-break-after:avoid;break-after:avoid">${label} — ${gRooms.length} חדרים</div>
+        ${cards}`;
     }).join("");
 
-    const staffHTML = staffGroups.length > 0
-      ? `<div style="margin-top:24px;border-top:2px solid #eee;padding-top:16px">
-          <div style="font-size:15px;font-weight:bold;margin-bottom:12px">אנשי צוות</div>
-          ${staffGroups.map((group) => `
-            <div style="margin-bottom:16px">
-              <div style="font-size:13.5px;font-weight:bold;padding:6px 10px;background:#f5f5f5;border-radius:6px;margin-bottom:8px">${group.label} — ${group.rooms.length} חדרים</div>
-              <div style="display:flex;flex-wrap:wrap;gap:8px">
-                ${group.rooms.map((room) => `
-                  <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px 12px;font-size:12.5px;break-inside:avoid">
-                    <strong>חדר ${room.number || "—"}</strong>
-                    <span style="color:#666;margin-right:6px">${room.capacity} מקומות</span>
-                  </div>`).join("")}
-              </div>
-            </div>`).join("")}
-        </div>`
+    const staffHTML = !isSingleClass && staffGroups.length > 0
+      ? `
+        <div data-print-block data-keep-with-next="true" style="margin-top:8px;border-top:2px solid #eee;padding-top:14px;font-size:15px;font-weight:bold;margin-bottom:12px;page-break-after:avoid;break-after:avoid">אנשי צוות</div>
+        ${staffGroups.map((group) => `
+          <div data-print-block style="margin-bottom:16px;page-break-inside:avoid;break-inside:avoid">
+            <div style="font-size:13.5px;font-weight:bold;padding:6px 10px;background:#f5f5f5;border-radius:6px;margin-bottom:8px">${esc(group.label)} — ${group.rooms.length} חדרים</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+              ${group.rooms.map((room) => `
+                <div style="background:white;border:1.5px solid #e0e0e0;border-radius:8px;padding:8px 12px;font-size:12.5px;page-break-inside:avoid;break-inside:avoid">
+                  <strong>חדר ${esc(room.number) || "—"}</strong>
+                  <span style="color:#666;margin-right:6px">${room.capacity} מקומות</span>
+                </div>`).join("")}
+            </div>
+          </div>`).join("")}`
       : "";
 
-    const unassignedHTML = unassigned.length > 0
-      ? `<div style="margin-top:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;break-inside:avoid">
-          <div style="font-size:13px;font-weight:bold;margin-bottom:6px">לא שובצו (${unassigned.length})</div>
+    const targetUnassigned = isSingleClass
+      ? unassigned.filter((s) => s.class === targetClass)
+      : unassigned;
+
+    const unassignedHTML = targetUnassigned.length > 0
+      ? `<div data-print-block style="margin-top:16px;background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:10px;page-break-inside:avoid;break-inside:avoid">
+          <div style="font-size:13px;font-weight:bold;margin-bottom:6px">לא שובצו (${targetUnassigned.length})</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px">
-            ${unassigned.map((s) => {
+            ${targetUnassigned.map((s) => {
               const bg  = s.gender === "female" ? "#fce4ec" : "#e3f2fd";
               const bdr = s.gender === "female" ? "#f48fb1" : "#90caf9";
-              return `<span style="background:${bg};border:1px solid ${bdr};border-radius:12px;padding:3px 9px;font-size:12px">${s.lastName} ${s.firstName} <span style="color:#666">(${s.class})</span></span>`;
+              return `<span style="background:${bg};border:1px solid ${bdr};border-radius:12px;padding:3px 9px;font-size:12px">${esc(s.lastName)} ${esc(s.firstName)} <span style="color:#666">(${esc(s.class)})</span></span>`;
             }).join("")}
           </div>
         </div>`
       : "";
 
+    const headerTitle = isSingleClass ? `חלוקת חדרים — כיתה ${esc(targetClass)}` : "חלוקת חדרים";
+
     return `
-      <div class="header">
-        <div class="title">חלוקת חדרים</div>
-        ${trip ? `<div class="ministry">${trip.name ?? ""} | ${trip.schoolName ?? ""}</div>` : ""}
+      <div class="header" data-print-block data-keep-with-next="true">
+        <div class="title">${headerTitle}</div>
+        ${trip ? `<div class="ministry">${esc(trip.name ?? "")} | ${esc(trip.schoolName ?? "")}</div>` : ""}
       </div>
       ${sections}
       ${staffHTML}
       ${unassignedHTML}
     `;
+  }
+
+  function getPrintTitle(targetClass: string) {
+    return targetClass === "all" ? "חלוקת חדרים" : `חלוקת חדרים — כיתה ${targetClass}`;
+  }
+
+  function handleOpenPrintDialog() {
+    setPrintTargetClass(classFilter);
+    setPrintDialogOpen(true);
+  }
+
+  async function handleShareRoomPDF(targetClass: string) {
+    setPdfLoading(true);
+    try {
+      await sharePDF(getHTML(targetClass), getPrintTitle(targetClass), { paginate: true });
+    } finally {
+      setPdfLoading(false);
+    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -1448,7 +1491,146 @@ export function RoomsClient() {
         }}
       />
 
-      <AppendixActions title="חלוקת חדרים" getHTML={getHTML} />
+      <div className="flex items-center gap-2 mt-6 pt-4 border-t border-border">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (printableClasses.length > 0) {
+              handleOpenPrintDialog();
+            } else {
+              printHTML(getHTML("all"), getPrintTitle("all"), { paginate: true });
+            }
+          }}
+        >
+          <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+          </svg>
+          הדפס
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            if (printableClasses.length > 0) {
+              handleOpenPrintDialog();
+            } else {
+              handleShareRoomPDF("all");
+            }
+          }}
+          disabled={pdfLoading}
+        >
+          {pdfLoading ? (
+            <svg className="w-4 h-4 ml-1.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
+          )}
+          {pdfLoading ? "מכין PDF..." : "שתף PDF"}
+        </Button>
+      </div>
+
+      {/* Print / PDF class selection dialog */}
+      {printDialogOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="fixed inset-0 bg-black/40" onClick={() => setPrintDialogOpen(false)} />
+          <div className="relative bg-white rounded-[var(--radius)] shadow-xl w-full max-w-md p-6 space-y-4" dir="rtl">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-foreground">הדפסת חלוקת חדרים</h2>
+              <button
+                type="button"
+                onClick={() => setPrintDialogOpen(false)}
+                className="text-muted-foreground hover:text-foreground text-xl leading-none"
+              >
+                ✕
+              </button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              בחר/י האם להדפיס את כל הכיתות או רק חדרים של כיתה אחת:
+            </p>
+
+            <div className="space-y-3">
+              {/* All classes option */}
+              <button
+                type="button"
+                onClick={() => setPrintTargetClass("all")}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-[var(--radius-sm)] border text-right transition-colors ${
+                  printTargetClass === "all"
+                    ? "border-primary bg-primary/10 text-primary font-semibold"
+                    : "border-border text-foreground hover:bg-muted/50"
+                }`}
+              >
+                <span className="text-sm">כל הכיתות</span>
+                <span className="text-xs text-muted-foreground">
+                  {rooms.length} חדרים{staffGroups.length > 0 ? " + צוות" : ""}
+                </span>
+              </button>
+
+              {/* Single class options */}
+              {printableClasses.length > 0 && (
+                <div className="space-y-1.5">
+                  <div className="text-xs font-medium text-muted-foreground">או בחר/י חדרים של כיתה אחת:</div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-56 overflow-y-auto">
+                    {printableClasses.map((className) => {
+                      const classRoomCount = rooms.filter((r) => roomBelongsToClass(r, className)).length;
+                      const isSelected = printTargetClass === className;
+                      return (
+                        <button
+                          key={className}
+                          type="button"
+                          onClick={() => setPrintTargetClass(className)}
+                          className={`flex flex-col items-start px-3 py-2 rounded-[var(--radius-sm)] border text-right transition-colors ${
+                            isSelected
+                              ? "border-primary bg-primary/10 text-primary font-semibold"
+                              : "border-border text-foreground hover:bg-muted/50"
+                          }`}
+                        >
+                          <span className="text-sm">כיתה {className}</span>
+                          <span className="text-xs text-muted-foreground">{classRoomCount} חדרים</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between gap-2 pt-3 border-t border-border">
+              <Button variant="outline" size="sm" onClick={() => setPrintDialogOpen(false)}>
+                ביטול
+              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pdfLoading}
+                  onClick={async () => {
+                    setPrintDialogOpen(false);
+                    await handleShareRoomPDF(printTargetClass);
+                  }}
+                >
+                  {pdfLoading ? "מכין PDF..." : "שתף PDF"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setPrintDialogOpen(false);
+                    printHTML(getHTML(printTargetClass), getPrintTitle(printTargetClass), { paginate: true });
+                  }}
+                >
+                  <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  הדפס
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <HostelDialog
         open={hostelOpen}

@@ -46,20 +46,20 @@ export default function QuickLibraryPage() {
 
   return (
     <div className="min-h-screen bg-muted">
-      <header className="sticky top-0 z-10 bg-white border-b border-border h-14 flex items-center justify-between px-6 shadow-[var(--shadow-card)]">
-        <Link href="/trips" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-          <svg className="w-4 h-4 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <header className="sticky top-0 z-10 bg-white border-b border-border min-h-14 py-2 flex items-center justify-between gap-2 px-3 sm:px-6 shadow-[var(--shadow-card)] flex-wrap">
+        <Link href="/trips" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors shrink-0">
+          <svg className="w-4 h-4 rotate-180 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           הטיולים שלי
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <Link href="/quick/bus-check"
-            className="px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
+            className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors whitespace-nowrap">
             + בדיקת אוטובוס
           </Link>
           <Link href="/quick/gimel"
-            className="px-3 py-1.5 text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors">
+            className="px-2 sm:px-3 py-1 sm:py-1.5 text-xs sm:text-sm border border-border rounded-[var(--radius-sm)] hover:bg-muted/50 transition-colors whitespace-nowrap">
             + כתב מינוי
           </Link>
           <ThemeToggle />

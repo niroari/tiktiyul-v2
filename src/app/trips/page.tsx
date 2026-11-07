@@ -56,9 +56,9 @@ export default function TripsPage() {
 
   return (
     <div className="min-h-screen bg-muted dark:bg-background">
-      <header className="sticky top-0 z-10 bg-card border-b border-border h-14 flex items-center justify-between px-6 shadow-[var(--shadow-card)]">
-        <span className="font-bold text-lg text-primary tracking-tight">תיק טיול</span>
-        <div className="flex items-center gap-2.5">
+      <header className="sticky top-0 z-10 bg-card border-b border-border h-14 flex items-center justify-between gap-2 px-4 sm:px-6 shadow-[var(--shadow-card)]">
+        <span className="font-bold text-lg text-primary tracking-tight truncate">תיק טיול</span>
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
           <Button size="sm" onClick={() => setDialogOpen(true)}>
             <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />

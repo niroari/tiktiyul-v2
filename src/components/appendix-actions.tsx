@@ -23,24 +23,26 @@ export function safeSigUrl(url: string | null): string | null {
 
 export type PrintOptions = {
   fitPages?: boolean;
+  paginate?: boolean;
 };
 
 function buildDoc(innerHTML: string, title: string, options?: PrintOptions) {
   const fitPages = options?.fitPages ?? false;
+  const paginate = options?.paginate ?? false;
   return `<!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
   <meta charset="UTF-8"/>
   <title>${title}</title>
   <style>
+    @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;700&display=swap');
     @page {
       size: A4 portrait;
-      margin: ${fitPages ? "8mm" : "20mm 15mm 20mm 15mm"};
+      margin: ${fitPages ? "8mm" : paginate ? "10mm" : "20mm 15mm 20mm 15mm"};
     }
-    @import url('https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;700&display=swap');
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Frank Ruhl Libre', 'Arial Hebrew', 'Arial', sans-serif; direction: rtl; text-align: right;
-           padding: ${fitPages ? "0" : "20mm 15mm"}; font-size: 13px; line-height: 1.5; color: #111; background: #fff;
+           padding: ${fitPages || paginate ? "0" : "20mm 15mm"}; font-size: 13px; line-height: 1.5; color: #111; background: #fff;
            word-spacing: normal; letter-spacing: normal; }
     table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
     th, td { border: 1px solid #999; padding: 6px 8px; text-align: right; font-size: 13px;
@@ -57,7 +59,7 @@ function buildDoc(innerHTML: string, title: string, options?: PrintOptions) {
     .letter-body { border: 1px solid #ddd; border-radius: 6px; padding: 18px 22px; line-height: 2; font-size: 14px; margin: 10px 0; }
     .print-page {
       width: 794px;
-      padding: 30px 30px;
+      padding: ${paginate ? "56px 56px" : "30px 30px"};
       background: #fff;
       page-break-after: always;
       break-after: page;
@@ -81,7 +83,7 @@ function buildDoc(innerHTML: string, title: string, options?: PrintOptions) {
       }
       .print-page {
         width: 100% !important;
-        padding: 0 !important;
+        padding: ${paginate ? "10mm 10mm" : "0"} !important;
         overflow: hidden !important;
       }
     }
@@ -89,6 +91,64 @@ function buildDoc(innerHTML: string, title: string, options?: PrintOptions) {
 </head>
 <body>${innerHTML}</body>
 </html>`;
+}
+
+/**
+ * Paginates `[data-print-block]` elements (or direct body children) into `.print-page`
+ * containers so that no block is ever sliced across A4 page boundaries and every page
+ * maintains consistent top/bottom/side margins.
+ * Elements with `data-keep-with-next="true"` are kept together with the following block.
+ */
+function paginateToA4Pages(iDoc: Document) {
+  const rawBlocks = Array.from(iDoc.querySelectorAll<HTMLElement>("[data-print-block]"));
+  const blocks = rawBlocks.length > 0 ? rawBlocks : Array.from(iDoc.body.children) as HTMLElement[];
+  if (blocks.length === 0) return;
+
+  // Group blocks where `data-keep-with-next="true"` chains into the next block
+  const groups: HTMLElement[][] = [];
+  let currentGroup: HTMLElement[] = [];
+  for (const block of blocks) {
+    currentGroup.push(block);
+    if (block.getAttribute("data-keep-with-next") !== "true") {
+      groups.push(currentGroup);
+      currentGroup = [];
+    }
+  }
+  if (currentGroup.length > 0) {
+    groups.push(currentGroup);
+  }
+
+  // Clear body and distribute groups across `.print-page` containers
+  iDoc.body.innerHTML = "";
+  const maxContentH = 880; // Safe A4 inner content height in px (leaving >= 40mm vertical margins)
+
+  function createPage() {
+    const page = iDoc.createElement("div");
+    page.className = "print-page";
+    const inner = iDoc.createElement("div");
+    inner.className = "print-page-inner";
+    page.appendChild(inner);
+    iDoc.body.appendChild(page);
+    return { page, inner };
+  }
+
+  let current = createPage();
+  let hasItemsOnPage = false;
+
+  for (const group of groups) {
+    for (const el of group) {
+      current.inner.appendChild(el);
+    }
+
+    if (hasItemsOnPage && current.inner.scrollHeight > maxContentH) {
+      // Move this group to a fresh page so it won't be cut across pages
+      current = createPage();
+      for (const el of group) {
+        current.inner.appendChild(el);
+      }
+    }
+    hasItemsOnPage = true;
+  }
 }
 
 /**
@@ -175,6 +235,9 @@ export function printHTML(innerHTML: string, title: string, options?: PrintOptio
   iDoc.write(buildDoc(innerHTML, title, options));
   iDoc.close();
   iDoc.fonts.ready.then(() => {
+    if (options?.paginate) {
+      paginateToA4Pages(iDoc);
+    }
     if (options?.fitPages) {
       fitPagesToA4(iDoc);
     }
@@ -201,6 +264,9 @@ export async function sharePDF(innerHTML: string, title: string, options?: Print
     await iDoc.fonts.ready;
     await new Promise<void>((r) => setTimeout(r, 400));
 
+    if (options?.paginate) {
+      paginateToA4Pages(iDoc);
+    }
     if (options?.fitPages) {
       fitPagesToA4(iDoc);
     }
@@ -214,7 +280,7 @@ export async function sharePDF(innerHTML: string, title: string, options?: Print
     const pdfW = pdf.internal.pageSize.getWidth();
     const pdfH = pdf.internal.pageSize.getHeight();
 
-    const pageElements = options?.fitPages
+    const pageElements = options?.fitPages || options?.paginate
       ? Array.from(iDoc.querySelectorAll<HTMLElement>(".print-page"))
       : [];
 
@@ -300,15 +366,16 @@ type Props = {
   title: string;
   getHTML: () => string;
   fitPages?: boolean;
+  paginate?: boolean;
 };
 
-export function AppendixActions({ title, getHTML, fitPages }: Props) {
+export function AppendixActions({ title, getHTML, fitPages, paginate }: Props) {
   const [pdfLoading, setPdfLoading] = useState(false);
 
   async function handleSharePDF() {
     setPdfLoading(true);
     try {
-      await sharePDF(getHTML(), title, { fitPages });
+      await sharePDF(getHTML(), title, { fitPages, paginate });
     } finally {
       setPdfLoading(false);
     }
@@ -316,7 +383,7 @@ export function AppendixActions({ title, getHTML, fitPages }: Props) {
 
   return (
     <div className="flex items-center gap-2 mt-6 pt-4 border-t border-border">
-      <Button variant="outline" size="sm" onClick={() => printHTML(getHTML(), title, { fitPages })}>
+      <Button variant="outline" size="sm" onClick={() => printHTML(getHTML(), title, { fitPages, paginate })}>
         <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
         </svg>

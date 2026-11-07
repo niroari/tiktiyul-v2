@@ -137,8 +137,8 @@ export function SplitStudentsDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col p-0 overflow-hidden sm:max-w-2xl" dir="rtl">
         {/* Header */}
-        <DialogHeader className="p-5 border-b border-border bg-muted/20 shrink-0">
-          <div className="flex items-center justify-between gap-4">
+        <DialogHeader className="p-4 sm:p-5 border-b border-border bg-muted/20 shrink-0">
+          <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-4 flex-wrap">
             <div>
               <DialogTitle className="text-base font-semibold text-foreground">
                 פיצול תלמידי כיתה {className}{dayLabel ? ` — ${dayLabel}` : ""}
@@ -147,7 +147,7 @@ export function SplitStudentsDialog({
                 שיוך שמות התלמידים לפי חלקי הכיתה (הכמויות יתעדכנו אוטומטית בטבלת השליטה)
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button
                 variant="outline"
                 size="sm"
@@ -234,9 +234,9 @@ export function SplitStudentsDialog({
               return (
                 <div
                   key={s.id}
-                  className="flex items-center justify-between gap-3 px-3 py-2 rounded-[var(--radius-sm)] border border-border bg-white hover:bg-muted/30 transition-colors"
+                  className="flex items-center justify-between gap-2 sm:gap-3 px-2.5 sm:px-3 py-2 rounded-[var(--radius-sm)] border border-border bg-white hover:bg-muted/30 transition-colors flex-wrap sm:flex-nowrap"
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                     <span className="text-xs font-medium text-foreground truncate">
                       {s.firstName} {s.lastName}
                     </span>
@@ -248,7 +248,7 @@ export function SplitStudentsDialog({
                   </div>
 
                   {/* Part selection segmented buttons */}
-                  <div className="flex items-center gap-1 shrink-0">
+                  <div className="flex items-center gap-1 shrink-0 flex-wrap">
                     {Array.from({ length: partsCount }, (_, pi) => {
                       const isSelected = currentPart === pi;
                       return (
@@ -256,7 +256,7 @@ export function SplitStudentsDialog({
                           key={pi}
                           type="button"
                           onClick={() => assignStudent(s.id, isSelected ? -1 : pi)}
-                          className={`text-xs px-2.5 py-1 rounded-[var(--radius-sm)] transition-all ${
+                          className={`text-xs px-2 sm:px-2.5 py-1 rounded-[var(--radius-sm)] transition-all ${
                             isSelected
                               ? "bg-[#1b4332] text-white font-medium shadow-xs"
                               : "bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground"
