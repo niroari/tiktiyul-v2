@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "@/components/ui/dialog";
-import { AppendixActions, esc } from "@/components/appendix-actions";
+import { AppendixActions, printHTML, sharePDF, esc } from "@/components/appendix-actions";
 import type { Student } from "@/lib/types";
 import { SplitStudentsDialog } from "./split-students-dialog";
 
@@ -223,6 +223,8 @@ export function AppendixVavClient() {
   const [exportTarget, setExportTarget] = useState<{ dayId: string; cls: string; partIdx: number | "all" } | null>(null);
   const [exportIncludePhones, setExportIncludePhones] = useState(false);
   const [copiedPartKey, setCopiedPartKey] = useState<string | null>(null);
+  const [topPdfLoading, setTopPdfLoading] = useState(false);
+  const [busRosterPdfLoadingId, setBusRosterPdfLoadingId] = useState<string | null>(null);
 
   const classControlRef = useRef<HTMLDivElement>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -245,6 +247,42 @@ export function AppendixVavClient() {
   }
 
   // ── Load ───────────────────────────────────────────────────────────────────
+
+  const uiStorageKeyDays = `tiktiyul-vav-collapsed-days-${tripId}`;
+  const uiStorageKeyBuses = `tiktiyul-vav-collapsed-buses-${tripId}`;
+
+  useEffect(() => {
+    try {
+      const savedDays = localStorage.getItem(uiStorageKeyDays);
+      if (savedDays) {
+        const parsed = JSON.parse(savedDays);
+        if (Array.isArray(parsed)) setCollapsed(new Set(parsed.filter((x): x is string => typeof x === "string")));
+      }
+      const savedBuses = localStorage.getItem(uiStorageKeyBuses);
+      if (savedBuses) {
+        const parsed = JSON.parse(savedBuses);
+        if (Array.isArray(parsed)) setCollapsedBuses(new Set(parsed.filter((x): x is string => typeof x === "string")));
+      }
+    } catch {
+      // ignore localStorage errors
+    }
+  }, [uiStorageKeyDays, uiStorageKeyBuses]);
+
+  function persistCollapsedDays(next: Set<string>) {
+    try {
+      localStorage.setItem(uiStorageKeyDays, JSON.stringify(Array.from(next)));
+    } catch {
+      // ignore localStorage errors
+    }
+  }
+
+  function persistCollapsedBuses(next: Set<string>) {
+    try {
+      localStorage.setItem(uiStorageKeyBuses, JSON.stringify(Array.from(next)));
+    } catch {
+      // ignore localStorage errors
+    }
+  }
 
   useEffect(() => {
     const unsub = subscribeToAppendix(tripId, "vav", (raw) => {
@@ -340,6 +378,7 @@ export function AppendixVavClient() {
     setCollapsed((prev) => {
       const next = new Set(prev);
       if (next.has(dayId)) { next.delete(dayId); } else { next.add(dayId); }
+      persistCollapsedDays(next);
       return next;
     });
     if (wasCollapsed) {
@@ -348,17 +387,22 @@ export function AppendixVavClient() {
   }
 
   function collapseAll() {
-    setCollapsed(new Set(data.days.map((d) => d.id)));
+    const next = new Set(data.days.map((d) => d.id));
+    setCollapsed(next);
+    persistCollapsedDays(next);
   }
 
   function expandAll() {
-    setCollapsed(new Set());
+    const next = new Set<string>();
+    setCollapsed(next);
+    persistCollapsedDays(next);
   }
 
   function toggleBusCollapse(busId: string) {
     setCollapsedBuses((prev) => {
       const next = new Set(prev);
       if (next.has(busId)) { next.delete(busId); } else { next.add(busId); }
+      persistCollapsedBuses(next);
       return next;
     });
   }
@@ -373,6 +417,7 @@ export function AppendixVavClient() {
       } else {
         allBusIds.forEach((id) => next.add(id));
       }
+      persistCollapsedBuses(next);
       return next;
     });
   }
@@ -759,6 +804,197 @@ export function AppendixVavClient() {
     return result;
   }
 
+  // Returns all students assigned to a bus (both full classes and split class parts), sorted alphabetically
+  function getBusAllStudents(day: DayData, bus: Bus): { student: Student; groupLabel: string }[] {
+    const result: { student: Student; groupLabel: string }[] = [];
+    const seen = new Set<string>();
+    const daySplitStudents = getDaySplitStudents(day);
+
+    bus.classSelections.filter(Boolean).forEach((sel) => {
+      if (isSplitSel(sel)) {
+        const [cls, part] = parseSplit(sel);
+        const label = splitLabel(cls, part);
+        const studentIds = daySplitStudents[cls]?.[part] ?? daySplitStudents[cls]?.[String(part)] ?? [];
+        const partStudents = (studentIds
+          .map((id) => goingStudents.find((s) => s.id === id))
+          .filter(Boolean) as Student[])
+          .sort((a, b) => {
+            const l = (a.lastName || "").localeCompare(b.lastName || "", "he");
+            return l !== 0 ? l : (a.firstName || "").localeCompare(b.firstName || "", "he");
+          });
+        partStudents.forEach((st) => {
+          if (!seen.has(st.id)) {
+            seen.add(st.id);
+            result.push({ student: st, groupLabel: label });
+          }
+        });
+      } else {
+        const clsStudents = goingStudents
+          .filter((s) => s.class === sel)
+          .sort((a, b) => {
+            const l = (a.lastName || "").localeCompare(b.lastName || "", "he");
+            return l !== 0 ? l : (a.firstName || "").localeCompare(b.firstName || "", "he");
+          });
+        clsStudents.forEach((st) => {
+          if (!seen.has(st.id)) {
+            seen.add(st.id);
+            result.push({ student: st, groupLabel: sel });
+          }
+        });
+      }
+    });
+
+    return result;
+  }
+
+  function getBusCrewMembers(bus: Bus): { role: string; name: string; phone: string; note: string }[] {
+    const list: { role: string; name: string; phone: string; note: string }[] = [];
+    CREW_ROLES.forEach((role, ri) => {
+      const c = bus.crew?.[ri];
+      const name = (c?.name ?? "").trim();
+      const phone = (c?.phone ?? "").trim();
+      const note = (c?.note ?? "").trim();
+      if (name || phone || note) {
+        list.push({ role, name: name || "—", phone, note });
+      }
+    });
+    (bus.extraTeachers ?? []).forEach((et) => {
+      const name = (et.name ?? "").trim();
+      const phone = (et.phone ?? "").trim();
+      const note = (et.note ?? "").trim();
+      if (name || phone || note) {
+        list.push({ role: (et.role ?? "מלווה נוסף").trim(), name: name || "—", phone, note });
+      }
+    });
+    return list;
+  }
+
+  function buildBusRosterHTML(day: DayData, bus: Bus, busIdx: number): string {
+    const t = trip;
+    const busNum = busIdx + 1;
+    const classLabels = bus.classSelections
+      .filter(Boolean)
+      .map((sel) => (isSplitSel(sel) ? splitLabel(...parseSplit(sel)) : sel))
+      .join(", ");
+    const crewList = getBusCrewMembers(bus);
+    const studentEntries = getBusAllStudents(day, bus);
+    const expectedStudents = busStudentCount(day, bus);
+    const escortsCount = calcEscorts(bus);
+
+    // Check if there are any split classes selected without named students assigned
+    const daySplitStudents = getDaySplitStudents(day);
+    const unassignedSplits = bus.classSelections
+      .filter(Boolean)
+      .filter((sel) => {
+        if (!isSplitSel(sel)) return false;
+        const [cls, part] = parseSplit(sel);
+        const ids = daySplitStudents[cls]?.[part] ?? daySplitStudents[cls]?.[String(part)] ?? [];
+        return ids.length === 0;
+      })
+      .map((sel) => splitLabel(...parseSplit(sel)));
+
+    const crewRowsHTML = crewList.length > 0
+      ? crewList.map((c, idx) => `
+          <tr>
+            <td style="width:28px;text-align:center;padding:4px 6px;font-size:11.5px">${idx + 1}</td>
+            <td style="width:32px;text-align:center;padding:4px 6px;font-size:13px">☐</td>
+            <td style="width:120px;padding:4px 8px;font-size:11.5px;font-weight:bold;color:#1b4332">${esc(c.role)}</td>
+            <td style="padding:4px 8px;font-size:11.5px;font-weight:500">${esc(c.name)}</td>
+            <td style="width:110px;padding:4px 8px;font-size:11.5px;direction:ltr;text-align:right">${esc(c.phone)}</td>
+            <td style="padding:4px 8px;font-size:11px;color:#555">${esc(c.note)}</td>
+          </tr>`).join("")
+      : `<tr><td colspan="6" style="text-align:center;padding:8px;color:#888;font-size:11.5px">לא הוזנו אנשי צוות לאוטובוס זה</td></tr>`;
+
+    const studentRowsHTML = studentEntries.length > 0
+      ? studentEntries.map(({ student: s, groupLabel }, idx) => {
+          const medNote = (s.medicalNotes ?? "").trim();
+          const genNote = (s.notes ?? "").trim();
+          const combinedNotes = [medNote ? `רפואי: ${medNote}` : "", genNote].filter(Boolean).join(" | ");
+          return `
+            <tr>
+              <td style="width:28px;text-align:center;padding:4px 6px;font-size:11.5px">${idx + 1}</td>
+              <td style="width:32px;text-align:center;padding:4px 6px;font-size:13px">☐</td>
+              <td style="width:32px;text-align:center;padding:4px 6px;font-size:13px">☐</td>
+              <td style="padding:4px 8px;font-size:12px;font-weight:500">${esc(s.lastName)} ${esc(s.firstName)}</td>
+              <td style="width:95px;padding:4px 8px;font-size:11.5px;text-align:center">${esc(groupLabel)}</td>
+              <td style="width:105px;padding:4px 8px;font-size:11px;direction:ltr;text-align:right">${esc(s.phone ?? "")}</td>
+              <td style="padding:4px 8px;font-size:10.5px;color:#444">${esc(combinedNotes)}</td>
+            </tr>`;
+        }).join("")
+      : `<tr><td colspan="7" style="text-align:center;padding:12px;color:#888;font-size:11.5px">לא נמצאו שמות תלמידים משובצים לאוטובוס זה</td></tr>`;
+
+    const missingSplitWarningHTML = unassignedSplits.length > 0
+      ? `<div style="margin-bottom:10px;padding:6px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:4px;font-size:11px;color:#856404">
+           שים לב: עבור <strong>${esc(unassignedSplits.join(", "))}</strong> טרם שובצו שמות תלמידים ספציפיים בפיצול הכיתות (מוצגת כמות מתוכננת של ${expectedStudents} תלמידים).
+         </div>`
+      : "";
+
+    return `
+      <div class="header" style="padding-bottom:8px;margin-bottom:12px">
+        <div class="title" style="font-size:18px;margin-top:0">רשימה שמית ובדיקת נוכחות — אוטובוס ${busNum}${data.days.length > 1 ? ` (${esc(day.label)})` : ""}</div>
+        ${t ? `<div class="ministry" style="font-size:11.5px;margin-top:2px">${esc(t.name ?? "")}${t.schoolName ? ` | ${esc(t.schoolName)}` : ""}</div>` : ""}
+      </div>
+
+      <div style="display:flex;gap:18px;flex-wrap:wrap;background:#f4faf6;border:1px solid #c3e6cb;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px">
+        <span><strong>יום:</strong> ${esc(day.label)}</span>
+        <span><strong>אוטובוס:</strong> ${busNum}</span>
+        <span><strong>כיתות:</strong> ${esc(classLabels || "—")}</span>
+        <span><strong>תלמידים:</strong> ${studentEntries.length || expectedStudents}</span>
+        <span><strong>מלווים (ללא נהג):</strong> ${escortsCount}</span>
+        <span><strong>סה״כ נוסעים:</strong> ${(studentEntries.length || expectedStudents) + escortsCount}</span>
+      </div>
+
+      <div class="section-title" style="font-size:13px;margin:8px 0 6px;color:#1b4332">צוות ומלווים באוטובוס</div>
+      <table style="margin-bottom:14px">
+        <thead>
+          <tr>
+            <th style="width:28px;text-align:center;padding:4px 6px;font-size:11px">#</th>
+            <th style="width:32px;text-align:center;padding:4px 6px;font-size:11px">נוכח</th>
+            <th style="width:120px;padding:4px 8px;font-size:11px">תפקיד</th>
+            <th style="padding:4px 8px;font-size:11px">שם מלא</th>
+            <th style="width:110px;padding:4px 8px;font-size:11px">טלפון</th>
+            <th style="padding:4px 8px;font-size:11px">הערות</th>
+          </tr>
+        </thead>
+        <tbody>${crewRowsHTML}</tbody>
+      </table>
+
+      <div class="section-title" style="font-size:13px;margin:10px 0 6px;color:#1b4332">
+        רשימת תלמידים באוטובוס (${studentEntries.length} שמות)
+      </div>
+      ${missingSplitWarningHTML}
+      <table>
+        <thead>
+          <tr>
+            <th style="width:28px;text-align:center;padding:4px 6px;font-size:11px">#</th>
+            <th style="width:32px;text-align:center;padding:4px 6px;font-size:10.5px">עלייה</th>
+            <th style="width:32px;text-align:center;padding:4px 6px;font-size:10.5px">חזרה</th>
+            <th style="padding:4px 8px;font-size:11px">שם התלמיד/ה (משפחה ופרטי)</th>
+            <th style="width:95px;text-align:center;padding:4px 8px;font-size:11px">כיתה</th>
+            <th style="width:105px;padding:4px 8px;font-size:11px">טלפון</th>
+            <th style="padding:4px 8px;font-size:11px">הערות / רפואי</th>
+          </tr>
+        </thead>
+        <tbody>${studentRowsHTML}</tbody>
+      </table>
+    `;
+  }
+
+  function printBusRoster(day: DayData, bus: Bus, busIdx: number) {
+    const title = `רשימה שמית — אוטובוס ${busIdx + 1}${data.days.length > 1 ? ` — ${day.label}` : ""}`;
+    printHTML(buildBusRosterHTML(day, bus, busIdx), title);
+  }
+
+  async function shareBusRosterPDF(day: DayData, bus: Bus, busIdx: number) {
+    const title = `רשימה שמית — אוטובוס ${busIdx + 1}${data.days.length > 1 ? ` — ${day.label}` : ""}`;
+    setBusRosterPdfLoadingId(bus.id);
+    try {
+      await sharePDF(buildBusRosterHTML(day, bus, busIdx), title);
+    } finally {
+      setBusRosterPdfLoadingId(null);
+    }
+  }
+
   const plannedByClass: Record<string, number> = {};
   goingStudents.forEach((s) => { plannedByClass[s.class] = (plannedByClass[s.class] ?? 0) + 1; });
   const classNames = Object.keys(plannedByClass).sort((a, b) => a.localeCompare(b, "he"));
@@ -1040,12 +1276,48 @@ export function AppendixVavClient() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-start justify-between gap-3 sm:gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold text-foreground">נספח ו׳ — טבלת שליטה בטיול</h1>
           <p className="text-sm text-muted-foreground mt-0.5">הקצאת אוטובוסים, צוות ובקרת נוכחות</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            onClick={() => printHTML(getHTML(), "נספח ו׳ — טבלת שליטה בטיול", { fitPages: true })}
+          >
+            <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            הדפס
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            type="button"
+            disabled={topPdfLoading}
+            onClick={async () => {
+              setTopPdfLoading(true);
+              try {
+                await sharePDF(getHTML(), "נספח ו׳ — טבלת שליטה בטיול", { fitPages: true });
+              } finally {
+                setTopPdfLoading(false);
+              }
+            }}
+          >
+            {topPdfLoading ? (
+              <svg className="w-4 h-4 ml-1.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            )}
+            {topPdfLoading ? "מכין PDF..." : "שתף PDF"}
+          </Button>
           {data.days.length > 1 && (
             <button
               onClick={allCollapsed ? expandAll : collapseAll}
@@ -1204,15 +1476,46 @@ export function AppendixVavClient() {
                               )}
                             </div>
 
-                            <div className="flex items-center gap-2.5 sm:gap-4 flex-wrap">
+                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                               <span className="text-xs font-medium text-foreground">👥 {busStudentCount(day, bus)} תלמידים</span>
                               <span className="text-xs font-medium text-foreground">🧑‍🏫 {calcEscorts(bus)} מלווים</span>
                               <span className="text-xs font-bold text-primary">סה״כ {busStudentCount(day, bus) + calcEscorts(bus)}</span>
-                              <button onClick={() => deleteBus(day.id, bi)} className="text-muted-foreground hover:text-destructive transition-colors p-0.5" title="מחק אוטובוס">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                </svg>
-                              </button>
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => printBusRoster(day, bus, bi)}
+                                  className="text-xs px-2 sm:px-2.5 py-1 rounded-[var(--radius-sm)] border border-primary/30 bg-white text-primary hover:bg-primary/5 transition-colors flex items-center gap-1 font-medium"
+                                  title="הדפס רשימה שמית לבדיקת נוכחות באוטובוס (תלמידים + צוות)"
+                                >
+                                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                                  </svg>
+                                  <span>רשימה שמית</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={busRosterPdfLoadingId === bus.id}
+                                  onClick={() => shareBusRosterPDF(day, bus, bi)}
+                                  className="text-xs px-2 py-1 rounded-[var(--radius-sm)] border border-primary/30 bg-white text-primary hover:bg-primary/5 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                  title="שתף PDF של רשימה שמית לאוטובוס זה"
+                                >
+                                  {busRosterPdfLoadingId === bus.id ? (
+                                    <svg className="w-3.5 h-3.5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 2v4m0 12v4M4.93 4.93l2.83 2.83m8.48 8.48l2.83 2.83M2 12h4m12 0h4M4.93 19.07l2.83-2.83m8.48-8.48l2.83-2.83" />
+                                    </svg>
+                                  ) : (
+                                    <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                    </svg>
+                                  )}
+                                  <span className="hidden sm:inline">{busRosterPdfLoadingId === bus.id ? "..." : "PDF"}</span>
+                                </button>
+                                <button onClick={() => deleteBus(day.id, bi)} className="text-muted-foreground hover:text-destructive transition-colors p-1" title="מחק אוטובוס">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -1238,8 +1541,8 @@ export function AppendixVavClient() {
 
                               {/* Bus assigned students roster expander */}
                               {(() => {
-                                const busStudents = getBusAssignedStudents(day, bus);
-                                if (busStudents.length === 0) return null;
+                                const busStudentEntries = getBusAllStudents(day, bus);
+                                if (busStudentEntries.length === 0) return null;
                                 const isRosterOpen = openBusRosters.has(bus.id);
                                 return (
                                   <div className="mt-2.5 pt-2 border-t border-border/40">
@@ -1257,18 +1560,18 @@ export function AppendixVavClient() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                       </svg>
                                       {isRosterOpen
-                                        ? "הסתר שמות תלמידים משובצים"
-                                        : `הצג שמות תלמידים משובצים (${busStudents.length})`}
+                                        ? "הסתר שמות תלמידים באוטובוס"
+                                        : `הצג שמות תלמידים באוטובוס (${busStudentEntries.length})`}
                                     </button>
                                     {isRosterOpen && (
                                       <div className="mt-1.5 flex flex-wrap gap-1.5 p-2 bg-white/70 rounded-[var(--radius-sm)] border border-border/50 max-h-36 overflow-y-auto">
-                                        {busStudents.map((s) => (
+                                        {busStudentEntries.map(({ student: s, groupLabel }) => (
                                           <span
                                             key={s.id}
                                             className="text-xs bg-muted/80 text-foreground px-2 py-0.5 rounded-full border border-border/40"
                                           >
                                             {s.firstName} {s.lastName}
-                                            <span className="text-muted-foreground text-[10px] mr-1">({s.class})</span>
+                                            <span className="text-muted-foreground text-[10px] mr-1">({groupLabel})</span>
                                           </span>
                                         ))}
                                       </div>
