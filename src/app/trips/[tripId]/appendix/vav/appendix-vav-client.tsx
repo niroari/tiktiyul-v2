@@ -1052,6 +1052,31 @@ export function AppendixVavClient() {
     return staff.filter((s) => s.name?.trim() && !assignedNames.has(s.name.trim()));
   }
 
+  function getAvailableStaffForSlot(
+    day: DayData,
+    busIdx: number,
+    slotType: "crew" | "extra",
+    slotIdx: number
+  ) {
+    const assignedElsewhere = new Set<string>();
+    day.buses.forEach((b, bIdx) => {
+      b.crew.forEach((c, cIdx) => {
+        if (bIdx === busIdx && slotType === "crew" && cIdx === slotIdx) return;
+        const n = c.name?.trim();
+        if (n) assignedElsewhere.add(n);
+      });
+      b.extraTeachers.forEach((et, etIdx) => {
+        if (bIdx === busIdx && slotType === "extra" && etIdx === slotIdx) return;
+        const n = et.name?.trim();
+        if (n) assignedElsewhere.add(n);
+      });
+    });
+    return staff.filter((s) => {
+      const n = s.name?.trim();
+      return Boolean(n) && !assignedElsewhere.has(n);
+    });
+  }
+
   // ── Print HTML ─────────────────────────────────────────────────────────────
 
   function getHTML() {
@@ -1600,7 +1625,8 @@ export function AppendixVavClient() {
                             const currentName = bus.crew[ri]?.name ?? "";
                             const currentPhone = bus.crew[ri]?.phone ?? "";
                             const currentNote = bus.crew[ri]?.note ?? "";
-                            const matchedStaffVal = staff.some((s) => s.name === currentName) ? currentName : "";
+                            const availableStaff = getAvailableStaffForSlot(day, bi, "crew", ri);
+                            const matchedStaffVal = availableStaff.some((s) => s.name === currentName) ? currentName : "";
 
                             return (
                               <div key={role} className="rounded-[var(--radius-sm)] border border-border p-2.5 bg-muted/10 space-y-2">
@@ -1626,7 +1652,7 @@ export function AppendixVavClient() {
                                     title="בחר מרשימת צוות הטיול"
                                   >
                                     <option value="">— בחר מצוות הטיול —</option>
-                                    {staff.map((s) => (
+                                    {availableStaff.map((s) => (
                                       <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
                                     ))}
                                   </select>
@@ -1662,7 +1688,8 @@ export function AppendixVavClient() {
                           })}
 
                           {bus.extraTeachers.map((et, ti) => {
-                            const matchedExtraVal = staff.some((s) => s.name === et.name) ? et.name : "";
+                            const availableStaff = getAvailableStaffForSlot(day, bi, "extra", ti);
+                            const matchedExtraVal = availableStaff.some((s) => s.name === et.name) ? et.name : "";
                             const extraRoleOptions = Array.from(
                               new Set([
                                 ...DEFAULT_EXTRA_ROLES,
@@ -1715,7 +1742,7 @@ export function AppendixVavClient() {
                                     title="בחר מרשימת צוות הטיול"
                                   >
                                     <option value="">— בחר מצוות הטיול —</option>
-                                    {staff.map((s) => (
+                                    {availableStaff.map((s) => (
                                       <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
                                     ))}
                                   </select>
@@ -1764,7 +1791,8 @@ export function AppendixVavClient() {
                             <tbody>
                               {CREW_ROLES.map((role, ri) => {
                                 const currentName = bus.crew[ri]?.name ?? "";
-                                const matchedStaffVal = staff.some((s) => s.name === currentName) ? currentName : "";
+                                const availableStaff = getAvailableStaffForSlot(day, bi, "crew", ri);
+                                const matchedStaffVal = availableStaff.some((s) => s.name === currentName) ? currentName : "";
 
                                 return (
                                   <tr key={role} className="border-b border-border last:border-0 hover:bg-muted/20">
@@ -1779,7 +1807,7 @@ export function AppendixVavClient() {
                                             title="בחר מרשימת צוות הטיול"
                                           >
                                             <option value="">— בחר מצוות הטיול —</option>
-                                            {staff.map((s) => (
+                                            {availableStaff.map((s) => (
                                               <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
                                             ))}
                                           </select>
@@ -1815,7 +1843,8 @@ export function AppendixVavClient() {
                               })}
 
                               {bus.extraTeachers.map((et, ti) => {
-                                const matchedExtraVal = staff.some((s) => s.name === et.name) ? et.name : "";
+                                const availableStaff = getAvailableStaffForSlot(day, bi, "extra", ti);
+                                const matchedExtraVal = availableStaff.some((s) => s.name === et.name) ? et.name : "";
                                 const extraRoleOptions = Array.from(
                                   new Set([
                                     ...DEFAULT_EXTRA_ROLES,
@@ -1854,7 +1883,7 @@ export function AppendixVavClient() {
                                             title="בחר מרשימת צוות הטיול"
                                           >
                                             <option value="">— בחר מצוות הטיול —</option>
-                                            {staff.map((s) => (
+                                            {availableStaff.map((s) => (
                                               <option key={s.id} value={s.name}>{s.name}{s.role ? ` (${s.role})` : ""}</option>
                                             ))}
                                           </select>
