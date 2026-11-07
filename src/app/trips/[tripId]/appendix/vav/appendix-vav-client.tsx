@@ -920,15 +920,14 @@ export function AppendixVavClient() {
           return `
             <tr style="${idx % 2 === 1 ? "background:#f9fbf9" : ""}">
               <td style="width:24px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">${idx + 1}</td>
-              <td style="width:28px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">☐</td>
-              <td style="width:28px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">☐</td>
+              <td style="width:36px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">☐</td>
               <td style="padding:${cellPad};font-size:${rowFontSize};font-weight:500;white-space:nowrap">${esc(s.lastName)} ${esc(s.firstName)}</td>
               <td style="width:85px;padding:${cellPad};font-size:${rowFontSize};text-align:center;white-space:nowrap">${esc(groupLabel)}</td>
               <td style="width:95px;padding:${cellPad};font-size:${rowFontSize};direction:ltr;text-align:right;white-space:nowrap">${esc(s.phone ?? "")}</td>
               <td style="padding:${cellPad};font-size:${rowFontSize};color:#444">${esc(combinedNotes)}</td>
             </tr>`;
         }).join("")
-      : `<tr><td colspan="7" style="text-align:center;padding:8px;color:#888;font-size:${rowFontSize}">לא נמצאו שמות תלמידים משובצים לאוטובוס זה</td></tr>`;
+      : `<tr><td colspan="6" style="text-align:center;padding:8px;color:#888;font-size:${rowFontSize}">לא נמצאו שמות תלמידים משובצים לאוטובוס זה</td></tr>`;
 
     const missingSplitWarningHTML = unassignedSplits.length > 0
       ? `<div style="margin-bottom:6px;padding:4px 8px;background:#fff8e1;border:1px solid #ffe082;border-radius:4px;font-size:10px;color:#856404">
@@ -975,8 +974,7 @@ export function AppendixVavClient() {
           <thead>
             <tr>
               <th style="width:24px;text-align:center;padding:${cellPad};font-size:${thFontSize}">#</th>
-              <th style="width:28px;text-align:center;padding:${cellPad};font-size:${thFontSize}">עלייה</th>
-              <th style="width:28px;text-align:center;padding:${cellPad};font-size:${thFontSize}">חזרה</th>
+              <th style="width:36px;text-align:center;padding:${cellPad};font-size:${thFontSize}">נוכחות</th>
               <th style="padding:${cellPad};font-size:${thFontSize}">שם התלמיד/ה (משפחה ופרטי)</th>
               <th style="width:85px;text-align:center;padding:${cellPad};font-size:${thFontSize}">כיתה</th>
               <th style="width:95px;padding:${cellPad};font-size:${thFontSize}">טלפון</th>
