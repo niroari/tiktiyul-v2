@@ -417,17 +417,52 @@ export function AppendixZayinClient() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold text-foreground">נספח ז׳ — רשימת תלמידים</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {goingCount} יוצאים
-            {notGoingCount > 0 && ` · ${notGoingCount} לא יוצאים`}
-            {classFilter && ` · סינון: כיתה ${classFilter}`}
-          </p>
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h1 className="text-xl font-semibold text-foreground">נספח ז׳ — רשימת תלמידים</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">
+              {goingCount} יוצאים
+              {notGoingCount > 0 && ` · ${notGoingCount} לא יוצאים`}
+              {classFilter && ` · סינון: כיתה ${classFilter}`}
+            </p>
+          </div>
+
+          {/* Print buttons at top */}
+          {students.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button
+                size="sm"
+                onClick={() => {
+                  setFsClass(classFilter);
+                  setFieldSheetOpen(true);
+                }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90"
+              >
+                <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                </svg>
+                דף מורה בשטח (להדפסה)
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => printHTML(getHTML(true), "נספח ז׳ — רשימת תלמידים יוצאים")}>
+                <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                </svg>
+                הדפס — יוצאים בלבד
+              </Button>
+              {notGoingCount > 0 && (
+                <Button variant="outline" size="sm" onClick={() => printHTML(getHTML(false), "נספח ז׳ — כל התלמידים")}>
+                  <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+                  </svg>
+                  הדפס — כולל לא יוצאים
+                </Button>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Controls */}
+        {/* Filter & sort controls */}
         {students.length > 0 && (
           <div className="flex items-center gap-2 flex-wrap">
             {/* Class filter */}
