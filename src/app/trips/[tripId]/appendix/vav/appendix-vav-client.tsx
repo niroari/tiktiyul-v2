@@ -893,17 +893,24 @@ export function AppendixVavClient() {
       })
       .map((sel) => splitLabel(...parseSplit(sel)));
 
+    const totalRows = crewList.length + studentEntries.length;
+    const isVeryDense = totalRows > 42;
+    const isDense = totalRows > 30;
+    const cellPad = isVeryDense ? "2px 4px" : isDense ? "2.5px 5px" : "3.5px 6px";
+    const rowFontSize = isVeryDense ? "10px" : isDense ? "10.5px" : "11.5px";
+    const thFontSize = isVeryDense ? "9.5px" : isDense ? "10px" : "10.5px";
+
     const crewRowsHTML = crewList.length > 0
       ? crewList.map((c, idx) => `
           <tr>
-            <td style="width:28px;text-align:center;padding:4px 6px;font-size:11.5px">${idx + 1}</td>
-            <td style="width:32px;text-align:center;padding:4px 6px;font-size:13px">☐</td>
-            <td style="width:120px;padding:4px 8px;font-size:11.5px;font-weight:bold;color:#1b4332">${esc(c.role)}</td>
-            <td style="padding:4px 8px;font-size:11.5px;font-weight:500">${esc(c.name)}</td>
-            <td style="width:110px;padding:4px 8px;font-size:11.5px;direction:ltr;text-align:right">${esc(c.phone)}</td>
-            <td style="padding:4px 8px;font-size:11px;color:#555">${esc(c.note)}</td>
+            <td style="width:24px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">${idx + 1}</td>
+            <td style="width:28px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">☐</td>
+            <td style="width:110px;padding:${cellPad};font-size:${rowFontSize};font-weight:bold;color:#1b4332;white-space:nowrap">${esc(c.role)}</td>
+            <td style="padding:${cellPad};font-size:${rowFontSize};font-weight:500">${esc(c.name)}</td>
+            <td style="width:100px;padding:${cellPad};font-size:${rowFontSize};direction:ltr;text-align:right;white-space:nowrap">${esc(c.phone)}</td>
+            <td style="padding:${cellPad};font-size:${rowFontSize};color:#555">${esc(c.note)}</td>
           </tr>`).join("")
-      : `<tr><td colspan="6" style="text-align:center;padding:8px;color:#888;font-size:11.5px">לא הוזנו אנשי צוות לאוטובוס זה</td></tr>`;
+      : `<tr><td colspan="6" style="text-align:center;padding:5px;color:#888;font-size:${rowFontSize}">לא הוזנו אנשי צוות לאוטובוס זה</td></tr>`;
 
     const studentRowsHTML = studentEntries.length > 0
       ? studentEntries.map(({ student: s, groupLabel }, idx) => {
@@ -911,85 +918,87 @@ export function AppendixVavClient() {
           const genNote = (s.notes ?? "").trim();
           const combinedNotes = [medNote ? `רפואי: ${medNote}` : "", genNote].filter(Boolean).join(" | ");
           return `
-            <tr>
-              <td style="width:28px;text-align:center;padding:4px 6px;font-size:11.5px">${idx + 1}</td>
-              <td style="width:32px;text-align:center;padding:4px 6px;font-size:13px">☐</td>
-              <td style="width:32px;text-align:center;padding:4px 6px;font-size:13px">☐</td>
-              <td style="padding:4px 8px;font-size:12px;font-weight:500">${esc(s.lastName)} ${esc(s.firstName)}</td>
-              <td style="width:95px;padding:4px 8px;font-size:11.5px;text-align:center">${esc(groupLabel)}</td>
-              <td style="width:105px;padding:4px 8px;font-size:11px;direction:ltr;text-align:right">${esc(s.phone ?? "")}</td>
-              <td style="padding:4px 8px;font-size:10.5px;color:#444">${esc(combinedNotes)}</td>
+            <tr style="${idx % 2 === 1 ? "background:#f9fbf9" : ""}">
+              <td style="width:24px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">${idx + 1}</td>
+              <td style="width:28px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">☐</td>
+              <td style="width:28px;text-align:center;padding:${cellPad};font-size:${rowFontSize}">☐</td>
+              <td style="padding:${cellPad};font-size:${rowFontSize};font-weight:500;white-space:nowrap">${esc(s.lastName)} ${esc(s.firstName)}</td>
+              <td style="width:85px;padding:${cellPad};font-size:${rowFontSize};text-align:center;white-space:nowrap">${esc(groupLabel)}</td>
+              <td style="width:95px;padding:${cellPad};font-size:${rowFontSize};direction:ltr;text-align:right;white-space:nowrap">${esc(s.phone ?? "")}</td>
+              <td style="padding:${cellPad};font-size:${rowFontSize};color:#444">${esc(combinedNotes)}</td>
             </tr>`;
         }).join("")
-      : `<tr><td colspan="7" style="text-align:center;padding:12px;color:#888;font-size:11.5px">לא נמצאו שמות תלמידים משובצים לאוטובוס זה</td></tr>`;
+      : `<tr><td colspan="7" style="text-align:center;padding:8px;color:#888;font-size:${rowFontSize}">לא נמצאו שמות תלמידים משובצים לאוטובוס זה</td></tr>`;
 
     const missingSplitWarningHTML = unassignedSplits.length > 0
-      ? `<div style="margin-bottom:10px;padding:6px 10px;background:#fff8e1;border:1px solid #ffe082;border-radius:4px;font-size:11px;color:#856404">
+      ? `<div style="margin-bottom:6px;padding:4px 8px;background:#fff8e1;border:1px solid #ffe082;border-radius:4px;font-size:10px;color:#856404">
            שים לב: עבור <strong>${esc(unassignedSplits.join(", "))}</strong> טרם שובצו שמות תלמידים ספציפיים בפיצול הכיתות (מוצגת כמות מתוכננת של ${expectedStudents} תלמידים).
          </div>`
       : "";
 
     return `
-      <div class="header" style="padding-bottom:8px;margin-bottom:12px">
-        <div class="title" style="font-size:18px;margin-top:0">רשימה שמית ובדיקת נוכחות — אוטובוס ${busNum}${data.days.length > 1 ? ` (${esc(day.label)})` : ""}</div>
-        ${t ? `<div class="ministry" style="font-size:11.5px;margin-top:2px">${esc(t.name ?? "")}${t.schoolName ? ` | ${esc(t.schoolName)}` : ""}</div>` : ""}
-      </div>
+      <div class="print-page">
+        <div class="header" style="padding-bottom:5px;margin-bottom:6px">
+          <div class="title" style="font-size:16px;margin-top:0">רשימה שמית ובדיקת נוכחות — אוטובוס ${busNum}${data.days.length > 1 ? ` (${esc(day.label)})` : ""}</div>
+          ${t ? `<div class="ministry" style="font-size:10.5px;margin-top:1px">${esc(t.name ?? "")}${t.schoolName ? ` | ${esc(t.schoolName)}` : ""}</div>` : ""}
+        </div>
 
-      <div style="display:flex;gap:18px;flex-wrap:wrap;background:#f4faf6;border:1px solid #c3e6cb;border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px">
-        <span><strong>יום:</strong> ${esc(day.label)}</span>
-        <span><strong>אוטובוס:</strong> ${busNum}</span>
-        <span><strong>כיתות:</strong> ${esc(classLabels || "—")}</span>
-        <span><strong>תלמידים:</strong> ${studentEntries.length || expectedStudents}</span>
-        <span><strong>מלווים (ללא נהג):</strong> ${escortsCount}</span>
-        <span><strong>סה״כ נוסעים:</strong> ${(studentEntries.length || expectedStudents) + escortsCount}</span>
-      </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;background:#f4faf6;border:1px solid #c3e6cb;border-radius:4px;padding:5px 10px;margin-bottom:8px;font-size:11px">
+          <span><strong>יום:</strong> ${esc(day.label)}</span>
+          <span><strong>אוטובוס:</strong> ${busNum}</span>
+          <span><strong>כיתות:</strong> ${esc(classLabels || "—")}</span>
+          <span><strong>תלמידים:</strong> ${studentEntries.length || expectedStudents}</span>
+          <span><strong>מלווים (ללא נהג):</strong> ${escortsCount}</span>
+          <span><strong>סה״כ נוסעים:</strong> ${(studentEntries.length || expectedStudents) + escortsCount}</span>
+        </div>
 
-      <div class="section-title" style="font-size:13px;margin:8px 0 6px;color:#1b4332">צוות ומלווים באוטובוס</div>
-      <table style="margin-bottom:14px">
-        <thead>
-          <tr>
-            <th style="width:28px;text-align:center;padding:4px 6px;font-size:11px">#</th>
-            <th style="width:32px;text-align:center;padding:4px 6px;font-size:11px">נוכח</th>
-            <th style="width:120px;padding:4px 8px;font-size:11px">תפקיד</th>
-            <th style="padding:4px 8px;font-size:11px">שם מלא</th>
-            <th style="width:110px;padding:4px 8px;font-size:11px">טלפון</th>
-            <th style="padding:4px 8px;font-size:11px">הערות</th>
-          </tr>
-        </thead>
-        <tbody>${crewRowsHTML}</tbody>
-      </table>
+        <div class="section-title" style="font-size:11.5px;margin:4px 0 4px;padding-bottom:2px;color:#1b4332">צוות ומלווים באוטובוס</div>
+        <table style="margin-bottom:8px">
+          <thead>
+            <tr>
+              <th style="width:24px;text-align:center;padding:${cellPad};font-size:${thFontSize}">#</th>
+              <th style="width:28px;text-align:center;padding:${cellPad};font-size:${thFontSize}">נוכח</th>
+              <th style="width:110px;padding:${cellPad};font-size:${thFontSize}">תפקיד</th>
+              <th style="padding:${cellPad};font-size:${thFontSize}">שם מלא</th>
+              <th style="width:100px;padding:${cellPad};font-size:${thFontSize}">טלפון</th>
+              <th style="padding:${cellPad};font-size:${thFontSize}">הערות</th>
+            </tr>
+          </thead>
+          <tbody>${crewRowsHTML}</tbody>
+        </table>
 
-      <div class="section-title" style="font-size:13px;margin:10px 0 6px;color:#1b4332">
-        רשימת תלמידים באוטובוס (${studentEntries.length} שמות)
+        <div class="section-title" style="font-size:11.5px;margin:6px 0 4px;padding-bottom:2px;color:#1b4332">
+          רשימת תלמידים באוטובוס (${studentEntries.length} שמות)
+        </div>
+        ${missingSplitWarningHTML}
+        <table style="margin-bottom:0">
+          <thead>
+            <tr>
+              <th style="width:24px;text-align:center;padding:${cellPad};font-size:${thFontSize}">#</th>
+              <th style="width:28px;text-align:center;padding:${cellPad};font-size:${thFontSize}">עלייה</th>
+              <th style="width:28px;text-align:center;padding:${cellPad};font-size:${thFontSize}">חזרה</th>
+              <th style="padding:${cellPad};font-size:${thFontSize}">שם התלמיד/ה (משפחה ופרטי)</th>
+              <th style="width:85px;text-align:center;padding:${cellPad};font-size:${thFontSize}">כיתה</th>
+              <th style="width:95px;padding:${cellPad};font-size:${thFontSize}">טלפון</th>
+              <th style="padding:${cellPad};font-size:${thFontSize}">הערות / רפואי</th>
+            </tr>
+          </thead>
+          <tbody>${studentRowsHTML}</tbody>
+        </table>
       </div>
-      ${missingSplitWarningHTML}
-      <table>
-        <thead>
-          <tr>
-            <th style="width:28px;text-align:center;padding:4px 6px;font-size:11px">#</th>
-            <th style="width:32px;text-align:center;padding:4px 6px;font-size:10.5px">עלייה</th>
-            <th style="width:32px;text-align:center;padding:4px 6px;font-size:10.5px">חזרה</th>
-            <th style="padding:4px 8px;font-size:11px">שם התלמיד/ה (משפחה ופרטי)</th>
-            <th style="width:95px;text-align:center;padding:4px 8px;font-size:11px">כיתה</th>
-            <th style="width:105px;padding:4px 8px;font-size:11px">טלפון</th>
-            <th style="padding:4px 8px;font-size:11px">הערות / רפואי</th>
-          </tr>
-        </thead>
-        <tbody>${studentRowsHTML}</tbody>
-      </table>
     `;
   }
 
   function printBusRoster(day: DayData, bus: Bus, busIdx: number) {
     const title = `רשימה שמית — אוטובוס ${busIdx + 1}${data.days.length > 1 ? ` — ${day.label}` : ""}`;
-    printHTML(buildBusRosterHTML(day, bus, busIdx), title);
+    printHTML(buildBusRosterHTML(day, bus, busIdx), title, { fitPages: true });
   }
 
   async function shareBusRosterPDF(day: DayData, bus: Bus, busIdx: number) {
     const title = `רשימה שמית — אוטובוס ${busIdx + 1}${data.days.length > 1 ? ` — ${day.label}` : ""}`;
     setBusRosterPdfLoadingId(bus.id);
     try {
-      await sharePDF(buildBusRosterHTML(day, bus, busIdx), title);
+      await sharePDF(buildBusRosterHTML(day, bus, busIdx), title, { fitPages: true });
     } finally {
       setBusRosterPdfLoadingId(null);
     }
