@@ -84,7 +84,7 @@ function buildDoc(innerHTML: string, title: string, options?: PrintOptions) {
       .print-page {
         width: 100% !important;
         padding: ${paginate ? "10mm 10mm" : "0"} !important;
-        overflow: hidden !important;
+        overflow: visible !important;
       }
     }
   </style>
@@ -153,12 +153,12 @@ function paginateToA4Pages(iDoc: Document) {
 
 /**
  * Dynamically scales each `.print-page` so its content always fits within a single A4 page
- * (734px printable width × 1040px printable height inside 8mm margins at 96 DPI).
+ * (734px printable width × 1000px conservative printable height inside 8mm margins at 96 DPI).
  */
 function fitPagesToA4(iDoc: Document) {
   const pages = Array.from(iDoc.querySelectorAll<HTMLElement>(".print-page"));
   const availW = 734; // 794px - 2 * 30px (8mm)
-  const availH = 1040; // ~297mm - 16mm margin in px, with safety buffer for print headers/footers
+  const availH = 1000; // Conservative A4 inner height leaving safe bottom margin so last row is never clipped
 
   for (const page of pages) {
     let inner = page.querySelector<HTMLElement>(".print-page-inner");
@@ -171,13 +171,18 @@ function fitPagesToA4(iDoc: Document) {
       page.appendChild(inner);
     }
 
-    // Reset before measuring
+    // Reset before measuring and add bottom breathing room so the last table row border is never flush with the edge
     inner.style.transform = "none";
     inner.style.width = "100%";
+    inner.style.paddingBottom = "16px";
     page.style.height = "auto";
 
+    // Account for subpixel table border / font rounding differences in SVG foreignObject and print engines
+    const rowCount = inner.querySelectorAll("tr").length;
+    const heightBuffer = Math.max(20, Math.ceil(rowCount * 0.6));
+
     const naturalW = Math.max(inner.scrollWidth, availW);
-    const naturalH = inner.scrollHeight;
+    const naturalH = inner.scrollHeight + heightBuffer;
 
     if (naturalH <= availH && naturalW <= availW) {
       continue;
@@ -185,40 +190,34 @@ function fitPagesToA4(iDoc: Document) {
 
     let scale = Math.min(1, availW / naturalW, availH / naturalH);
 
-    // Refine scale: widening the inner container to (100 / scale)% gives tables more horizontal
+    // Refine scale: widening the inner container to (availW / scale) gives tables more horizontal
     // room so cells wrap less, reducing scrollHeight and allowing a larger, more readable scale.
     for (let step = 0; step < 3; step++) {
       const targetWidthPx = Math.floor(availW / scale);
       inner.style.width = `${targetWidthPx}px`;
 
-      const curW = inner.scrollWidth;
-      const curH = inner.scrollHeight;
+      const curW = Math.max(inner.scrollWidth, targetWidthPx);
+      const curH = inner.scrollHeight + heightBuffer;
 
-      const scaleW = availW / Math.max(curW, availW);
+      const scaleW = availW / curW;
       const scaleH = availH / Math.max(curH, 1);
-      const nextScale = Math.min(1, scaleW, scaleH);
-
-      if (curH * scale <= availH && curW * scale <= availW + 2) {
-        // Already fits; if there's significant vertical headroom we can nudge scale up slightly
-        scale = Math.min(1, nextScale * 0.99);
-        break;
-      }
-      scale = nextScale * 0.98;
+      scale = Math.min(1, scaleW, scaleH) * 0.985;
     }
 
+    // Measure one final time at the exact width that will be rendered so text wrapping cannot change afterwards
     const finalWidthPx = Math.floor(availW / scale);
     inner.style.width = `${finalWidthPx}px`;
-    if (inner.scrollWidth > finalWidthPx) {
-      scale = Math.min(scale, availW / inner.scrollWidth);
-    }
+    const finalW = Math.max(inner.scrollWidth, finalWidthPx);
+    const finalH = inner.scrollHeight + heightBuffer;
+    scale = Math.min(scale, availW / finalW, availH / Math.max(finalH, 1));
 
     inner.style.transform = `scale(${scale})`;
     inner.style.transformOrigin = "top right";
 
-    const scaledH = Math.ceil(inner.scrollHeight * scale);
-    // Wrap in a fixed-height clip box so the DOM layout height matches the visual scaled height
+    const scaledH = Math.ceil(finalH * scale);
+    // Wrap in a container whose layout height matches the visual scaled height (+ safety buffer) without clipping
     const clipBox = iDoc.createElement("div");
-    clipBox.style.cssText = `width:${availW}px;height:${Math.min(scaledH, availH)}px;overflow:hidden;position:relative;`;
+    clipBox.style.cssText = `width:${availW}px;height:${scaledH}px;overflow:visible;position:relative;`;
     page.insertBefore(clipBox, inner);
     clipBox.appendChild(inner);
   }
@@ -252,7 +251,7 @@ export function printHTML(innerHTML: string, title: string, options?: PrintOptio
 // correctly preserves spaces in Hebrew RTL text — html2canvas's own text renderer drops them.
 export async function sharePDF(innerHTML: string, title: string, options?: PrintOptions): Promise<void> {
   const iframe = document.createElement("iframe");
-  iframe.style.cssText = "position:fixed;top:0;left:0;width:794px;height:1px;border:none;visibility:hidden;";
+  iframe.style.cssText = "position:fixed;top:0;left:0;width:794px;height:1123px;border:none;visibility:hidden;";
   document.body.appendChild(iframe);
 
   try {
@@ -272,7 +271,7 @@ export async function sharePDF(innerHTML: string, title: string, options?: Print
     }
 
     // Expand to full content height before capture
-    iframe.style.height = iDoc.body.scrollHeight + "px";
+    iframe.style.height = Math.max(1123, iDoc.body.scrollHeight + 80) + "px";
 
     const h2c = (await import("html2canvas-pro")).default;
     const { jsPDF } = await import("jspdf");

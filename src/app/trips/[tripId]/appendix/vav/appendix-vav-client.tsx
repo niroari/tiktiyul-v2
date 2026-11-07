@@ -894,11 +894,12 @@ export function AppendixVavClient() {
       .map((sel) => splitLabel(...parseSplit(sel)));
 
     const totalRows = crewList.length + studentEntries.length;
-    const isVeryDense = totalRows > 42;
-    const isDense = totalRows > 30;
-    const cellPad = isVeryDense ? "2px 4px" : isDense ? "2.5px 5px" : "3.5px 6px";
+    const isVeryDense = totalRows > 38;
+    const isDense = totalRows > 28;
+    const cellPad = isVeryDense ? "1.5px 4px" : isDense ? "2px 5px" : "3px 6px";
     const rowFontSize = isVeryDense ? "10px" : isDense ? "10.5px" : "11.5px";
     const thFontSize = isVeryDense ? "9.5px" : isDense ? "10px" : "10.5px";
+    const rowLineHeight = isVeryDense ? "1.2" : "1.3";
 
     const crewRowsHTML = crewList.length > 0
       ? crewList.map((c, idx) => `
@@ -936,13 +937,13 @@ export function AppendixVavClient() {
       : "";
 
     return `
-      <div class="print-page">
-        <div class="header" style="padding-bottom:5px;margin-bottom:6px">
-          <div class="title" style="font-size:16px;margin-top:0">רשימה שמית ובדיקת נוכחות — אוטובוס ${busNum}${data.days.length > 1 ? ` (${esc(day.label)})` : ""}</div>
-          ${t ? `<div class="ministry" style="font-size:10.5px;margin-top:1px">${esc(t.name ?? "")}${t.schoolName ? ` | ${esc(t.schoolName)}` : ""}</div>` : ""}
+      <div class="print-page" style="line-height:${rowLineHeight}">
+        <div class="header" style="padding-bottom:4px;margin-bottom:5px">
+          <div class="title" style="font-size:15.5px;margin-top:0">רשימה שמית ובדיקת נוכחות — אוטובוס ${busNum}${data.days.length > 1 ? ` (${esc(day.label)})` : ""}</div>
+          ${t ? `<div class="ministry" style="font-size:10px;margin-top:1px">${esc(t.name ?? "")}${t.schoolName ? ` | ${esc(t.schoolName)}` : ""}</div>` : ""}
         </div>
 
-        <div style="display:flex;gap:14px;flex-wrap:wrap;background:#f4faf6;border:1px solid #c3e6cb;border-radius:4px;padding:5px 10px;margin-bottom:8px;font-size:11px">
+        <div style="display:flex;gap:14px;flex-wrap:wrap;background:#f4faf6;border:1px solid #c3e6cb;border-radius:4px;padding:4px 10px;margin-bottom:6px;font-size:10.5px">
           <span><strong>יום:</strong> ${esc(day.label)}</span>
           <span><strong>אוטובוס:</strong> ${busNum}</span>
           <span><strong>כיתות:</strong> ${esc(classLabels || "—")}</span>
@@ -951,8 +952,8 @@ export function AppendixVavClient() {
           <span><strong>סה״כ נוסעים:</strong> ${(studentEntries.length || expectedStudents) + escortsCount}</span>
         </div>
 
-        <div class="section-title" style="font-size:11.5px;margin:4px 0 4px;padding-bottom:2px;color:#1b4332">צוות ומלווים באוטובוס</div>
-        <table style="margin-bottom:8px">
+        <div class="section-title" style="font-size:11px;margin:3px 0 3px;padding-bottom:2px;color:#1b4332">צוות ומלווים באוטובוס</div>
+        <table style="margin-bottom:6px;line-height:${rowLineHeight}">
           <thead>
             <tr>
               <th style="width:24px;text-align:center;padding:${cellPad};font-size:${thFontSize}">#</th>
@@ -966,11 +967,11 @@ export function AppendixVavClient() {
           <tbody>${crewRowsHTML}</tbody>
         </table>
 
-        <div class="section-title" style="font-size:11.5px;margin:6px 0 4px;padding-bottom:2px;color:#1b4332">
+        <div class="section-title" style="font-size:11px;margin:4px 0 3px;padding-bottom:2px;color:#1b4332">
           רשימת תלמידים באוטובוס (${studentEntries.length} שמות)
         </div>
         ${missingSplitWarningHTML}
-        <table style="margin-bottom:0">
+        <table style="margin-bottom:4px;line-height:${rowLineHeight}">
           <thead>
             <tr>
               <th style="width:24px;text-align:center;padding:${cellPad};font-size:${thFontSize}">#</th>
@@ -1491,20 +1492,21 @@ export function AppendixVavClient() {
                                 <button
                                   type="button"
                                   onClick={() => printBusRoster(day, bus, bi)}
-                                  className="text-xs px-2 sm:px-2.5 py-1 rounded-[var(--radius-sm)] border border-primary/30 bg-white text-primary hover:bg-primary/5 transition-colors flex items-center gap-1 font-medium"
+                                  className="p-1.5 rounded-[var(--radius-sm)] border border-primary/30 bg-white text-primary hover:bg-primary/5 transition-colors flex items-center justify-center"
                                   title="הדפס רשימה שמית לבדיקת נוכחות באוטובוס (תלמידים + צוות)"
+                                  aria-label="הדפס רשימה שמית"
                                 >
                                   <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
                                   </svg>
-                                  <span>רשימה שמית</span>
                                 </button>
                                 <button
                                   type="button"
                                   disabled={busRosterPdfLoadingId === bus.id}
                                   onClick={() => shareBusRosterPDF(day, bus, bi)}
-                                  className="text-xs px-2 py-1 rounded-[var(--radius-sm)] border border-primary/30 bg-white text-primary hover:bg-primary/5 transition-colors flex items-center gap-1 disabled:opacity-50"
+                                  className="p-1.5 rounded-[var(--radius-sm)] border border-primary/30 bg-white text-primary hover:bg-primary/5 transition-colors flex items-center justify-center disabled:opacity-50"
                                   title="שתף PDF של רשימה שמית לאוטובוס זה"
+                                  aria-label="שתף PDF של רשימה שמית"
                                 >
                                   {busRosterPdfLoadingId === bus.id ? (
                                     <svg className="w-3.5 h-3.5 animate-spin shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1515,7 +1517,6 @@ export function AppendixVavClient() {
                                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                                     </svg>
                                   )}
-                                  <span className="hidden sm:inline">{busRosterPdfLoadingId === bus.id ? "..." : "PDF"}</span>
                                 </button>
                                 <button onClick={() => deleteBus(day.id, bi)} className="text-muted-foreground hover:text-destructive transition-colors p-1" title="מחק אוטובוס">
                                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
