@@ -806,13 +806,11 @@ export function RoomsClient() {
           gender: r.gender,
           notes: r.notes,
         }));
-      const token = await createRoomFillToken(
+      await createRoomFillToken(
         tripId, className, trip?.name ?? "", trip?.schoolName ?? "", classRooms
       );
-      setRoomTokens((prev) => {
-        const filtered = prev.filter((t) => t.class !== className);
-        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", rooms: classRooms, createdAt: null as unknown as import("firebase/firestore").Timestamp, expiresAt: null as unknown as import("firebase/firestore").Timestamp }];
-      });
+      const updated = await listRoomFillTokensForTrip(tripId);
+      setRoomTokens(updated);
     } catch (e) {
       console.error("generateRoomToken error:", e);
       setShareError("שגיאה ביצירת הקישור. ודא שהחיבור לרשת תקין.");

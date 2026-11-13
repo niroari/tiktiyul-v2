@@ -210,11 +210,9 @@ export function StudentsClient() {
   async function generateToken(className: string) {
     setGeneratingClass(className);
     try {
-      const token = await createClassToken(tripId, className, trip?.name ?? "", trip?.schoolName ?? "");
-      setTokens((prev) => {
-        const filtered = prev.filter((t) => t.class !== className);
-        return [...filtered, { token, tripId, class: className, tripName: trip?.name ?? "", schoolName: trip?.schoolName ?? "", createdAt: null as unknown as import("firebase/firestore").Timestamp, expiresAt: null as unknown as import("firebase/firestore").Timestamp }];
-      });
+      await createClassToken(tripId, className, trip?.name ?? "", trip?.schoolName ?? "");
+      const updated = await listClassTokensForTrip(tripId);
+      setTokens(updated);
     } finally {
       setGeneratingClass(null);
     }
