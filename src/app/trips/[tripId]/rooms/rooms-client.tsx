@@ -554,6 +554,7 @@ export function RoomsClient() {
   const [shareError,     setShareError]     = useState<string | null>(null);
   const [printDialogOpen, setPrintDialogOpen] = useState(false);
   const [printTargetClass, setPrintTargetClass] = useState<string>("all");
+  const [printFormat, setPrintFormat] = useState<"full" | "condensed">("full");
   const [pdfLoading,     setPdfLoading]     = useState(false);
 
   const saveTimer  = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
@@ -1023,6 +1024,94 @@ export function RoomsClient() {
     `;
   }
 
+  function getCondensedHTML(targetClass: string = "all") {
+    const isSingleClass = targetClass !== "all";
+    const headerTitle = isSingleClass ? `חלוקת חדרים — כיתה ${esc(targetClass)}` : "חלוקת חדרים";
+
+    const rowStyle = "padding:5px 8px;border:1px solid #ccc;font-size:12px;vertical-align:top;";
+    const thStyle  = "padding:5px 8px;border:1px solid #aaa;font-size:12px;background:#1b4332;color:white;font-weight:600;";
+
+    const genderSections = (["male", "female"] as const).map((gender) => {
+      const gRooms = rooms.filter((r) => r.gender === gender && roomBelongsToClass(r, targetClass));
+      if (gRooms.length === 0) return "";
+      const label = gender === "female" ? "בנות" : "בנים";
+      const bgColor = gender === "female" ? "#fce4ec" : "#e3f2fd";
+
+      const rows = gRooms.map((room) => {
+        const studs = room.studentIds.map((id) => studentById[id]).filter(Boolean);
+        const names = studs.map((s) => `${esc(s.lastName)} ${esc(s.firstName)}${isSingleClass ? "" : ` (${esc(s.class)})`}`).join(", ");
+        const capLabel = room.capacity !== undefined ? String(room.capacity) : "—";
+        const countLabel = `${studs.length}${room.capacity !== undefined ? `/${room.capacity}` : ""}`;
+        return `<tr>
+          <td style="${rowStyle}text-align:center;white-space:nowrap;">${esc(room.number) || "—"}</td>
+          <td style="${rowStyle}text-align:center;">${countLabel}</td>
+          <td style="${rowStyle}">${names || '<span style="color:#aaa">ריק</span>'}</td>
+          <td style="${rowStyle}color:#555;">${esc(room.notes ?? "")}</td>
+        </tr>`;
+      }).join("");
+
+      return `
+        <div data-print-block data-keep-with-next="true" style="font-size:13px;font-weight:bold;padding:5px 8px;background:${bgColor};border-radius:4px;margin-bottom:4px;page-break-after:avoid;break-after:avoid">
+          ${label} — ${gRooms.length} חדרים
+        </div>
+        <table data-print-block style="width:100%;border-collapse:collapse;margin-bottom:14px;table-layout:fixed;">
+          <colgroup>
+            <col style="width:60px"/>
+            <col style="width:50px"/>
+            <col/>
+            <col style="width:120px"/>
+          </colgroup>
+          <thead>
+            <tr>
+              <th style="${thStyle}text-align:center;">חדר</th>
+              <th style="${thStyle}text-align:center;">תלמידים</th>
+              <th style="${thStyle}">שמות</th>
+              <th style="${thStyle}">הערה</th>
+            </tr>
+          </thead>
+          <tbody>${rows}</tbody>
+        </table>`;
+    }).join("");
+
+    const staffSection = !isSingleClass && staffGroups.length > 0
+      ? `<div data-print-block data-keep-with-next="true" style="font-size:13px;font-weight:bold;padding:5px 8px;background:#f0f0f0;border-radius:4px;margin-bottom:4px;page-break-after:avoid;break-after:avoid">אנשי צוות</div>
+         <table data-print-block style="width:100%;border-collapse:collapse;margin-bottom:14px;">
+           <thead><tr>
+             <th style="${thStyle}">קבוצה</th>
+             <th style="${thStyle}text-align:center;">מס׳ חדר</th>
+             <th style="${thStyle}text-align:center;">מקומות</th>
+           </tr></thead>
+           <tbody>
+             ${staffGroups.flatMap((g) => g.rooms.map((r) =>
+               `<tr>
+                 <td style="${rowStyle}">${esc(g.label)}</td>
+                 <td style="${rowStyle}text-align:center;">${esc(r.number) || "—"}</td>
+                 <td style="${rowStyle}text-align:center;">${r.capacity}</td>
+               </tr>`
+             )).join("")}
+           </tbody>
+         </table>`
+      : "";
+
+    const targetUnassigned = isSingleClass ? unassigned.filter((s) => s.class === targetClass) : unassigned;
+    const unassignedSection = targetUnassigned.length > 0
+      ? `<div data-print-block style="margin-top:8px;background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:8px 10px;page-break-inside:avoid;break-inside:avoid">
+           <span style="font-size:12px;font-weight:bold;">לא שובצו (${targetUnassigned.length}): </span>
+           <span style="font-size:11.5px;">${targetUnassigned.map((s) => `${esc(s.lastName)} ${esc(s.firstName)} (${esc(s.class)})`).join(", ")}</span>
+         </div>`
+      : "";
+
+    return `
+      <div class="header" data-print-block data-keep-with-next="true">
+        <div class="title">${headerTitle}</div>
+        ${trip ? `<div class="ministry">${esc(trip.name ?? "")} | ${esc(trip.schoolName ?? "")}</div>` : ""}
+      </div>
+      ${genderSections}
+      ${staffSection}
+      ${unassignedSection}
+    `;
+  }
+
   function getPrintTitle(targetClass: string) {
     return targetClass === "all" ? "חלוקת חדרים" : `חלוקת חדרים — כיתה ${targetClass}`;
   }
@@ -1057,6 +1146,16 @@ export function RoomsClient() {
           <span className={`text-xs flex-shrink-0 ${status === "saved" ? "text-green-600" : "text-muted-foreground"}`}>
             {status === "saving" ? "שומר..." : status === "saved" ? "נשמר ✓" : ""}
           </span>
+          <button
+            onClick={handleOpenPrintDialog}
+            title="הדפס / שתף PDF"
+            className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border bg-white text-foreground rounded-[var(--radius-sm)] hover:bg-muted transition-colors shadow-xs"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+            הדפס
+          </button>
           <button
             onClick={() => setHostelMessageOpen(true)}
             className="flex items-center gap-1.5 text-sm px-3 py-1.5 border border-border bg-white text-foreground rounded-[var(--radius-sm)] hover:bg-muted transition-colors shadow-xs"
@@ -1546,8 +1645,28 @@ export function RoomsClient() {
                 ✕
               </button>
             </div>
+            {/* Format toggle */}
+            <div className="flex rounded-[var(--radius-sm)] border border-border overflow-hidden text-sm">
+              <button
+                type="button"
+                onClick={() => setPrintFormat("full")}
+                className={`flex-1 px-4 py-2 transition-colors ${printFormat === "full" ? "bg-primary text-primary-foreground font-medium" : "bg-background text-muted-foreground hover:bg-muted"}`}
+              >
+                פורמט מלא
+              </button>
+              <button
+                type="button"
+                onClick={() => setPrintFormat("condensed")}
+                className={`flex-1 px-4 py-2 transition-colors ${printFormat === "condensed" ? "bg-primary text-primary-foreground font-medium" : "bg-background text-muted-foreground hover:bg-muted"}`}
+              >
+                פורמט מקוצר
+              </button>
+            </div>
+
             <p className="text-sm text-muted-foreground">
-              בחר/י האם להדפיס את כל הכיתות או רק חדרים של כיתה אחת:
+              {printFormat === "condensed"
+                ? "פורמט מקוצר — טבלה צפופה המתאימה לעמוד אחד עד שניים."
+                : "בחר/י האם להדפיס את כל הכיתות או רק חדרים של כיתה אחת:"}
             </p>
 
             <div className="space-y-3">
@@ -1606,8 +1725,14 @@ export function RoomsClient() {
                   size="sm"
                   disabled={pdfLoading}
                   onClick={async () => {
+                    const html = printFormat === "condensed" ? getCondensedHTML(printTargetClass) : getHTML(printTargetClass);
                     setPrintDialogOpen(false);
-                    await handleShareRoomPDF(printTargetClass);
+                    setPdfLoading(true);
+                    try {
+                      await sharePDF(html, getPrintTitle(printTargetClass), { paginate: true });
+                    } finally {
+                      setPdfLoading(false);
+                    }
                   }}
                 >
                   {pdfLoading ? "מכין PDF..." : "שתף PDF"}
@@ -1615,8 +1740,9 @@ export function RoomsClient() {
                 <Button
                   size="sm"
                   onClick={() => {
+                    const html = printFormat === "condensed" ? getCondensedHTML(printTargetClass) : getHTML(printTargetClass);
                     setPrintDialogOpen(false);
-                    printHTML(getHTML(printTargetClass), getPrintTitle(printTargetClass), { paginate: true });
+                    printHTML(html, getPrintTitle(printTargetClass), { paginate: true });
                   }}
                 >
                   <svg className="w-4 h-4 ml-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
